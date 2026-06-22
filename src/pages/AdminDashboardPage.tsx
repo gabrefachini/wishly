@@ -1,0 +1,102 @@
+import { useEffect, useState } from "react";
+import { listAdminAuditLogs, listAffiliateMerchants, listSponsoredItems } from "../services/admin";
+import type { AdminAuditLogRecord, AffiliateMerchantRecord, SponsoredItemRecord } from "../types/domain";
+import { useTranslation } from "../i18n/useTranslation";
+import { EmptyState } from "../components/States";
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <section className="rounded-[28px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <p className="text-sm font-semibold text-warm-500">{label}</p>
+      <p className="mt-2 text-3xl font-bold text-warm-900">{value}</p>
+    </section>
+  );
+}
+
+export function AdminDashboardPage() {
+  const { t } = useTranslation();
+  const [merchants, setMerchants] = useState<AffiliateMerchantRecord[]>([]);
+  const [sponsoredItems, setSponsoredItems] = useState<SponsoredItemRecord[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    Promise.all([listAffiliateMerchants(), listSponsoredItems(), listAdminAuditLogs()])
+      .then(([nextMerchants, nextSponsoredItems, nextAuditLogs]) => {
+        if (!active) return;
+        setMerchants(nextMerchants);
+        setSponsoredItems(nextSponsoredItems);
+        setAuditLogs(nextAuditLogs);
+      })
+      .catch((nextError) => {
+        if (active) {
+          setError(nextError instanceof Error ? nextError.message : t("common.error"));
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [t]);
+
+  if (loading) {
+    return <p className="text-sm text-warm-500">{t("common.loading")}</p>;
+  }
+
+  if (error) {
+    return <p className="text-sm text-terracotta">{error}</p>;
+  }
+
+  return (
+    <div className="grid gap-6">
+      <header>
+        <p className="text-sm font-semibold text-coral">{t("admin.admin")}</p>
+        <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("admin.dashboard")}</h1>
+      </header>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label={t("admin.affiliateMerchants")} value={merchants.length} />
+        <StatCard label={t("admin.sponsoredItems")} value={sponsoredItems.length} />
+        <StatCard
+          label={t("admin.activeSponsoredItems")}
+          value={sponsoredItems.filter((item) => item.status === "active").length}
+        />
+        <StatCard
+          label={t("admin.pausedCampaigns")}
+          value={sponsoredItems.filter((item) => item.status === "paused").length}
+        />
+      </div>
+
+      <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-warm-900">{t("admin.recentActivity")}</h2>
+        </div>
+        {auditLogs.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState title={t("common.empty")} body={t("admin.noRecentActivity")} />
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="rounded-[24px] bg-warm-50/60 p-4">
+                <p className="text-sm font-semibold text-warm-900">{log.action}</p>
+                <p className="mt-1 text-xs text-warm-500">
+                  {log.entity_type} · {log.admin_email}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+

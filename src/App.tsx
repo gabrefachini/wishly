@@ -1,0 +1,55 @@
+import { Route, Routes } from "react-router-dom";
+import { AdminRoute } from "./components/AdminRoute";
+import { AdminShell } from "./components/AdminShell";
+import { AppShell } from "./components/AppShell";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { PublicOnlyRoute } from "./components/PublicOnlyRoute";
+import { AdminAffiliatesPage } from "./pages/AdminAffiliatesPage";
+import { AdminDashboardPage } from "./pages/AdminDashboardPage";
+import { AdminSettingsPage } from "./pages/AdminSettingsPage";
+import { AdminSponsoredItemsPage } from "./pages/AdminSponsoredItemsPage";
+import { AddGiftPage } from "./pages/AddGiftPage";
+import { CreateWishlistPage } from "./pages/CreateWishlistPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { GoGiftPage } from "./pages/GoGiftPage";
+import { HomePage } from "./pages/HomePage";
+import { ListIndexPage } from "./pages/ListIndexPage";
+import { LoginPage } from "./pages/LoginPage";
+import { MockCheckoutPage } from "./pages/MockCheckoutPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { SignupPage } from "./pages/SignupPage";
+import { VisitorPage } from "./pages/VisitorPage";
+import { WishlistDetailPage } from "./pages/WishlistDetailPage";
+
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      </Route>
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/lists" element={<ListIndexPage />} />
+          <Route path="/lists/:id" element={<WishlistDetailPage />} />
+          <Route path="/create" element={<CreateWishlistPage />} />
+          <Route path="/gift/new" element={<AddGiftPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+      </Route>
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<AdminShell />}>
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="affiliates" element={<AdminAffiliatesPage />} />
+          <Route path="sponsored-items" element={<AdminSponsoredItemsPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
+        </Route>
+      </Route>
+      <Route path="/go/gift/:giftId" element={<GoGiftPage />} />
+      <Route path="/checkout/mock/:contributionId" element={<MockCheckoutPage />} />
+      <Route path="/w/:shareId" element={<VisitorPage />} />
+    </Routes>
+  );
+}

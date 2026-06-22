@@ -1,0 +1,293 @@
+{
+  "app": {
+    "name": "Wishly",
+    "promise": "Share wishes. Give better.",
+    "setupRequired": "Supabase configuration required",
+    "setupBody": "Add your public Supabase URL and anon key to start real authentication and persistence."
+  },
+  "language": {
+    "label": "Language",
+    "en": "EN",
+    "pt-BR": "PT"
+  },
+  "nav": {
+    "primary": "Primary",
+    "home": "Home",
+    "lists": "Lists",
+    "discover": "Discover",
+    "profile": "Profile"
+  },
+  "actions": {
+    "createWishlist": "Create wishlist",
+    "shareWishlist": "Share wishlist",
+    "addGift": "Add gift",
+    "reserveGift": "Reserve gift",
+    "buyWithAffiliate": "Buy with affiliate link",
+    "viewAll": "View all",
+    "previewLink": "Preview link",
+    "saveForLater": "Save for later",
+    "buyThis": "I'll buy this",
+    "buyTogether": "Buy together with friends",
+    "chooseCover": "Cover image URL",
+    "addProductImage": "Product image URL",
+    "logIn": "Log in",
+    "signUp": "Sign up",
+    "createAccount": "Create account",
+    "continue": "Continue",
+    "logOut": "Log out",
+    "copyLink": "Copy link",
+    "markPurchased": "Mark purchased",
+    "confirmReservation": "Confirm reservation",
+    "close": "Close",
+    "backToWishlist": "Back to wishlist",
+    "cancel": "Cancel",
+    "deleteGift": "Delete gift"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "empty": "Nothing here yet",
+    "notFound": "Not found",
+    "currency": "Currency",
+    "private": "Private",
+    "shared": "Shared",
+    "publicLink": "Public link",
+    "ownerOnly": "Owner area",
+    "copied": "Link copied",
+    "optional": "Optional",
+    "or": "or"
+  },
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "createYourAccount": "Create your Wishly account",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "forgotPassword": "Forgot password?",
+    "resetPasswordTitle": "Reset your password",
+    "resetPasswordBody": "Enter your email and we will send a reset link if the provider is configured for it.",
+    "checkEmail": "Check your email",
+    "resetSent": "If your account exists, a reset link is on the way.",
+    "loginError": "We couldn't sign you in.",
+    "signupError": "We couldn't create your account.",
+    "logoutSuccess": "You have been logged out."
+  },
+  "home": {
+    "greetingPrefix": "Hi",
+    "greeting": "Hi, Gabriel",
+    "title": "Your wishlists",
+    "heroTitle": "Make gift ideas feel thoughtful, simple, and pressure-free.",
+    "heroBody": "Invite friends with one gentle link. They can reserve gifts without creating an account, while surprises stay protected.",
+    "activeLists": "Active lists",
+    "notifications": "Notifications",
+    "emptyTitle": "No wishlists yet",
+    "emptyBody": "Create your first wishlist and start sharing ideas that feel natural to send.",
+    "emptyAction": "Create your first wishlist"
+  },
+  "lists": {
+    "allOccasions": "All occasions",
+    "profileEyebrow": "Wishly account",
+    "profileTitle": "Profile",
+    "profileBody": "Manage your account basics and keep your sharing language in sync.",
+    "profileEmptyTitle": "A lighter profile for now",
+    "profileEmptyBody": "This first version keeps the focus on creating, sharing, and reserving wishlists.",
+    "reservedCount": "reserved",
+    "giftCount": "gifts"
+  },
+  "wishlist": {
+    "giftIdeas": "Gift ideas",
+    "items": "items",
+    "emptyTitle": "No gifts yet",
+    "emptyBody": "Add a few ideas so guests can choose without guessing.",
+    "message": "I made this little list to help everyone who asked for gift ideas 💛",
+    "created": "Wishlist created",
+    "linkCopied": "Link copied",
+    "notFoundTitle": "Wishlist not found",
+    "notFoundBody": "This wishlist does not exist or you do not have access to it."
+  },
+  "visitor": {
+    "noLogin": "No login needed",
+    "title": "Choose a gift for Sofia",
+    "body": "Reserve it to avoid duplicate gifts.",
+    "privateTitle": "This wishlist is private",
+    "privateBody": "The public link is unavailable or has been removed."
+  },
+  "create": {
+    "eyebrow": "New wishlist",
+    "title": "Create a list in a few gentle steps",
+    "body": "Add the occasion, a date, and a short message. You can polish the details later.",
+    "wishlistName": "Wishlist name",
+    "occasion": "Occasion",
+    "eventDate": "Event date",
+    "message": "Message",
+    "messageHint": "Keep it warm and low-pressure.",
+    "visibility": "Visibility",
+    "successTitle": "Wishlist created",
+    "successBody": "Your list is ready. Add a few thoughtful ideas, then share it when it feels right.",
+    "errors": {
+      "auth": "Please sign in again before creating a wishlist.",
+      "profile": "We couldn't prepare your Wishly profile yet. Please try again in a moment.",
+      "permission": "Your account is not allowed to create wishlists yet. Apply the latest database policies and try again.",
+      "eventDate": "Check the event date and try again.",
+      "visibility": "Check the visibility option and try again.",
+      "retry": "We had trouble generating a public link. Please try again.",
+      "generic": "We couldn't save your wishlist right now."
+    }
+  },
+  "giftForm": {
+    "eyebrow": "Gift idea",
+    "title": "Add something thoughtful",
+    "body": "A store link, estimated price, and priority help guests choose with confidence.",
+    "giftName": "Gift name",
+    "storeLink": "Store link",
+    "estimatedPrice": "Estimated price",
+    "priority": "Priority",
+    "productImage": "Product image",
+    "optionalNote": "Optional note",
+    "noteHint": "Optional details like color, size, or what matters most.",
+    "notePlaceholder": "Natural colors would be lovely.",
+    "successTitle": "Gift added",
+    "successBody": "It is now part of the wishlist with clear status and priority for guests.",
+    "estimated": "estimated",
+    "selectWishlist": "Wishlist",
+    "purchaseType": "Purchase type",
+    "individualGift": "Individual gift"
+  },
+  "giftFunding": {
+    "groupGift": "Group gift",
+    "contribute": "Contribute",
+    "contributeToThisGift": "Contribute to this gift",
+    "goal": "Funding goal",
+    "raised": "Raised",
+    "remaining": "Remaining",
+    "chooseAmount": "Choose amount",
+    "customAmount": "Custom amount",
+    "contributorName": "Contributor name",
+    "contributorEmail": "Contributor email",
+    "message": "Message",
+    "continueToPayment": "Continue to payment",
+    "contributionReceived": "Contribution received",
+    "paymentPending": "Payment pending",
+    "fullyFunded": "Gift fully funded",
+    "paymentSandbox": "This sandbox checkout confirms the contribution without a real card charge.",
+    "simulateApprovedPayment": "Simulate approved payment",
+    "checkoutNotFound": "This contribution checkout could not be found."
+  },
+  "affiliate": {
+    "disclosure": "Wishly may earn a commission from eligible purchases.",
+    "redirecting": "Redirecting to the store",
+    "redirectErrorTitle": "We couldn't open this purchase link",
+    "redirectErrorBody": "Please go back to the wishlist and try again."
+  },
+  "giftDelete": {
+    "title": "Delete this gift?",
+    "body": "This action cannot be undone.",
+    "success": "Gift deleted",
+    "error": "Could not delete gift. Please try again."
+  },
+  "admin": {
+    "admin": "Admin",
+    "dashboard": "Dashboard",
+    "affiliateMerchants": "Affiliate merchants",
+    "sponsoredItems": "Sponsored items",
+    "settings": "Settings",
+    "backToApp": "Back to app",
+    "accessDenied": "Access denied",
+    "accessDeniedBody": "You do not have permission to access this area.",
+    "merchant": "Merchant",
+    "domain": "Domain",
+    "strategy": "Strategy",
+    "status": "Status",
+    "createMerchant": "Create merchant",
+    "editMerchant": "Edit merchant",
+    "saveMerchant": "Save merchant",
+    "createSponsoredItem": "Create sponsored item",
+    "editSponsoredItem": "Edit sponsored item",
+    "destinationUrl": "Destination URL",
+    "priority": "Priority",
+    "recentActivity": "Recent admin activity",
+    "activeSponsoredItems": "Active sponsored items",
+    "pausedCampaigns": "Paused campaigns",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "delete": "Delete",
+    "title": "Title",
+    "description": "Description",
+    "category": "Category",
+    "noMerchant": "No merchant",
+    "currentAdminEmail": "Current admin email",
+    "affiliateDisclosureEnabled": "Affiliate disclosure enabled",
+    "defaultAffiliateBehavior": "Default affiliate behavior",
+    "supportedLocales": "Supported locales",
+    "requiredEnv": "Required environment variables",
+    "noRecentActivity": "No recent admin activity yet.",
+    "validationError": "Please review the form fields and try again.",
+    "save": "Save"
+  },
+  "adminStatus": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "manual": "Manual",
+    "unsupported": "Unsupported"
+  },
+  "adminCampaignStatus": {
+    "draft": "Draft",
+    "active": "Active",
+    "paused": "Paused",
+    "archived": "Archived"
+  },
+  "adminLocale": {
+    "en": "English",
+    "pt-BR": "Portuguese (Brazil)",
+    "all": "All locales"
+  },
+  "adminStrategy": {
+    "query_param": "Query param",
+    "deeplink_template": "Deep link template",
+    "api": "API",
+    "manual": "Manual",
+    "passthrough": "Passthrough"
+  },
+  "reservation": {
+    "title": "Reserve gift",
+    "name": "Your name",
+    "email": "Your email",
+    "message": "Message",
+    "successTitle": "Gift reserved",
+    "successBody": "Thank you. This gift is now marked as reserved.",
+    "alreadyReserved": "This gift is already reserved",
+    "thankYou": "Thank you"
+  },
+  "status": {
+    "available": "Available",
+    "reserved": "Reserved",
+    "purchased": "Purchased",
+    "surpriseProtected": "Surprise protected"
+  },
+  "priority": {
+    "mustHave": "Must-have",
+    "niceToHave": "Nice to have",
+    "surpriseMe": "Surprise me"
+  },
+  "summary": {
+    "gifts": "gifts",
+    "reserved": "reserved",
+    "shared": "Shared"
+  },
+  "occasions": {
+    "birthday": "Birthday",
+    "babyShower": "Baby shower",
+    "wedding": "Wedding",
+    "christmas": "Christmas",
+    "newHome": "New home",
+    "holiday": "Holiday",
+    "housewarming": "Housewarming"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "email": "Enter a valid email.",
+    "passwordMin": "Password must have at least 6 characters.",
+    "positiveNumber": "Enter a positive number.",
+    "url": "Enter a valid URL."
+  }
+}

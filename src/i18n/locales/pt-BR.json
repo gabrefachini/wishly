@@ -1,0 +1,293 @@
+{
+  "app": {
+    "name": "Wishly",
+    "promise": "Share wishes. Give better.",
+    "setupRequired": "Configuração do Supabase necessária",
+    "setupBody": "Adicione sua URL pública do Supabase e a anon key para ativar autenticação e persistência reais."
+  },
+  "language": {
+    "label": "Idioma",
+    "en": "EN",
+    "pt-BR": "PT"
+  },
+  "nav": {
+    "primary": "Navegação principal",
+    "home": "Início",
+    "lists": "Listas",
+    "discover": "Descobrir",
+    "profile": "Perfil"
+  },
+  "actions": {
+    "createWishlist": "Criar lista",
+    "shareWishlist": "Compartilhar lista",
+    "addGift": "Adicionar presente",
+    "reserveGift": "Reservar presente",
+    "buyWithAffiliate": "Comprar com link de afiliado",
+    "viewAll": "Ver todas",
+    "previewLink": "Ver link",
+    "saveForLater": "Salvar para depois",
+    "buyThis": "Vou comprar",
+    "buyTogether": "Comprar junto com amigos",
+    "chooseCover": "URL da capa",
+    "addProductImage": "URL da imagem do produto",
+    "logIn": "Entrar",
+    "signUp": "Criar conta",
+    "createAccount": "Criar conta",
+    "continue": "Continuar",
+    "logOut": "Sair",
+    "copyLink": "Copiar link",
+    "markPurchased": "Marcar como comprado",
+    "confirmReservation": "Confirmar reserva",
+    "close": "Fechar",
+    "backToWishlist": "Voltar para a lista",
+    "cancel": "Cancelar",
+    "deleteGift": "Excluir presente"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Algo deu errado",
+    "empty": "Nada por aqui ainda",
+    "notFound": "Não encontrado",
+    "currency": "Moeda",
+    "private": "Privada",
+    "shared": "Compartilhada",
+    "publicLink": "Link público",
+    "ownerOnly": "Área do dono",
+    "copied": "Link copiado",
+    "optional": "Opcional",
+    "or": "ou"
+  },
+  "auth": {
+    "welcomeBack": "Bem-vindo de volta",
+    "createYourAccount": "Crie sua conta Wishly",
+    "email": "E-mail",
+    "password": "Senha",
+    "name": "Nome",
+    "forgotPassword": "Esqueceu a senha?",
+    "resetPasswordTitle": "Recupere sua senha",
+    "resetPasswordBody": "Informe seu e-mail e enviaremos um link de recuperação se o provedor estiver configurado para isso.",
+    "checkEmail": "Verifique seu e-mail",
+    "resetSent": "Se a conta existir, um link de recuperação está a caminho.",
+    "loginError": "Não foi possível entrar.",
+    "signupError": "Não foi possível criar sua conta.",
+    "logoutSuccess": "Você saiu da conta."
+  },
+  "home": {
+    "greetingPrefix": "Olá",
+    "greeting": "Olá, Gabriel",
+    "title": "Suas listas de desejos",
+    "heroTitle": "Deixe as ideias de presente mais simples, afetuosas e sem pressão.",
+    "heroBody": "Convide pessoas com um link gentil. Elas podem reservar presentes sem criar conta, enquanto a surpresa continua protegida.",
+    "activeLists": "Listas ativas",
+    "notifications": "Notificações",
+    "emptyTitle": "Nenhuma lista ainda",
+    "emptyBody": "Crie sua primeira lista e comece a compartilhar ideias de um jeito natural.",
+    "emptyAction": "Crie sua primeira lista"
+  },
+  "lists": {
+    "allOccasions": "Todas as ocasiões",
+    "profileEyebrow": "Conta Wishly",
+    "profileTitle": "Perfil",
+    "profileBody": "Gerencie o básico da sua conta e mantenha o idioma de compartilhamento em sintonia.",
+    "profileEmptyTitle": "Um perfil mais leve por enquanto",
+    "profileEmptyBody": "Esta primeira versão mantém o foco em criar, compartilhar e reservar listas de desejos.",
+    "reservedCount": "reservados",
+    "giftCount": "presentes"
+  },
+  "wishlist": {
+    "giftIdeas": "Ideias de presente",
+    "items": "itens",
+    "emptyTitle": "Nenhum presente ainda",
+    "emptyBody": "Adicione algumas ideias para que convidados escolham sem precisar adivinhar.",
+    "message": "Montei essa listinha para ajudar quem pediu sugestões de presente 💛",
+    "created": "Lista criada",
+    "linkCopied": "Link copiado",
+    "notFoundTitle": "Lista não encontrada",
+    "notFoundBody": "Esta lista não existe ou você não tem acesso a ela."
+  },
+  "visitor": {
+    "noLogin": "Não precisa entrar",
+    "title": "Escolha um presente para Sofia",
+    "body": "Reserve para evitar presentes repetidos.",
+    "privateTitle": "Esta lista é privada",
+    "privateBody": "O link público está indisponível ou foi removido."
+  },
+  "create": {
+    "eyebrow": "Nova lista",
+    "title": "Crie uma lista em poucos passos gentis",
+    "body": "Adicione a ocasião, uma data e uma mensagem curta. Você pode ajustar os detalhes depois.",
+    "wishlistName": "Nome da lista",
+    "occasion": "Ocasião",
+    "eventDate": "Data do evento",
+    "message": "Mensagem",
+    "messageHint": "Mantenha um tom acolhedor e sem pressão.",
+    "visibility": "Visibilidade",
+    "successTitle": "Lista criada",
+    "successBody": "Sua lista está pronta. Adicione algumas ideias especiais e compartilhe quando fizer sentido.",
+    "errors": {
+      "auth": "Faça login novamente antes de criar uma lista.",
+      "profile": "Ainda não conseguimos preparar seu perfil da Wishly. Tente de novo em instantes.",
+      "permission": "Sua conta ainda não tem permissão para criar listas. Aplique as policies mais recentes do banco e tente novamente.",
+      "eventDate": "Revise a data do evento e tente novamente.",
+      "visibility": "Revise a visibilidade escolhida e tente novamente.",
+      "retry": "Houve um problema ao gerar o link público. Tente novamente.",
+      "generic": "Não foi possível salvar sua lista agora."
+    }
+  },
+  "giftForm": {
+    "eyebrow": "Ideia de presente",
+    "title": "Adicione algo especial",
+    "body": "Um link da loja, preço estimado e prioridade ajudam convidados a escolher com confiança.",
+    "giftName": "Nome do presente",
+    "storeLink": "Link da loja",
+    "estimatedPrice": "Preço estimado",
+    "priority": "Prioridade",
+    "productImage": "Imagem do produto",
+    "optionalNote": "Observação opcional",
+    "noteHint": "Detalhes opcionais como cor, tamanho ou o que mais importa.",
+    "notePlaceholder": "Cores naturais seriam lindas.",
+    "successTitle": "Presente adicionado",
+    "successBody": "Ele agora faz parte da lista com status e prioridade claros para convidados.",
+    "estimated": "estimado",
+    "selectWishlist": "Lista",
+    "purchaseType": "Tipo de compra",
+    "individualGift": "Presente individual"
+  },
+  "giftFunding": {
+    "groupGift": "Presente coletivo",
+    "contribute": "Contribuir",
+    "contributeToThisGift": "Contribuir para este presente",
+    "goal": "Meta",
+    "raised": "Arrecadado",
+    "remaining": "Restante",
+    "chooseAmount": "Escolha um valor",
+    "customAmount": "Outro valor",
+    "contributorName": "Nome do contribuidor",
+    "contributorEmail": "E-mail do contribuidor",
+    "message": "Mensagem",
+    "continueToPayment": "Continuar para pagamento",
+    "contributionReceived": "Contribuição recebida",
+    "paymentPending": "Pagamento pendente",
+    "fullyFunded": "Presente totalmente financiado",
+    "paymentSandbox": "Este checkout sandbox confirma a contribuição sem cobrar um cartão real.",
+    "simulateApprovedPayment": "Simular pagamento aprovado",
+    "checkoutNotFound": "Não foi possível localizar este checkout de contribuição."
+  },
+  "affiliate": {
+    "disclosure": "A Wishly pode receber comissão em compras qualificadas.",
+    "redirecting": "Redirecionando para a loja",
+    "redirectErrorTitle": "Não foi possível abrir este link de compra",
+    "redirectErrorBody": "Volte para a lista e tente novamente."
+  },
+  "giftDelete": {
+    "title": "Excluir este presente?",
+    "body": "Esta ação não pode ser desfeita.",
+    "success": "Presente excluído",
+    "error": "Não foi possível excluir o presente. Tente novamente."
+  },
+  "admin": {
+    "admin": "Admin",
+    "dashboard": "Painel",
+    "affiliateMerchants": "Parceiros afiliados",
+    "sponsoredItems": "Itens patrocinados",
+    "settings": "Configurações",
+    "backToApp": "Voltar ao app",
+    "accessDenied": "Acesso negado",
+    "accessDeniedBody": "Você não tem permissão para acessar esta área.",
+    "merchant": "Parceiro",
+    "domain": "Domínio",
+    "strategy": "Estratégia",
+    "status": "Status",
+    "createMerchant": "Criar parceiro",
+    "editMerchant": "Editar parceiro",
+    "saveMerchant": "Salvar parceiro",
+    "createSponsoredItem": "Criar item patrocinado",
+    "editSponsoredItem": "Editar item patrocinado",
+    "destinationUrl": "URL de destino",
+    "priority": "Prioridade",
+    "recentActivity": "Atividade administrativa recente",
+    "activeSponsoredItems": "Itens patrocinados ativos",
+    "pausedCampaigns": "Campanhas pausadas",
+    "saved": "Salvo",
+    "deleted": "Excluído",
+    "delete": "Excluir",
+    "title": "Título",
+    "description": "Descrição",
+    "category": "Categoria",
+    "noMerchant": "Sem parceiro",
+    "currentAdminEmail": "E-mail admin atual",
+    "affiliateDisclosureEnabled": "Disclosure de afiliado ativo",
+    "defaultAffiliateBehavior": "Comportamento padrão de afiliado",
+    "supportedLocales": "Idiomas suportados",
+    "requiredEnv": "Variáveis de ambiente necessárias",
+    "noRecentActivity": "Ainda não há atividade administrativa recente.",
+    "validationError": "Revise os campos do formulário e tente novamente.",
+    "save": "Salvar"
+  },
+  "adminStatus": {
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "manual": "Manual",
+    "unsupported": "Não suportado"
+  },
+  "adminCampaignStatus": {
+    "draft": "Rascunho",
+    "active": "Ativo",
+    "paused": "Pausado",
+    "archived": "Arquivado"
+  },
+  "adminLocale": {
+    "en": "Inglês",
+    "pt-BR": "Português (Brasil)",
+    "all": "Todos os idiomas"
+  },
+  "adminStrategy": {
+    "query_param": "Parâmetro na URL",
+    "deeplink_template": "Template de deeplink",
+    "api": "API",
+    "manual": "Manual",
+    "passthrough": "Passthrough"
+  },
+  "reservation": {
+    "title": "Reservar presente",
+    "name": "Seu nome",
+    "email": "Seu e-mail",
+    "message": "Mensagem",
+    "successTitle": "Presente reservado",
+    "successBody": "Obrigado. Este presente agora está marcado como reservado.",
+    "alreadyReserved": "Este presente já foi reservado",
+    "thankYou": "Obrigado"
+  },
+  "status": {
+    "available": "Disponível",
+    "reserved": "Reservado",
+    "purchased": "Comprado",
+    "surpriseProtected": "Surpresa protegida"
+  },
+  "priority": {
+    "mustHave": "Quero muito",
+    "niceToHave": "Seria legal",
+    "surpriseMe": "Me surpreenda"
+  },
+  "summary": {
+    "gifts": "presentes",
+    "reserved": "reservados",
+    "shared": "Compartilhada"
+  },
+  "occasions": {
+    "birthday": "Aniversário",
+    "babyShower": "Chá de bebê",
+    "wedding": "Casamento",
+    "christmas": "Natal",
+    "newHome": "Casa nova",
+    "holiday": "Feriado",
+    "housewarming": "Casa nova"
+  },
+  "validation": {
+    "required": "Este campo é obrigatório.",
+    "email": "Informe um e-mail válido.",
+    "passwordMin": "A senha deve ter pelo menos 6 caracteres.",
+    "positiveNumber": "Informe um número positivo.",
+    "url": "Informe uma URL válida."
+  }
+}
