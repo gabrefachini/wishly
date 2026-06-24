@@ -36,7 +36,6 @@ export async function listMyWishlists() {
   const { data, error } = await supabase!
     .from("wishlists")
     .select("*, gifts(*)")
-    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -47,6 +46,11 @@ export async function listMyWishlists() {
     ...wishlist,
     gifts: (wishlist.gifts ?? []).filter((gift) => gift.deleted_at === null),
   }));
+}
+
+export async function listActiveWishlists() {
+  const items = await listMyWishlists();
+  return items.filter((wishlist) => wishlist.archived_at === null);
 }
 
 export async function getMyWishlist(id: string) {
@@ -162,6 +166,55 @@ export async function deleteGift(giftId: string) {
   if (error) {
     throw error;
   }
+}
+
+export async function archiveWishlist(wishlistId: string) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { error } = await supabase!
+    .from("wishlists")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", wishlistId)
+    .is("archived_at", null);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function restoreWishlist(wishlistId: string) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { error } = await supabase!
+    .from("wishlists")
+    .update({ archived_at: null })
+    .eq("id", wishlistId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function listDiscoverSponsoredItems() {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { data, error } = await supabase!
+    .from("sponsored_items")
+    .select("*")
+    .order("priority", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as import("../types/domain").SponsoredItemRecord[];
 }
 
 export async function getPublicWishlist(shareId: string) {

@@ -1,4 +1,4 @@
-import { HandCoins, ImagePlus, Link as LinkIcon, Mail, Sparkles } from "lucide-react";
+import { HandCoins, ImagePlus, Link as LinkIcon, Mail, Sparkles, Upload } from "lucide-react";
 import type { ReactNode } from "react";
 import { PrimaryButton, SecondaryButton } from "./Buttons";
 
@@ -37,8 +37,10 @@ type CreateWishlistFormProps = {
   };
   errors: Record<string, string | undefined>;
   loading: boolean;
+  coverUploading: boolean;
   t: (key: string) => string;
   onChange: (name: string, value: string) => void;
+  onCoverUpload: (file: File | null) => void;
   onSubmit: () => void;
 };
 
@@ -46,8 +48,10 @@ export function CreateWishlistForm({
   values,
   errors,
   loading,
+  coverUploading,
   t,
   onChange,
+  onCoverUpload,
   onSubmit,
 }: CreateWishlistFormProps) {
   return (
@@ -96,18 +100,43 @@ export function CreateWishlistForm({
         />
       </Field>
       <Field label={t("actions.chooseCover")} error={errors.cover_image_url}>
-        <div className="relative">
-          <ImagePlus
-            size={18}
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-warm-300"
-            aria-hidden="true"
-          />
-          <input
-            className={`${inputClass} w-full pl-11`}
-            value={values.cover_image_url}
-            onChange={(event) => onChange("cover_image_url", event.target.value)}
-            placeholder="https://images.unsplash.com/..."
-          />
+        <div className="grid gap-3">
+          <div className="relative">
+            <ImagePlus
+              size={18}
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-warm-300"
+              aria-hidden="true"
+            />
+            <input
+              className={`${inputClass} w-full pl-11`}
+              value={values.cover_image_url}
+              onChange={(event) => onChange("cover_image_url", event.target.value)}
+              placeholder="https://images.unsplash.com/..."
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta">
+              <Upload size={17} aria-hidden="true" />
+              {coverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  onCoverUpload(event.target.files?.[0] ?? null);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <span className="text-xs leading-6 text-warm-500">{t("create.coverUploadHint")}</span>
+          </div>
+          {values.cover_image_url ? (
+            <img
+              src={values.cover_image_url}
+              alt=""
+              className="h-40 w-full rounded-[24px] object-cover ring-1 ring-warm-100"
+            />
+          ) : null}
         </div>
       </Field>
       <Field label={t("create.visibility")}>

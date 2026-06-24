@@ -1,16 +1,41 @@
 import { Compass, Home, ListChecks, UserRound } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "../i18n/useTranslation";
 
 const items = [
   { to: "/app", labelKey: "nav.home", icon: Home },
   { to: "/lists", labelKey: "nav.lists", icon: ListChecks },
-  { to: "/w/sofia-7", labelKey: "nav.discover", icon: Compass },
+  { to: "/discover", labelKey: "nav.discover", icon: Compass },
   { to: "/profile", labelKey: "nav.profile", icon: UserRound },
 ];
 
 export function BottomNavigation() {
   const { t } = useTranslation();
+  const location = useLocation();
+
+  function isActiveTab(path: string) {
+    if (path === "/app") {
+      return location.pathname === "/app";
+    }
+
+    if (path === "/lists") {
+      return (
+        location.pathname.startsWith("/lists") ||
+        location.pathname === "/create" ||
+        location.pathname.startsWith("/gift/new")
+      );
+    }
+
+    if (path === "/discover") {
+      return location.pathname.startsWith("/discover");
+    }
+
+    if (path === "/profile") {
+      return location.pathname.startsWith("/profile");
+    }
+
+    return location.pathname === path;
+  }
 
   return (
     <nav
@@ -22,9 +47,9 @@ export function BottomNavigation() {
           <NavLink
             key={item.labelKey}
             to={item.to}
-            className={({ isActive }) =>
+            className={() =>
               `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-coral/15 ${
-                isActive
+                isActiveTab(item.to)
                   ? "bg-blush text-terracotta"
                   : "text-warm-500 hover:bg-warm-50"
               }`

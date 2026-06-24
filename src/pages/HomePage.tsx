@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Plus } from "lucide-react";
+import { ArrowRight, Bell, CalendarDays, Gift, HandCoins, Plus, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
@@ -7,7 +7,7 @@ import { EmptyState } from "../components/States";
 import { WishlistCard } from "../components/WishlistCard";
 import { buildWishlistSummary } from "../lib/presenters";
 import { useTranslation } from "../i18n/useTranslation";
-import { listMyWishlists } from "../services/wishlists";
+import { listActiveWishlists } from "../services/wishlists";
 import type { WishlistWithGifts } from "../types/domain";
 import { updateMetadata } from "../lib/metadata";
 
@@ -32,7 +32,7 @@ export function HomePage() {
   useEffect(() => {
     let active = true;
 
-    listMyWishlists()
+    listActiveWishlists()
       .then((data) => {
         if (active) {
           setWishlists(data);
@@ -59,6 +59,18 @@ export function HomePage() {
   const addGiftHref = firstWishlist
     ? `/gift/new?wishlistId=${firstWishlist.id}`
     : "/create";
+  const activeListCount = wishlists.length;
+  const reservedGiftCount = wishlists.reduce(
+    (total, wishlist) => total + wishlist.gifts.filter((gift) => gift.status === "reserved").length,
+    0,
+  );
+  const fundedAmount = wishlists.reduce(
+    (total, wishlist) =>
+      total +
+      wishlist.gifts.reduce((giftTotal, gift) => giftTotal + (gift.funding_received_amount ?? 0), 0),
+    0,
+  );
+  const upcomingCount = wishlists.filter((wishlist) => wishlist.event_date).length;
 
   return (
     <div className="grid gap-7">
@@ -82,28 +94,27 @@ export function HomePage() {
       <section className="overflow-hidden rounded-[36px] bg-warm-900 text-white shadow-soft">
         <div className="grid gap-5 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:items-center">
           <div>
-            <p className="text-sm font-semibold text-blush">{t("app.promise")}</p>
+            <p className="text-sm font-semibold text-blush">{t("home.question")}</p>
             <h2 className="mt-3 text-2xl font-bold leading-tight">{t("home.heroTitle")}</h2>
             <p className="mt-3 text-sm leading-6 text-warm-100">{t("home.heroBody")}</p>
             <Link to="/create" className="mt-5 inline-flex">
               <SecondaryButton className="border-white/10 bg-white/10 text-white hover:bg-white/15 hover:text-white">
-                {t("actions.createWishlist")}
+                {t("home.createNew")}
               </SecondaryButton>
             </Link>
           </div>
-          <div className="rounded-[30px] bg-white/10 p-3">
-            <img
-              src={firstWishlist?.cover_image_url || fallbackCover}
-              alt=""
-              className="h-56 w-full rounded-[24px] object-cover"
-            />
+          <div className="grid grid-cols-2 gap-3 rounded-[30px] bg-white/10 p-4">
+            <SummaryCard icon={Gift} label={t("home.activeLists")} value={String(activeListCount)} />
+            <SummaryCard icon={Share2} label={t("home.reservedGifts")} value={String(reservedGiftCount)} />
+            <SummaryCard icon={HandCoins} label={t("home.receivedContributions")} value={String(fundedAmount)} />
+            <SummaryCard icon={CalendarDays} label={t("home.upcomingEvents")} value={String(upcomingCount)} />
           </div>
         </div>
       </section>
 
       <section className="grid gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-warm-900">{t("home.activeLists")}</h2>
+          <h2 className="text-xl font-bold text-warm-900">{t("home.upcomingLists")}</h2>
           <Link
             to="/lists"
             className="inline-flex items-center gap-1 text-sm font-semibold text-terracotta focus:outline-none focus:ring-4 focus:ring-coral/15"
@@ -146,17 +157,41 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Link to="/create" className="contents">
+          <SecondaryButton className="w-full">
+            <Plus size={17} aria-hidden="true" />
+            {t("home.createNew")}
+          </SecondaryButton>
+        </Link>
         <Link to={addGiftHref} className="contents">
           <SecondaryButton className="w-full">
             <Plus size={17} aria-hidden="true" />
             {t("actions.addGift")}
           </SecondaryButton>
         </Link>
-        <Link to={previewHref} className="contents">
-          <SecondaryButton className="w-full">{t("actions.previewLink")}</SecondaryButton>
+        <Link to={firstWishlist ? `/lists/${firstWishlist.id}` : previewHref} className="contents">
+          <SecondaryButton className="w-full">{t("home.shareList")}</SecondaryButton>
         </Link>
       </section>
+    </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Gift;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[24px] bg-white/10 p-4">
+      <Icon size={18} aria-hidden="true" className="text-blush" />
+      <p className="mt-3 text-2xl font-bold">{value}</p>
+      <p className="mt-1 text-sm text-warm-100">{label}</p>
     </div>
   );
 }

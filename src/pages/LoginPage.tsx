@@ -126,8 +126,7 @@ export function LoginPage() {
           <div className="mb-5 flex justify-center">
             <WishlyLogo size="md" />
           </div>
-          <p className="text-sm font-semibold text-coral">{t("auth.welcomeBack")}</p>
-          <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("actions.logIn")}</h1>
+          <h1 className="text-3xl font-bold text-warm-900">{t("actions.logIn")}</h1>
           <form
             className="mt-6 grid gap-4"
             onSubmit={(event) => {

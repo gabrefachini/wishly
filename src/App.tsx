@@ -15,6 +15,7 @@ import { GoGiftPage } from "./pages/GoGiftPage";
 import { HomePage } from "./pages/HomePage";
 import { InfoPage } from "./pages/InfoPage";
 import { LandingPage } from "./pages/LandingPage";
+import { DiscoverPage } from "./pages/DiscoverPage";
 import { ListIndexPage } from "./pages/ListIndexPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MockCheckoutPage } from "./pages/MockCheckoutPage";
@@ -39,6 +40,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/app" element={<HomePage />} />
           <Route path="/lists" element={<ListIndexPage />} />
+          <Route path="/discover" element={<DiscoverPage />} />
           <Route path="/lists/:id" element={<WishlistDetailPage />} />
           <Route path="/create" element={<CreateWishlistPage />} />
           <Route path="/gift/new" element={<AddGiftPage />} />

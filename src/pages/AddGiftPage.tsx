@@ -50,7 +50,15 @@ export function AddGiftPage() {
         if (!active) return;
         setWishlists(data);
         const preferredId = searchParams.get("wishlistId") || data[0]?.id || "";
-        setValues((current) => ({ ...current, wishlist_id: preferredId }));
+        setValues((current) => ({
+          ...current,
+          wishlist_id: preferredId,
+          name: searchParams.get("name") || current.name,
+          store_url: searchParams.get("storeUrl") || current.store_url,
+          estimated_price: searchParams.get("estimatedPrice") || current.estimated_price,
+          image_url: searchParams.get("imageUrl") || current.image_url,
+          description: searchParams.get("description") || current.description,
+        }));
       })
       .finally(() => {
         if (active) {

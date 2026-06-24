@@ -8,6 +8,7 @@ import { hasSupabaseEnv } from "../lib/env";
 import { wishlistSchema } from "../lib/validation";
 import { useTranslation } from "../i18n/useTranslation";
 import { ensureProfile } from "../services/auth";
+import { uploadWishlistCover } from "../services/storage";
 import { createWishlist } from "../services/wishlists";
 
 export function CreateWishlistPage() {
@@ -24,6 +25,7 @@ export function CreateWishlistPage() {
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [loading, setLoading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   if (!hasSupabaseEnv) {
@@ -72,6 +74,47 @@ export function CreateWishlistPage() {
     }
   }
 
+  async function handleCoverUpload(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (!session?.user) {
+      setSubmitError(t("create.errors.auth"));
+      return;
+    }
+
+    setSubmitError(null);
+    setErrors((current) => ({ ...current, cover_image_url: undefined }));
+    setCoverUploading(true);
+
+    try {
+      const uploadedUrl = await uploadWishlistCover(file, session.user.id);
+      setValues((current) => ({ ...current, cover_image_url: uploadedUrl }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+
+      if (message === "invalid_image_type") {
+        setErrors((current) => ({
+          ...current,
+          cover_image_url: t("create.errors.coverFileType"),
+        }));
+      } else if (message === "image_too_large") {
+        setErrors((current) => ({
+          ...current,
+          cover_image_url: t("create.errors.coverFileSize"),
+        }));
+      } else {
+        setErrors((current) => ({
+          ...current,
+          cover_image_url: t("create.errors.coverUpload"),
+        }));
+      }
+    } finally {
+      setCoverUploading(false);
+    }
+  }
+
   return (
     <div className="grid gap-6">
       <header>
@@ -85,10 +128,12 @@ export function CreateWishlistPage() {
           values={values}
           errors={errors}
           loading={loading}
+          coverUploading={coverUploading}
           t={t}
           onChange={(name, value) =>
             setValues((current) => ({ ...current, [name]: value }))
           }
+          onCoverUpload={(file) => void handleCoverUpload(file)}
           onSubmit={() => void handleSubmit()}
         />
       </section>

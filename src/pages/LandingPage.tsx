@@ -278,23 +278,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 md:pb-20">
-          <div className="overflow-hidden rounded-[34px] bg-warm-900 text-white shadow-soft">
-            <div className="grid gap-6 px-6 py-8 md:grid-cols-[1.1fr_0.9fr] md:items-center md:px-8">
-              <div>
-                <p className="text-sm font-semibold text-blush">{t("landing.brazilEyebrow")}</p>
-                <h2 className="mt-3 text-3xl font-bold">{t("landing.brazilTitle")}</h2>
-                <p className="mt-4 max-w-2xl text-base leading-8 text-warm-100">{t("landing.brazilBody")}</p>
-              </div>
-              <div className="grid gap-3 rounded-[28px] bg-white/10 p-4">
-                <ValueChip label={t("landing.brazilChipOne")} />
-                <ValueChip label={t("landing.brazilChipTwo")} />
-                <ValueChip label={t("landing.brazilChipThree")} />
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section id="faq" className="bg-porcelain/65">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
             <SectionIntro eyebrow={t("landing.faqEyebrow")} title={t("landing.faqTitle")} body={t("landing.faqBody")} />
@@ -353,15 +336,6 @@ function SectionIntro({ eyebrow, title, body }: { eyebrow: string; title: string
       <p className="text-sm font-semibold text-coral">{eyebrow}</p>
       <h2 className="mt-2 text-3xl font-bold text-warm-900">{title}</h2>
       <p className="mt-4 text-base leading-8 text-warm-500">{body}</p>
-    </div>
-  );
-}
-
-function ValueChip({ label }: { label: string }) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-semibold text-white">
-      <CheckCircle2 size={16} className="text-blush" aria-hidden="true" />
-      {label}
     </div>
   );
 }
