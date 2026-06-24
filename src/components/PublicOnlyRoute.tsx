@@ -11,7 +11,7 @@ export function PublicOnlyRoute() {
   }
 
   if (session) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   return <Outlet />;

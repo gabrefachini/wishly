@@ -50,6 +50,19 @@ function getNestedValue(dictionary: TranslationNode, key: string) {
   }, dictionary);
 }
 
+function interpolate(
+  value: string,
+  variables?: Record<string, string | number>,
+) {
+  if (!variables) {
+    return value;
+  }
+
+  return Object.entries(variables).reduce((nextValue, [key, replacement]) => {
+    return nextValue.replaceAll(`{{${key}}}`, String(replacement));
+  }, value);
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectInitialLocale);
 
@@ -59,12 +72,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   const value = useMemo<I18nContextValue>(() => {
-    function t(key: string) {
+    function t(key: string, variables?: Record<string, string | number>) {
       const translated = getNestedValue(dictionaries[locale], key);
       const fallback = getNestedValue(dictionaries.en, key);
       const valueToUse = translated ?? fallback;
 
-      return typeof valueToUse === "string" ? valueToUse : key;
+      return typeof valueToUse === "string" ? interpolate(valueToUse, variables) : key;
     }
 
     return {

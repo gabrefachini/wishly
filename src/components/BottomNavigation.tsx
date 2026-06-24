@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "../i18n/useTranslation";
 
 const items = [
-  { to: "/", labelKey: "nav.home", icon: Home },
+  { to: "/app", labelKey: "nav.home", icon: Home },
   { to: "/lists", labelKey: "nav.lists", icon: ListChecks },
   { to: "/w/sofia-7", labelKey: "nav.discover", icon: Compass },
   { to: "/profile", labelKey: "nav.profile", icon: UserRound },

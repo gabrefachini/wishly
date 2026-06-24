@@ -9,7 +9,7 @@ export function AppShell() {
       <main className="mx-auto min-h-screen w-full max-w-3xl px-4 pb-32 pt-5 sm:px-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <Link
-            to="/"
+            to="/app"
             className="inline-flex rounded-full bg-porcelain px-3 py-2 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15"
             aria-label="Wishly"
           >

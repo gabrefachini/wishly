@@ -9,6 +9,7 @@ import { buildWishlistSummary } from "../lib/presenters";
 import { useTranslation } from "../i18n/useTranslation";
 import { listMyWishlists } from "../services/wishlists";
 import type { WishlistWithGifts } from "../types/domain";
+import { updateMetadata } from "../lib/metadata";
 
 const fallbackCover =
   "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80";
@@ -20,6 +21,13 @@ export function HomePage() {
   const [wishlists, setWishlists] = useState<WishlistWithGifts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    updateMetadata({
+      title: `${t("home.title")} — Wishly`,
+      description: t("home.heroBody"),
+    });
+  }, [t]);
 
   useEffect(() => {
     let active = true;

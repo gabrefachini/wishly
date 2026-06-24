@@ -42,6 +42,17 @@ export async function signUpWithPassword(
   });
 }
 
+export async function resendSignupConfirmation(email: string) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  return supabase!.auth.resend({
+    type: "signup",
+    email,
+  });
+}
+
 export async function signOut() {
   if (!supabase) {
     return;

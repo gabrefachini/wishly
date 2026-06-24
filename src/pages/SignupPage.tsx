@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signUpSchema } from "../lib/validation";
-import { normalizeErrorMessage } from "../lib/http";
+import { getFriendlyAuthErrorMessage } from "../lib/authErrors";
 import { useTranslation } from "../i18n/useTranslation";
 import { signUpWithPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { SetupNotice } from "../components/SetupNotice";
+import { SuccessState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { hasSupabaseEnv } from "../lib/env";
+import { updateMetadata } from "../lib/metadata";
 
 export function SignupPage() {
   const { t, locale } = useTranslation();
@@ -18,6 +20,14 @@ export function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    updateMetadata({
+      title: `${t("actions.createAccount")} — Wishly`,
+      description: t("auth.createYourAccount"),
+    });
+  }, [t]);
 
   if (!hasSupabaseEnv) {
     return (
@@ -34,6 +44,7 @@ export function SignupPage() {
 
   async function handleSubmit() {
     setError(null);
+    setConfirmationEmail(null);
     const parsed = signUpSchema.safeParse({ name, email, password });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? t("validation.required"));
@@ -42,13 +53,19 @@ export function SignupPage() {
 
     setLoading(true);
     try {
-      const { error: authError } = await signUpWithPassword(name, email, password, locale);
+      const { data, error: authError } = await signUpWithPassword(name, email, password, locale);
       if (authError) {
         throw authError;
       }
-      navigate("/");
+
+      if (data.session) {
+        navigate("/app");
+        return;
+      }
+
+      setConfirmationEmail(email);
     } catch (submitError) {
-      setError(normalizeErrorMessage(submitError));
+      setError(getFriendlyAuthErrorMessage(submitError, t));
     } finally {
       setLoading(false);
     }
@@ -64,13 +81,34 @@ export function SignupPage() {
           <div className="mb-5 flex justify-center">
             <WishlyLogo size="md" />
           </div>
+          {confirmationEmail ? (
+            <div className="grid gap-5">
+              <SuccessState
+                title={t("auth.confirmEmailTitle")}
+                body={t("auth.confirmEmailBody", { email: confirmationEmail })}
+              />
+              <Link to={`/login?email=${encodeURIComponent(confirmationEmail)}&notice=confirm-email`}>
+                <PrimaryButton type="button" className="w-full">
+                  {t("actions.logIn")}
+                </PrimaryButton>
+              </Link>
+            </div>
+          ) : (
+            <>
           <p className="text-sm font-semibold text-coral">{t("auth.createYourAccount")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("actions.signUp")}</h1>
-          <div className="mt-6 grid gap-4">
+          <form
+            className="mt-6 grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSubmit();
+            }}
+          >
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.name")}</span>
               <input
                 className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                autoComplete="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
@@ -79,6 +117,8 @@ export function SignupPage() {
               <span className="text-sm font-semibold text-warm-700">{t("auth.email")}</span>
               <input
                 className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -88,12 +128,13 @@ export function SignupPage() {
               <input
                 className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
                 type="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
             {error ? <p className="text-sm text-terracotta">{error}</p> : null}
-            <PrimaryButton onClick={handleSubmit} disabled={loading}>
+            <PrimaryButton type="submit" disabled={loading}>
               {t("actions.createAccount")}
             </PrimaryButton>
             <Link to="/login">
@@ -101,7 +142,9 @@ export function SignupPage() {
                 {t("actions.logIn")}
               </SecondaryButton>
             </Link>
-          </div>
+          </form>
+            </>
+          )}
         </section>
       </div>
     </main>

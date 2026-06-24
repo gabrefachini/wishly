@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginSchema } from "../lib/validation";
-import { normalizeErrorMessage } from "../lib/http";
+import { getFriendlyAuthErrorMessage } from "../lib/authErrors";
 import { useTranslation } from "../i18n/useTranslation";
-import { signInWithPassword } from "../services/auth";
+import { resendSignupConfirmation, signInWithPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { SetupNotice } from "../components/SetupNotice";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { hasSupabaseEnv } from "../lib/env";
+import { updateMetadata } from "../lib/metadata";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -17,7 +18,31 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+
+  useEffect(() => {
+    updateMetadata({
+      title: `${t("actions.logIn")} — Wishly`,
+      description: t("auth.welcomeBack"),
+    });
+  }, [t]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nextEmail = params.get("email");
+    const nextNotice = params.get("notice");
+
+    if (nextEmail) {
+      setEmail(nextEmail);
+    }
+
+    if (nextNotice === "confirm-email") {
+      setNotice(t("auth.confirmEmailNotice"));
+    }
+  }, [location.search, t]);
 
   if (!hasSupabaseEnv) {
     return (
@@ -34,6 +59,8 @@ export function LoginPage() {
 
   async function handleSubmit() {
     setError(null);
+    setNotice(null);
+    setNeedsEmailConfirmation(false);
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? t("validation.required"));
@@ -48,11 +75,44 @@ export function LoginPage() {
       }
 
       const params = new URLSearchParams(location.search);
-      navigate(params.get("next") || "/");
+      navigate(params.get("next") || "/app");
     } catch (submitError) {
-      setError(normalizeErrorMessage(submitError));
+      const rawMessage = submitError instanceof Error ? submitError.message.toLowerCase() : "";
+      const message = getFriendlyAuthErrorMessage(submitError, t);
+      if (rawMessage.includes("email not confirmed")) {
+        setNeedsEmailConfirmation(true);
+        setError(t("auth.emailNotConfirmed"));
+        return;
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResendConfirmation() {
+    setError(null);
+    setNotice(null);
+
+    const parsed = loginSchema.pick({ email: true }).safeParse({ email });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? t("validation.required"));
+      return;
+    }
+
+    setResendingConfirmation(true);
+    try {
+      const { error: resendError } = await resendSignupConfirmation(email);
+      if (resendError) {
+        throw resendError;
+      }
+
+      setNotice(t("auth.confirmationResent"));
+    } catch (submitError) {
+      setError(getFriendlyAuthErrorMessage(submitError, t));
+    } finally {
+      setResendingConfirmation(false);
     }
   }
 
@@ -68,11 +128,19 @@ export function LoginPage() {
           </div>
           <p className="text-sm font-semibold text-coral">{t("auth.welcomeBack")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("actions.logIn")}</h1>
-          <div className="mt-6 grid gap-4">
+          <form
+            className="mt-6 grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSubmit();
+            }}
+          >
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.email")}</span>
               <input
                 className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -82,12 +150,24 @@ export function LoginPage() {
               <input
                 className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
+            {notice ? <p className="text-sm text-warm-600">{notice}</p> : null}
             {error ? <p className="text-sm text-terracotta">{error}</p> : null}
-            <PrimaryButton onClick={handleSubmit} disabled={loading}>
+            {needsEmailConfirmation ? (
+              <SecondaryButton
+                type="button"
+                onClick={() => void handleResendConfirmation()}
+                disabled={resendingConfirmation}
+                className="w-full"
+              >
+                {resendingConfirmation ? t("auth.resendingConfirmation") : t("auth.resendConfirmation")}
+              </SecondaryButton>
+            ) : null}
+            <PrimaryButton type="submit" disabled={loading}>
               {t("actions.continue")}
             </PrimaryButton>
             <div className="flex items-center justify-between gap-3 text-sm">
@@ -98,7 +178,7 @@ export function LoginPage() {
                 <SecondaryButton type="button">{t("actions.signUp")}</SecondaryButton>
               </Link>
             </div>
-          </div>
+          </form>
         </section>
       </div>
     </main>

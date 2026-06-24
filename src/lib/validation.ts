@@ -21,7 +21,26 @@ export const wishlistSchema = z.object({
   event_date: z.string().optional().or(z.literal("")),
   message: z.string().optional(),
   cover_image_url: z.string().url().optional().or(z.literal("")),
+  theme_color: z.enum(["coral", "blush", "terracotta", "lavender", "sky", "sage"]),
+  slug: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || /^[a-z0-9-]+$/.test(value), {
+      message: "slug_format",
+    })
+    .refine((value) => !value || (value.length >= 3 && value.length <= 80), {
+      message: "slug_length",
+    }),
   visibility: z.enum(["private", "public_link"]),
+  rsvp_enabled: z.boolean(),
+  event_location: z.string().optional(),
+  event_time: z.string().optional().or(z.literal("")),
+  max_guests: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
 });
 
 export const giftSchema = z.object({
@@ -41,6 +60,7 @@ export const giftSchema = z.object({
     .string()
     .optional()
     .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
+  source_sponsored_item_id: z.string().uuid().optional().or(z.literal("")),
 }).superRefine((value, context) => {
   if (value.purchase_type === "collective" && !value.funding_goal_amount) {
     context.addIssue({
@@ -65,6 +85,19 @@ export const contributionSchema = z.object({
     .string()
     .min(1)
     .refine((value) => Number(value) > 0, { message: "positive_number" }),
+});
+
+export const rsvpSchema = z.object({
+  guest_name: z.string().min(1),
+  guest_email: z.string().email().optional().or(z.literal("")),
+  guest_phone: z.string().optional(),
+  response: z.enum(["yes", "no", "maybe"]),
+  guests_count: z
+    .string()
+    .min(1)
+    .refine((value) => Number(value) >= 1, { message: "positive_number" }),
+  message: z.string().optional(),
+  honeypot: z.string().optional(),
 });
 
 export const affiliateMerchantSchema = z.object({

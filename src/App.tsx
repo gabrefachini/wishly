@@ -13,6 +13,8 @@ import { CreateWishlistPage } from "./pages/CreateWishlistPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { GoGiftPage } from "./pages/GoGiftPage";
 import { HomePage } from "./pages/HomePage";
+import { InfoPage } from "./pages/InfoPage";
+import { LandingPage } from "./pages/LandingPage";
 import { ListIndexPage } from "./pages/ListIndexPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MockCheckoutPage } from "./pages/MockCheckoutPage";
@@ -29,9 +31,13 @@ export default function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/privacy" element={<InfoPage />} />
+      <Route path="/terms" element={<InfoPage />} />
+      <Route path="/contact" element={<InfoPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/app" element={<HomePage />} />
           <Route path="/lists" element={<ListIndexPage />} />
           <Route path="/lists/:id" element={<WishlistDetailPage />} />
           <Route path="/create" element={<CreateWishlistPage />} />

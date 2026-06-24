@@ -12,6 +12,9 @@ export type AffiliateLinkStatus = "generated" | "fallback" | "failed";
 export type ContributionPaymentStatus = "pending" | "paid" | "failed" | "refunded" | "cancelled";
 export type SponsoredItemStatus = "draft" | "active" | "paused" | "archived";
 export type SponsoredItemLocale = "en" | "pt-BR" | "all";
+export type WishlistThemeColor = "coral" | "blush" | "terracotta" | "lavender" | "sky" | "sage";
+export type EventRsvpResponse = "yes" | "no" | "maybe";
+export type AffiliateConversionStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export type Profile = {
   id: string;
@@ -32,9 +35,15 @@ export type WishlistRecord = {
   event_date: string | null;
   message: string | null;
   cover_image_url: string | null;
+  theme_color: WishlistThemeColor | null;
+  slug: string | null;
   visibility: WishlistVisibility;
   share_id: string;
   locale: Locale;
+  rsvp_enabled: boolean;
+  event_location: string | null;
+  event_time: string | null;
+  max_guests: number | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -56,6 +65,7 @@ export type GiftRecord = {
   funding_currency: string;
   funding_received_amount: number;
   funding_status: FundingStatus;
+  source_sponsored_item_id: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -76,6 +86,19 @@ export type ReservationRecord = {
 
 export type WishlistWithGifts = WishlistRecord & {
   gifts: GiftRecord[];
+};
+
+export type EventRsvpRecord = {
+  id: string;
+  wishlist_id: string;
+  guest_name: string;
+  guest_email: string | null;
+  guest_phone: string | null;
+  response: EventRsvpResponse;
+  guests_count: number;
+  message: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AffiliateMerchantRecord = {
@@ -140,6 +163,52 @@ export type SponsoredItemRecord = {
   ends_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type SponsoredItemClickRecord = {
+  id: string;
+  sponsored_item_id: string;
+  wishlist_id: string | null;
+  share_id: string | null;
+  visitor_id: string | null;
+  locale: Locale;
+  clicked_url: string;
+  referrer: string | null;
+  user_agent: string | null;
+  ip_hash: string | null;
+  created_at: string;
+};
+
+export type AffiliateClickRecord = {
+  id: string;
+  gift_id: string;
+  wishlist_id: string;
+  affiliate_link_id: string | null;
+  share_id: string;
+  merchant_id: string | null;
+  clicked_url: string;
+  user_agent: string | null;
+  ip_hash: string | null;
+  referrer: string | null;
+  locale: Locale;
+  created_at: string;
+};
+
+export type AffiliateConversionRecord = {
+  id: string;
+  affiliate_click_id: string | null;
+  merchant_id: string | null;
+  gift_id: string | null;
+  wishlist_id: string | null;
+  external_order_id: string | null;
+  conversion_status: AffiliateConversionStatus;
+  order_amount: number | null;
+  commission_amount: number | null;
+  currency: string;
+  occurred_at: string;
+  approved_at: string | null;
+  raw_payload: Record<string, unknown> | null;
+  created_at: string;
 };
 
 export type AdminAuditLogRecord = {

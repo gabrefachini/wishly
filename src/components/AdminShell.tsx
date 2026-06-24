@@ -24,7 +24,7 @@ export function AdminShell() {
           </div>
           <div className="flex items-center gap-3">
             <NavLink
-              to="/"
+              to="/app"
               className="inline-flex items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100"
             >
               <Undo2 size={16} aria-hidden="true" />
