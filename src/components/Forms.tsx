@@ -140,14 +140,21 @@ export function CreateWishlistForm({
         </div>
       </Field>
       <Field label={t("create.visibility")}>
-        <select
-          className={inputClass}
-          value={values.visibility}
-          onChange={(event) => onChange("visibility", event.target.value)}
-        >
-          <option value="public_link">{t("common.publicLink")}</option>
-          <option value="private">{t("common.private")}</option>
-        </select>
+        <div className="grid gap-2">
+          <select
+            className={inputClass}
+            value={values.visibility}
+            onChange={(event) => onChange("visibility", event.target.value)}
+          >
+            <option value="public_link">{t("common.publicLink")}</option>
+            <option value="private">{t("common.private")}</option>
+          </select>
+          <p className="text-xs leading-6 text-warm-500">
+            {values.visibility === "private"
+              ? t("create.visibilityPrivateHint")
+              : t("create.visibilityPublicHint")}
+          </p>
+        </div>
       </Field>
       <PrimaryButton type="submit" className="w-full" disabled={loading}>
         {t("actions.createWishlist")}

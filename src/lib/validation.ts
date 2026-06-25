@@ -43,6 +43,17 @@ export const wishlistSchema = z.object({
     .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
 });
 
+export const createWishlistSchema = z.object({
+  title: z.string().min(1),
+  occasion: z.string().min(1),
+  event_date: z.string().optional().or(z.literal("")),
+  message: z.string().optional(),
+  cover_image_url: z.string().url().optional().or(z.literal("")),
+  visibility: z.enum(["private", "public_link"]),
+});
+
+export const updateWishlistSchema = createWishlistSchema;
+
 export const giftSchema = z.object({
   wishlist_id: z.string().uuid(),
   name: z.string().min(1),
@@ -61,6 +72,32 @@ export const giftSchema = z.object({
     .optional()
     .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
   source_sponsored_item_id: z.string().uuid().optional().or(z.literal("")),
+}).superRefine((value, context) => {
+  if (value.purchase_type === "collective" && !value.funding_goal_amount) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["funding_goal_amount"],
+      message: "required",
+    });
+  }
+});
+
+export const updateGiftSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  store_url: z.string().url().optional().or(z.literal("")),
+  image_url: z.string().url().optional().or(z.literal("")),
+  estimated_price: z
+    .string()
+    .optional()
+    .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
+  currency: z.string().min(3).max(3),
+  priority: z.enum(["must_have", "nice_to_have", "surprise_me"]),
+  purchase_type: z.enum(["individual", "collective"]),
+  funding_goal_amount: z
+    .string()
+    .optional()
+    .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
 }).superRefine((value, context) => {
   if (value.purchase_type === "collective" && !value.funding_goal_amount) {
     context.addIssue({

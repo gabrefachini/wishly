@@ -14,8 +14,32 @@ type CreateWishlistInput = {
   locale: "en" | "pt-BR";
 };
 
+type UpdateWishlistInput = {
+  id: string;
+  title: string;
+  occasion: string;
+  event_date?: string;
+  message?: string;
+  cover_image_url?: string;
+  visibility: "private" | "public_link";
+};
+
 type CreateGiftInput = {
   wishlist_id: string;
+  name: string;
+  description?: string;
+  store_url?: string;
+  image_url?: string;
+  estimated_price?: number;
+  currency: string;
+  priority: "must_have" | "nice_to_have" | "surprise_me";
+  purchase_type: GiftPurchaseType;
+  funding_goal_amount?: number;
+  funding_currency?: string;
+};
+
+type UpdateGiftInput = {
+  id: string;
   name: string;
   description?: string;
   store_url?: string;
@@ -102,6 +126,32 @@ export async function createWishlist(input: CreateWishlistInput) {
   return data;
 }
 
+export async function updateWishlist(input: UpdateWishlistInput) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { data, error } = await supabase!
+    .from("wishlists")
+    .update({
+      title: input.title,
+      occasion: input.occasion,
+      event_date: input.event_date || null,
+      message: input.message || null,
+      cover_image_url: input.cover_image_url || null,
+      visibility: input.visibility,
+    })
+    .eq("id", input.id)
+    .select("*")
+    .single<WishlistRecord>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export async function createGift(input: CreateGiftInput) {
   if (!supabase) {
     invariantSupabase();
@@ -123,6 +173,40 @@ export async function createGift(input: CreateGiftInput) {
           ? (input.funding_currency || input.currency).toUpperCase()
           : input.currency.toUpperCase(),
     })
+    .select("*")
+    .single<GiftRecord>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateGift(input: UpdateGiftInput) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { data, error } = await supabase!
+    .from("gifts")
+    .update({
+      name: input.name,
+      description: input.description || null,
+      store_url: input.store_url || null,
+      image_url: input.image_url || null,
+      estimated_price: input.estimated_price ?? null,
+      currency: input.currency.toUpperCase(),
+      priority: input.priority,
+      purchase_type: input.purchase_type,
+      funding_goal_amount:
+        input.purchase_type === "collective" ? input.funding_goal_amount ?? null : null,
+      funding_currency:
+        input.purchase_type === "collective"
+          ? (input.funding_currency || input.currency).toUpperCase()
+          : input.currency.toUpperCase(),
+    })
+    .eq("id", input.id)
     .select("*")
     .single<GiftRecord>();
 

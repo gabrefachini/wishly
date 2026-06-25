@@ -5,7 +5,7 @@ import { CreateWishlistForm } from "../components/Forms";
 import { SetupNotice } from "../components/SetupNotice";
 import { getCreateWishlistErrorMessage } from "../lib/errors";
 import { hasSupabaseEnv } from "../lib/env";
-import { wishlistSchema } from "../lib/validation";
+import { createWishlistSchema } from "../lib/validation";
 import { useTranslation } from "../i18n/useTranslation";
 import { ensureProfile } from "../services/auth";
 import { uploadWishlistCover } from "../services/storage";
@@ -34,7 +34,7 @@ export function CreateWishlistPage() {
 
   async function handleSubmit() {
     setSubmitError(null);
-    const parsed = wishlistSchema.safeParse(values);
+    const parsed = createWishlistSchema.safeParse(values);
     if (!parsed.success) {
       const nextErrors = Object.fromEntries(
         parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]),

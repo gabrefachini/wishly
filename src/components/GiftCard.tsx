@@ -33,6 +33,7 @@ type GiftCardProps = {
   onReserve?: (giftId: string) => void;
   onContribute?: (giftId: string) => void;
   ownerAction?: ReactNode;
+  suppressOwnerStatusNote?: boolean;
 };
 
 export function GiftCard({
@@ -41,6 +42,7 @@ export function GiftCard({
   onReserve,
   onContribute,
   ownerAction,
+  suppressOwnerStatusNote = false,
 }: GiftCardProps) {
   const { t } = useTranslation();
   const disabled = gift.status !== "available";
@@ -60,7 +62,7 @@ export function GiftCard({
           <p className="mt-1 text-sm text-warm-500">
             {gift.store} · {gift.priceLabel}
           </p>
-          {mode === "owner" && gift.status !== "available" ? (
+          {mode === "owner" && gift.status !== "available" && !suppressOwnerStatusNote ? (
             <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-warm-500">
               <LockKeyhole size={14} aria-hidden="true" />
               {t("status.surpriseProtected")}
