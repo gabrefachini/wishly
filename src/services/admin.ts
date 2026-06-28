@@ -15,7 +15,6 @@ type MerchantInput = {
   strategy: AffiliateMerchantRecord["strategy"];
   deeplink_template?: string;
   tracking_param_name?: string;
-  tracking_param_value?: string;
   tracking_param_value_env_key?: string;
   notes?: string;
 };
@@ -82,7 +81,6 @@ export async function saveAffiliateMerchant(
     strategy: input.strategy,
     deeplink_template: input.deeplink_template || null,
     tracking_param_name: input.tracking_param_name || null,
-    tracking_param_value: input.tracking_param_value || null,
     tracking_param_value_env_key: input.tracking_param_value_env_key || null,
     notes: input.notes || null,
   };

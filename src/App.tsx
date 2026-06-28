@@ -17,6 +17,7 @@ import { InfoPage } from "./pages/InfoPage";
 import { LandingPage } from "./pages/LandingPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { ListIndexPage } from "./pages/ListIndexPage";
+import { PremiumRadarPage } from "./pages/PremiumRadarPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MockCheckoutPage } from "./pages/MockCheckoutPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/lists/:id" element={<WishlistDetailPage />} />
           <Route path="/create" element={<CreateWishlistPage />} />
           <Route path="/gift/new" element={<AddGiftPage />} />
+          <Route path="/premium/radar-de-precos" element={<PremiumRadarPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
@@ -56,7 +58,9 @@ export default function App() {
         </Route>
       </Route>
       <Route path="/go/gift/:giftId" element={<GoGiftPage />} />
-      <Route path="/checkout/mock/:contributionId" element={<MockCheckoutPage />} />
+      {import.meta.env.DEV ? (
+        <Route path="/checkout/mock/:contributionId" element={<MockCheckoutPage />} />
+      ) : null}
       <Route path="/w/:shareId" element={<VisitorPage />} />
     </Routes>
   );

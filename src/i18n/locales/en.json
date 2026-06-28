@@ -58,6 +58,10 @@
     "optional": "Optional",
     "or": "or"
   },
+  "wishlistType": {
+    "event": "Event list",
+    "wishlist": "Wish list"
+  },
   "auth": {
     "welcomeBack": "Welcome back",
     "createYourAccount": "Create your Wishly account",
@@ -254,7 +258,10 @@
     "language": "Language",
     "createdLists": "Lists created",
     "currentLanguage": "Current language",
-    "adminArea": "Admin area"
+    "adminArea": "Admin area",
+    "radarTier": "Price Radar",
+    "radarPremium": "Premium active",
+    "radarFree": "Free plan"
   },
   "wishlist": {
     "giftIdeas": "Gift ideas",
@@ -289,7 +296,10 @@
   "create": {
     "eyebrow": "New wishlist",
     "title": "Create a list in a few gentle steps",
-    "body": "Add the occasion, a date, and a short message. You can polish the details later.",
+    "body": "Add the list type, occasion, a date, and a short message. You can polish the details later.",
+    "listType": "List type",
+    "listTypeHint": "Event lists work for celebrations. Wish lists are personal and can use Price Radar.",
+    "wishlistOccasionHint": "Personal wish lists do not need a fixed celebration, but you can keep a reference date if you want.",
     "coverUploadAction": "Upload image",
     "coverUploading": "Uploading image...",
     "coverUploadHint": "Choose a photo from your phone or computer, or paste an image URL.",
@@ -301,6 +311,10 @@
     "visibility": "Visibility",
     "visibilityPublicHint": "Best for sharing with guests by link and avoiding duplicate gifts.",
     "visibilityPrivateHint": "Visible only to you, for organizing wishes and tracking personal purchases.",
+    "radarTitle": "Price Radar",
+    "radarHint": "Premium wish lists can track price changes, alerts, and target prices.",
+    "radarToggle": "Enable Price Radar",
+    "radarToggleHint": "You can activate it now and manage each item from the list later.",
     "successTitle": "Wishlist created",
     "successBody": "Your list is ready. Add a few thoughtful ideas, then share it when it feels right.",
     "errors": {
@@ -310,6 +324,8 @@
       "eventDate": "Check the event date and try again.",
       "visibility": "Check the visibility option and try again.",
       "coverUpload": "We couldn't upload this cover image right now.",
+      "coverBucket": "Image storage is not configured yet for this Supabase project.",
+      "coverPermission": "Your session is not allowed to upload this image right now. Please sign in again and retry.",
       "coverFileType": "Use a JPG, PNG, WebP, or HEIC image.",
       "coverFileSize": "The cover image must be up to 5 MB.",
       "retry": "We had trouble generating a public link. Please try again.",
@@ -333,7 +349,14 @@
     "estimated": "estimated",
     "selectWishlist": "Wishlist",
     "purchaseType": "Purchase type",
-    "individualGift": "Individual gift"
+    "individualGift": "Individual gift",
+    "priceRadar": "Price Radar",
+    "priceRadarHint": "Track prices, target prices, and useful alerts for personal wish lists.",
+    "priceRadarCurrent": "Current price",
+    "priceRadarTarget": "Target price",
+    "priceRadarPriority": "Tracking priority",
+    "priceRadarAlerts": "Alert preferences",
+    "priceRadarActivate": "Activate radar"
   },
   "giftFunding": {
     "groupGift": "Group gift",
@@ -353,7 +376,8 @@
     "fullyFunded": "Gift fully funded",
     "paymentSandbox": "This sandbox checkout confirms the contribution without a real card charge.",
     "simulateApprovedPayment": "Simulate approved payment",
-    "checkoutNotFound": "This contribution checkout could not be found."
+    "checkoutNotFound": "This contribution checkout could not be found.",
+    "temporarilyUnavailable": "Group contributions are temporarily unavailable while we harden the payment flow."
   },
   "affiliate": {
     "disclosure": "Wishly may earn a commission from eligible purchases.",
@@ -366,6 +390,91 @@
     "body": "This action cannot be undone.",
     "success": "Gift deleted",
     "error": "Could not delete gift. Please try again."
+  },
+  "priceRadar": {
+    "eyebrow": "Price Radar",
+    "dashboardTitle": "Buy your wishes at the right time",
+    "dashboardBody": "Wishly watches price changes, highlights good opportunities, and helps you buy when it makes sense.",
+    "enabled": "Radar on",
+    "disabled": "Radar off",
+    "sectionTitle": "Price Radar",
+    "sectionBody": "Track price changes and set a target price for this wish.",
+    "activate": "Activate radar",
+    "upgrade": "Upgrade to premium",
+    "freeLimit": "Free accounts can monitor up to 2 items.",
+    "currentPrice": "Current price",
+    "targetPrice": "Target price",
+    "priority": "Tracking priority",
+    "current": "Current",
+    "lowest": "Lowest",
+    "average": "Average",
+    "noCurrentPrice": "No current price yet",
+    "noHistory": "No history yet",
+    "disable": "Disable radar",
+    "setTarget": "Set target price",
+    "updateError": "We couldn't update this radar setting right now. Please try again.",
+    "itemLabel": "Price insight",
+    "dashboard": "Dashboard",
+    "stats": {
+      "monitored": "Items monitored",
+      "monitoredBody": "Wish items with radar active",
+      "opportunities": "Good opportunities",
+      "opportunitiesBody": "Items currently looking attractive",
+      "potentialSavings": "Potential savings",
+      "potentialSavingsBody": "Estimated savings if you buy now"
+    },
+    "emptyTitle": "Want to know the best time to buy?",
+    "emptyBody": "Enable Price Radar and track when your wishes get cheaper.",
+    "paywallTitle": "Buy your wishes at the right time",
+    "paywallBody": "Wishly tracks price changes, highlights good opportunities, and alerts you when it is worth buying.",
+    "benefitTracking": "Price drop alerts",
+    "benefitHistory": "Price history",
+    "benefitAlerts": "Smart alerts",
+    "benefitTarget": "Personal target price",
+    "upgradeCta": "Activate Price Radar",
+    "upgradeEyebrow": "Premium feature",
+    "upgradeTitle": "Buy your wishes at the right time",
+    "upgradeBody": "Wishly monitors prices, identifies good opportunities, and tells you when it is worth buying.",
+    "alerts": {
+      "title": "Alerts",
+      "anyDrop": "Any price drop",
+      "drop5": "Drop above 5%",
+      "drop10": "Drop above 10%",
+      "belowTarget": "Below target price",
+      "backToLow": "Back to lowest price",
+      "weeklySummary": "Weekly summary",
+      "relevantOnly": "Only relevant opportunities"
+    },
+    "priority": {
+      "mustBuy": "I really want it",
+      "maybeBuy": "Maybe I'll buy it",
+      "saleOnly": "Only if it goes on sale",
+      "futureGift": "Future gift"
+    }
+  },
+  "theme": {
+    "title": "Personalize your list",
+    "body": "Choose colors that match your moment.",
+    "preview": "Preview",
+    "previewTitle": "Sofia's Birthday",
+    "previewBody": "A warm, thoughtful page for sharing gift ideas with friends and family.",
+    "primary": "Primary color",
+    "secondary": "Secondary color",
+    "customMode": "Appearance mode",
+    "usePreset": "Use preset",
+    "chooseMyColors": "Choose my colors",
+    "reset": "Restore default",
+    "contrastWarning": "We adjusted the accents to keep text readable and the overall layout clean.",
+    "contrastSafe": "These colors keep the public page balanced and readable.",
+    "presets": {
+      "default": "Wishly original",
+      "baby": "Baby shower",
+      "wedding": "Wedding",
+      "birthday": "Birthday",
+      "christmas": "Christmas",
+      "newHome": "New home",
+      "minimal": "Minimal"
+    }
   },
   "admin": {
     "admin": "Admin",
@@ -463,6 +572,7 @@
     "christmas": "Christmas",
     "newHome": "New home",
     "secretSanta": "Secret Santa",
+    "wishlist": "Wish list",
     "holiday": "Holiday",
     "housewarming": "Housewarming"
   },

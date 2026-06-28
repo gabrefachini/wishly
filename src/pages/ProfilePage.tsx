@@ -3,14 +3,13 @@ import { useAuth } from "../auth/useAuth";
 import { SecondaryButton } from "../components/Buttons";
 import { EmptyState } from "../components/States";
 import { useTranslation } from "../i18n/useTranslation";
-import { isAdminUser } from "../lib/admin";
 import { listMyWishlists } from "../services/wishlists";
 import { useEffect, useState } from "react";
 import { updateMetadata } from "../lib/metadata";
 
 export function ProfilePage() {
   const { t, locale } = useTranslation();
-  const { profile, signOutUser, session } = useAuth();
+  const { profile, signOutUser, isAdmin } = useAuth();
   const [wishlistCount, setWishlistCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -70,6 +69,10 @@ export function ProfilePage() {
             <dd className="mt-1 text-base font-semibold text-warm-900">
               {t("profile.language")}: {locale}
             </dd>
+            <p className="mt-1 text-sm text-warm-500">
+              {t("profile.radarTier")}:{" "}
+              {profile.price_radar_tier === "premium" ? t("profile.radarPremium") : t("profile.radarFree")}
+            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[24px] bg-warm-50/70 p-4">
@@ -89,7 +92,7 @@ export function ProfilePage() {
           </div>
         </dl>
         <div className="mt-6 flex flex-wrap gap-3">
-          {isAdminUser(session?.user) ? (
+          {isAdmin ? (
             <Link to="/admin" className="contents">
               <SecondaryButton>{t("profile.adminArea")}</SecondaryButton>
             </Link>

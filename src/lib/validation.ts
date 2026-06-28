@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "invalid_color");
+const priceAlertPreferenceSchema = z.enum([
+  "any_drop",
+  "drop_5",
+  "drop_10",
+  "below_target",
+  "back_to_low",
+  "weekly_summary",
+  "relevant_only",
+]);
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -49,7 +60,13 @@ export const createWishlistSchema = z.object({
   event_date: z.string().optional().or(z.literal("")),
   message: z.string().optional(),
   cover_image_url: z.string().url().optional().or(z.literal("")),
+  type: z.enum(["event", "wishlist"]),
   visibility: z.enum(["private", "public_link"]),
+  theme_preset: z.enum(["default", "baby", "wedding", "birthday", "christmas", "newHome", "minimal"]),
+  theme_primary_color: hexColorSchema,
+  theme_secondary_color: hexColorSchema,
+  use_custom_theme: z.boolean(),
+  is_price_radar_enabled: z.boolean(),
 });
 
 export const updateWishlistSchema = createWishlistSchema;
@@ -71,6 +88,11 @@ export const giftSchema = z.object({
     .string()
     .optional()
     .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
+  price_tracking_enabled: z.boolean(),
+  current_price: z.string().optional().or(z.literal("")),
+  target_price: z.string().optional().or(z.literal("")),
+  price_radar_priority: z.enum(["must_buy", "maybe_buy", "sale_only", "future_gift"]),
+  price_alert_preferences: z.array(priceAlertPreferenceSchema),
   source_sponsored_item_id: z.string().uuid().optional().or(z.literal("")),
 }).superRefine((value, context) => {
   if (value.purchase_type === "collective" && !value.funding_goal_amount) {
@@ -98,6 +120,11 @@ export const updateGiftSchema = z.object({
     .string()
     .optional()
     .refine((value) => !value || Number(value) > 0, { message: "positive_number" }),
+  price_tracking_enabled: z.boolean(),
+  current_price: z.string().optional().or(z.literal("")),
+  target_price: z.string().optional().or(z.literal("")),
+  price_radar_priority: z.enum(["must_buy", "maybe_buy", "sale_only", "future_gift"]),
+  price_alert_preferences: z.array(priceAlertPreferenceSchema),
 }).superRefine((value, context) => {
   if (value.purchase_type === "collective" && !value.funding_goal_amount) {
     context.addIssue({
@@ -144,7 +171,6 @@ export const affiliateMerchantSchema = z.object({
   strategy: z.enum(["query_param", "deeplink_template", "api", "manual", "passthrough"]),
   deeplink_template: z.string().optional(),
   tracking_param_name: z.string().optional(),
-  tracking_param_value: z.string().optional(),
   tracking_param_value_env_key: z.string().optional(),
   notes: z.string().optional(),
 });

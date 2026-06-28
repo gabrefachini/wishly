@@ -1,6 +1,9 @@
-import { HandCoins, ImagePlus, Link as LinkIcon, Mail, Sparkles, Upload } from "lucide-react";
+import { BellRing, HandCoins, ImagePlus, Link as LinkIcon, Mail, Radar, Sparkles, Target, Upload } from "lucide-react";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { PrimaryButton, SecondaryButton } from "./Buttons";
+import { WishlistThemeSection } from "./WishlistThemeSection";
+import type { PriceAlertPreference, PriceRadarPriority, WishlistType } from "../types/domain";
 
 function Field({
   label,
@@ -29,17 +32,23 @@ const inputClass =
 type CreateWishlistFormProps = {
   values: {
     title: string;
+    type: WishlistType;
     occasion: string;
     event_date: string;
     message: string;
     cover_image_url: string;
     visibility: "private" | "public_link";
+    theme_preset: "default" | "baby" | "wedding" | "birthday" | "christmas" | "newHome" | "minimal";
+    theme_primary_color: string;
+    theme_secondary_color: string;
+    use_custom_theme: boolean;
+    is_price_radar_enabled: boolean;
   };
   errors: Record<string, string | undefined>;
   loading: boolean;
   coverUploading: boolean;
   t: (key: string) => string;
-  onChange: (name: string, value: string) => void;
+  onChange: (name: string, value: string | boolean) => void;
   onCoverUpload: (file: File | null) => void;
   onSubmit: () => void;
 };
@@ -69,20 +78,39 @@ export function CreateWishlistForm({
           onChange={(event) => onChange("title", event.target.value)}
         />
       </Field>
+      <Field label={t("create.listType")}>
+        <select
+          className={inputClass}
+          value={values.type}
+          onChange={(event) => onChange("type", event.target.value)}
+        >
+          <option value="event">{t("wishlistType.event")}</option>
+          <option value="wishlist">{t("wishlistType.wishlist")}</option>
+        </select>
+        <p className="text-xs leading-6 text-warm-500">{t("create.listTypeHint")}</p>
+      </Field>
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label={t("create.occasion")} error={errors.occasion}>
-          <select
-            className={inputClass}
-            value={values.occasion}
-            onChange={(event) => onChange("occasion", event.target.value)}
-          >
-            <option value="birthday">{t("occasions.birthday")}</option>
-            <option value="babyShower">{t("occasions.babyShower")}</option>
-            <option value="wedding">{t("occasions.wedding")}</option>
-            <option value="christmas">{t("occasions.christmas")}</option>
-            <option value="newHome">{t("occasions.newHome")}</option>
-          </select>
-        </Field>
+        {values.type === "event" ? (
+          <Field label={t("create.occasion")} error={errors.occasion}>
+            <select
+              className={inputClass}
+              value={values.occasion}
+              onChange={(event) => onChange("occasion", event.target.value)}
+            >
+              <option value="birthday">{t("occasions.birthday")}</option>
+              <option value="babyShower">{t("occasions.babyShower")}</option>
+              <option value="wedding">{t("occasions.wedding")}</option>
+              <option value="christmas">{t("occasions.christmas")}</option>
+              <option value="newHome">{t("occasions.newHome")}</option>
+            </select>
+          </Field>
+        ) : (
+          <Field label={t("create.occasion")} hint={t("create.wishlistOccasionHint")}>
+            <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+              {t("wishlistType.wishlist")}
+            </div>
+          </Field>
+        )}
         <Field label={t("create.eventDate")}>
           <input
             className={inputClass}
@@ -141,21 +169,75 @@ export function CreateWishlistForm({
       </Field>
       <Field label={t("create.visibility")}>
         <div className="grid gap-2">
-          <select
-            className={inputClass}
-            value={values.visibility}
-            onChange={(event) => onChange("visibility", event.target.value)}
-          >
-            <option value="public_link">{t("common.publicLink")}</option>
-            <option value="private">{t("common.private")}</option>
-          </select>
-          <p className="text-xs leading-6 text-warm-500">
-            {values.visibility === "private"
-              ? t("create.visibilityPrivateHint")
-              : t("create.visibilityPublicHint")}
-          </p>
+          {values.type === "wishlist" ? (
+            <div className="grid gap-2">
+              <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+                {t("common.private")}
+              </div>
+              <p className="text-xs leading-6 text-warm-500">{t("create.visibilityPrivateHint")}</p>
+            </div>
+          ) : (
+            <>
+              <select
+                className={inputClass}
+                value={values.visibility}
+                onChange={(event) => onChange("visibility", event.target.value)}
+              >
+                <option value="public_link">{t("common.publicLink")}</option>
+                <option value="private">{t("common.private")}</option>
+              </select>
+              <p className="text-xs leading-6 text-warm-500">
+                {values.visibility === "private"
+                  ? t("create.visibilityPrivateHint")
+                  : t("create.visibilityPublicHint")}
+              </p>
+            </>
+          )}
         </div>
       </Field>
+      {values.type === "wishlist" ? (
+        <label className="grid gap-3 rounded-[28px] border border-warm-100 bg-warm-50/60 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+              <Radar size={18} aria-hidden="true" />
+            </span>
+            <div className="grid gap-1">
+              <span className="text-sm font-semibold text-warm-800">{t("create.radarTitle")}</span>
+              <span className="text-xs leading-6 text-warm-500">{t("create.radarHint")}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-warm-700">{t("create.radarToggle")}</span>
+            <button
+              type="button"
+              aria-pressed={values.is_price_radar_enabled}
+              onClick={() => onChange("is_price_radar_enabled", !values.is_price_radar_enabled)}
+              className={`relative inline-flex h-10 w-[72px] items-center rounded-full border transition ${
+                values.is_price_radar_enabled
+                  ? "border-coral bg-coral/15"
+                  : "border-warm-200 bg-white"
+              }`}
+            >
+              <span
+                className={`inline-block h-8 w-8 rounded-full bg-white shadow-sm transition ${
+                  values.is_price_radar_enabled ? "translate-x-8 bg-coral" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+          <p className="text-xs leading-6 text-warm-500">{t("create.radarToggleHint")}</p>
+        </label>
+      ) : null}
+      <WishlistThemeSection
+        values={{
+          theme_preset: values.theme_preset,
+          theme_primary_color: values.theme_primary_color,
+          theme_secondary_color: values.theme_secondary_color,
+          use_custom_theme: values.use_custom_theme,
+        }}
+        t={t}
+        onChange={onChange}
+      />
       <PrimaryButton type="submit" className="w-full" disabled={loading}>
         {t("actions.createWishlist")}
       </PrimaryButton>
@@ -175,14 +257,173 @@ type AddGiftFormProps = {
     funding_goal_amount: string;
     image_url: string;
     description: string;
+    price_tracking_enabled: boolean;
+    current_price: string;
+    target_price: string;
+    price_radar_priority: PriceRadarPriority;
+    price_alert_preferences: PriceAlertPreference[];
   };
-  wishlistOptions: Array<{ id: string; title: string }>;
+  wishlistOptions: Array<{ id: string; title: string; type: WishlistType; is_price_radar_enabled: boolean }>;
   errors: Record<string, string | undefined>;
   loading: boolean;
   t: (key: string) => string;
-  onChange: (name: string, value: string) => void;
+  onChange: (name: string, value: string | boolean | string[]) => void;
   onSubmit: () => void;
+  priceTrackingAllowed: boolean;
 };
+
+type PriceRadarFieldsProps = {
+  enabled: boolean;
+  priceTrackingAllowed: boolean;
+  values: {
+    price_tracking_enabled: boolean;
+    current_price: string;
+    target_price: string;
+    price_radar_priority: PriceRadarPriority;
+    price_alert_preferences: PriceAlertPreference[];
+  };
+  errors: Record<string, string | undefined>;
+  t: (key: string) => string;
+  onChange: (name: string, value: string | boolean | string[]) => void;
+  upgradeHref?: string;
+};
+
+export function PriceRadarFields({
+  enabled,
+  priceTrackingAllowed,
+  values,
+  errors,
+  t,
+  onChange,
+  upgradeHref = "/premium/radar-de-precos",
+}: PriceRadarFieldsProps) {
+  const alertOptions: Array<{ value: PriceAlertPreference; label: string }> = [
+    { value: "any_drop", label: t("priceRadar.alerts.anyDrop") },
+    { value: "drop_5", label: t("priceRadar.alerts.drop5") },
+    { value: "drop_10", label: t("priceRadar.alerts.drop10") },
+    { value: "below_target", label: t("priceRadar.alerts.belowTarget") },
+    { value: "back_to_low", label: t("priceRadar.alerts.backToLow") },
+    { value: "weekly_summary", label: t("priceRadar.alerts.weeklySummary") },
+    { value: "relevant_only", label: t("priceRadar.alerts.relevantOnly") },
+  ];
+
+  function toggleAlert(value: PriceAlertPreference) {
+    const next = values.price_alert_preferences.includes(value)
+      ? values.price_alert_preferences.filter((item) => item !== value)
+      : [...values.price_alert_preferences, value];
+    onChange("price_alert_preferences", next);
+  }
+
+  if (!enabled) {
+    return (
+      <label className="grid gap-3 rounded-[28px] border border-dashed border-warm-200 bg-warm-50/60 p-4">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-coral">
+            <Target size={18} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-warm-800">{t("priceRadar.sectionTitle")}</p>
+            <p className="text-xs leading-6 text-warm-500">{t("priceRadar.sectionBody")}</p>
+          </div>
+        </div>
+        {priceTrackingAllowed ? (
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white"
+            onClick={() => onChange("price_tracking_enabled", true)}
+          >
+            {t("priceRadar.activate")}
+          </button>
+        ) : (
+          <Link
+            to={upgradeHref}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white"
+          >
+            {t("priceRadar.upgrade")}
+          </Link>
+        )}
+        {!priceTrackingAllowed ? <p className="text-xs leading-6 text-warm-500">{t("priceRadar.freeLimit")}</p> : null}
+      </label>
+    );
+  }
+
+  return (
+    <section className="grid gap-4 rounded-[28px] border border-warm-100 bg-white p-4 shadow-card">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+          <Radar size={18} aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-warm-800">{t("priceRadar.sectionTitle")}</p>
+          <p className="text-xs leading-6 text-warm-500">{t("priceRadar.sectionBody")}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold text-warm-700">{t("priceRadar.currentPrice")}</span>
+          <input
+            className={inputClass}
+            value={values.current_price}
+            onChange={(event) => onChange("current_price", event.target.value)}
+            placeholder="1899"
+          />
+          {errors.current_price ? <span className="text-xs text-terracotta">{errors.current_price}</span> : null}
+        </label>
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold text-warm-700">{t("priceRadar.targetPrice")}</span>
+          <input
+            className={inputClass}
+            value={values.target_price}
+            onChange={(event) => onChange("target_price", event.target.value)}
+            placeholder="1749"
+          />
+          {errors.target_price ? <span className="text-xs text-terracotta">{errors.target_price}</span> : null}
+        </label>
+      </div>
+
+      <label className="grid gap-2">
+        <span className="text-sm font-semibold text-warm-700">{t("priceRadar.priority")}</span>
+        <select
+          className={inputClass}
+          value={values.price_radar_priority}
+          onChange={(event) => onChange("price_radar_priority", event.target.value)}
+        >
+          <option value="must_buy">{t("priceRadar.priority.mustBuy")}</option>
+          <option value="maybe_buy">{t("priceRadar.priority.maybeBuy")}</option>
+          <option value="sale_only">{t("priceRadar.priority.saleOnly")}</option>
+          <option value="future_gift">{t("priceRadar.priority.futureGift")}</option>
+        </select>
+      </label>
+
+      <div className="grid gap-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-warm-700">
+          <BellRing size={16} aria-hidden="true" />
+          {t("priceRadar.alerts.title")}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {alertOptions.map((option) => {
+            const active = values.price_alert_preferences.includes(option.value);
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleAlert(option.value)}
+                className={`rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                  active
+                    ? "border-coral bg-blush text-terracotta"
+                    : "border-warm-100 bg-porcelain text-warm-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function AddGiftForm({
   values,
@@ -192,7 +433,10 @@ export function AddGiftForm({
   t,
   onChange,
   onSubmit,
+  priceTrackingAllowed,
 }: AddGiftFormProps) {
+  const selectedWishlist = wishlistOptions.find((wishlist) => wishlist.id === values.wishlist_id);
+
   return (
     <form
       className="grid gap-5"
@@ -209,7 +453,7 @@ export function AddGiftForm({
         >
           {wishlistOptions.map((wishlist) => (
             <option key={wishlist.id} value={wishlist.id}>
-              {wishlist.title}
+              {wishlist.title} {wishlist.type === "wishlist" ? `· ${t("wishlistType.wishlist")}` : ""}
             </option>
           ))}
         </select>
@@ -292,6 +536,22 @@ export function AddGiftForm({
             />
           </div>
         </Field>
+      ) : null}
+      {selectedWishlist?.type === "wishlist" ? (
+        <PriceRadarFields
+          enabled={values.price_tracking_enabled}
+          priceTrackingAllowed={priceTrackingAllowed}
+          values={{
+            price_tracking_enabled: values.price_tracking_enabled,
+            current_price: values.current_price,
+            target_price: values.target_price,
+            price_radar_priority: values.price_radar_priority,
+            price_alert_preferences: values.price_alert_preferences,
+          }}
+          errors={errors}
+          t={t}
+          onChange={onChange}
+        />
       ) : null}
       <Field label={t("actions.addProductImage")} error={errors.image_url}>
         <div className="relative">

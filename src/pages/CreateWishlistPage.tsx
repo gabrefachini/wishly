@@ -7,21 +7,42 @@ import { getCreateWishlistErrorMessage } from "../lib/errors";
 import { hasSupabaseEnv } from "../lib/env";
 import { createWishlistSchema } from "../lib/validation";
 import { useTranslation } from "../i18n/useTranslation";
+import { WISHLIST_THEME_PRESETS } from "../lib/wishlistAppearance";
 import { ensureProfile } from "../services/auth";
 import { uploadWishlistCover } from "../services/storage";
 import { createWishlist } from "../services/wishlists";
+import type { WishlistThemePreset, WishlistType } from "../types/domain";
 
 export function CreateWishlistPage() {
   const { t, locale } = useTranslation();
   const { session, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
-  const [values, setValues] = useState({
+  const [values, setValues] = useState<{
+    title: string;
+    type: WishlistType;
+    occasion: string;
+    event_date: string;
+    message: string;
+    cover_image_url: string;
+    visibility: "private" | "public_link";
+    theme_preset: WishlistThemePreset;
+    theme_primary_color: string;
+    theme_secondary_color: string;
+    use_custom_theme: boolean;
+    is_price_radar_enabled: boolean;
+  }>({
     title: "",
+    type: "event",
     occasion: "birthday",
     event_date: "",
     message: t("wishlist.message"),
     cover_image_url: "",
     visibility: "public_link" as const,
+    theme_preset: "default" as const,
+    theme_primary_color: WISHLIST_THEME_PRESETS.default.primary,
+    theme_secondary_color: WISHLIST_THEME_PRESETS.default.secondary,
+    use_custom_theme: false,
+    is_price_radar_enabled: false,
   });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [loading, setLoading] = useState(false);
@@ -56,11 +77,17 @@ export function CreateWishlistPage() {
       const wishlist = await createWishlist({
         owner_id: ownerProfile.id,
         title: values.title,
+        type: values.type,
         occasion: values.occasion,
         event_date: values.event_date,
         message: values.message,
         cover_image_url: values.cover_image_url,
         visibility: values.visibility,
+        theme_preset: values.theme_preset,
+        theme_primary_color: values.theme_primary_color,
+        theme_secondary_color: values.theme_secondary_color,
+        use_custom_theme: values.use_custom_theme,
+        is_price_radar_enabled: values.is_price_radar_enabled,
         locale,
       });
       navigate(`/lists/${wishlist.id}`);
@@ -104,6 +131,16 @@ export function CreateWishlistPage() {
           ...current,
           cover_image_url: t("create.errors.coverFileSize"),
         }));
+      } else if (message === "storage_bucket_not_found") {
+        setErrors((current) => ({
+          ...current,
+          cover_image_url: t("create.errors.coverBucket"),
+        }));
+      } else if (message === "storage_permission_denied") {
+        setErrors((current) => ({
+          ...current,
+          cover_image_url: t("create.errors.coverPermission"),
+        }));
       } else {
         setErrors((current) => ({
           ...current,
@@ -131,7 +168,24 @@ export function CreateWishlistPage() {
           coverUploading={coverUploading}
           t={t}
           onChange={(name, value) =>
-            setValues((current) => ({ ...current, [name]: value }))
+            setValues((current) => {
+              if (name === "type") {
+                const type = value === "wishlist" ? "wishlist" : "event";
+                return {
+                  ...current,
+                  type,
+                  occasion: type === "wishlist" ? "wishlist" : current.occasion === "wishlist" ? "birthday" : current.occasion,
+                  visibility: type === "wishlist" ? "private" : current.visibility,
+                  is_price_radar_enabled: type === "wishlist" ? current.is_price_radar_enabled : false,
+                };
+              }
+
+              if (name === "is_price_radar_enabled") {
+                return { ...current, is_price_radar_enabled: Boolean(value) };
+              }
+
+              return { ...current, [name]: value };
+            })
           }
           onCoverUpload={(file) => void handleCoverUpload(file)}
           onSubmit={() => void handleSubmit()}

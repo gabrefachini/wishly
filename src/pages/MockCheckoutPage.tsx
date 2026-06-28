@@ -14,8 +14,14 @@ export function MockCheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [paid, setPaid] = useState(false);
+  const mockCheckoutDisabled = !import.meta.env.DEV;
 
   useEffect(() => {
+    if (mockCheckoutDisabled) {
+      setLoading(false);
+      return;
+    }
+
     if (!contributionId) {
       setLoading(false);
       return;
@@ -24,7 +30,21 @@ export function MockCheckoutPage() {
     getContributionCheckout(contributionId)
       .then((data) => setCheckout(data))
       .finally(() => setLoading(false));
-  }, [contributionId]);
+  }, [contributionId, mockCheckoutDisabled]);
+
+  if (mockCheckoutDisabled) {
+    return (
+      <main className="min-h-screen bg-cream px-4 py-8">
+        <div className="mx-auto max-w-md">
+          <EmptyState
+            title={t("common.notFound")}
+            body={t("giftFunding.temporarilyUnavailable")}
+            branded
+          />
+        </div>
+      </main>
+    );
+  }
 
   async function handleConfirm() {
     if (!contributionId) return;

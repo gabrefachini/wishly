@@ -1,4 +1,4 @@
-import { CheckCircle2, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Radar, Target, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
@@ -6,12 +6,18 @@ import { GiftCard, type GiftCardModel } from "../components/GiftCard";
 import { SecondaryButton, ShareButton } from "../components/Buttons";
 import { Modal } from "../components/Modal";
 import { EmptyState } from "../components/States";
+import { WishlistThemeSection } from "../components/WishlistThemeSection";
+import { PriceRadarFields } from "../components/Forms";
+import { PriceSparkline } from "../components/PriceSparkline";
 import { buildFundingSummary, buildWishlistSummary, formatGiftPrice, mapGiftPriority, mapGiftStatus } from "../lib/presenters";
+import { formatCurrency } from "../i18n/formatters";
+import { getPriceRadarHistoryPoints, getPriceRecommendation } from "../lib/priceRadar";
 import { useTranslation } from "../i18n/useTranslation";
 import { updateGiftSchema, updateWishlistSchema } from "../lib/validation";
+import { WISHLIST_THEME_PRESETS } from "../lib/wishlistAppearance";
 import { uploadWishlistCover } from "../services/storage";
-import { deleteGift, getMyWishlist, updateGift, updateGiftStatus, updateWishlist } from "../services/wishlists";
-import type { GiftRecord, WishlistWithGifts } from "../types/domain";
+import { deleteGift, getMyWishlist, updateGift, updateGiftRadarSettings, updateGiftStatus, updateWishlist } from "../services/wishlists";
+import type { GiftRecord, WishlistThemePreset, WishlistWithGifts } from "../types/domain";
 
 const fallbackCover =
   "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80";
@@ -41,13 +47,32 @@ export function WishlistDetailPage() {
   const [wishlistEditLoading, setWishlistEditLoading] = useState(false);
   const [wishlistCoverUploading, setWishlistCoverUploading] = useState(false);
   const [wishlistEditErrors, setWishlistEditErrors] = useState<Record<string, string | undefined>>({});
-  const [wishlistValues, setWishlistValues] = useState({
+  const [wishlistValues, setWishlistValues] = useState<{
+    title: string;
+    type: "event" | "wishlist";
+    occasion: string;
+    event_date: string;
+    message: string;
+    cover_image_url: string;
+    visibility: "private" | "public_link";
+    theme_preset: WishlistThemePreset;
+    theme_primary_color: string;
+    theme_secondary_color: string;
+    use_custom_theme: boolean;
+    is_price_radar_enabled: boolean;
+  }>({
     title: "",
+    type: "event",
     occasion: "birthday",
     event_date: "",
     message: "",
     cover_image_url: "",
     visibility: "public_link" as "private" | "public_link",
+    theme_preset: "default" as const,
+    theme_primary_color: WISHLIST_THEME_PRESETS.default.primary,
+    theme_secondary_color: WISHLIST_THEME_PRESETS.default.secondary,
+    use_custom_theme: false,
+    is_price_radar_enabled: false,
   });
   const [giftEditLoading, setGiftEditLoading] = useState(false);
   const [giftEditErrors, setGiftEditErrors] = useState<Record<string, string | undefined>>({});
@@ -62,6 +87,13 @@ export function WishlistDetailPage() {
     funding_goal_amount: "",
     image_url: "",
     description: "",
+    price_tracking_enabled: false,
+    current_price: "",
+    target_price: "",
+    price_radar_priority: "must_buy" as "must_buy" | "maybe_buy" | "sale_only" | "future_gift",
+    price_alert_preferences: [] as Array<
+      "any_drop" | "drop_5" | "drop_10" | "below_target" | "back_to_low" | "weekly_summary" | "relevant_only"
+    >,
   });
 
   useEffect(() => {
@@ -74,13 +106,20 @@ export function WishlistDetailPage() {
         if (active) {
           setWishlist(data);
           if (data) {
+            const presetKey = data.theme_preset || "default";
             setWishlistValues({
               title: data.title,
+              type: data.type || "event",
               occasion: data.occasion,
               event_date: data.event_date || "",
               message: data.message || "",
               cover_image_url: data.cover_image_url || "",
               visibility: data.visibility,
+              theme_preset: presetKey,
+              theme_primary_color: data.theme_primary_color || WISHLIST_THEME_PRESETS[presetKey].primary,
+              theme_secondary_color: data.theme_secondary_color || WISHLIST_THEME_PRESETS[presetKey].secondary,
+              use_custom_theme: data.use_custom_theme ?? false,
+              is_price_radar_enabled: data.is_price_radar_enabled ?? false,
             });
           }
         }
@@ -116,14 +155,21 @@ export function WishlistDetailPage() {
 
   function openWishlistEditor() {
     if (!wishlist) return;
+    const presetKey = wishlist.theme_preset || "default";
     setWishlistEditErrors({});
     setWishlistValues({
       title: wishlist.title,
+      type: wishlist.type || "event",
       occasion: wishlist.occasion,
       event_date: wishlist.event_date || "",
       message: wishlist.message || "",
       cover_image_url: wishlist.cover_image_url || "",
       visibility: wishlist.visibility,
+      theme_preset: presetKey,
+      theme_primary_color: wishlist.theme_primary_color || WISHLIST_THEME_PRESETS[presetKey].primary,
+      theme_secondary_color: wishlist.theme_secondary_color || WISHLIST_THEME_PRESETS[presetKey].secondary,
+      use_custom_theme: wishlist.use_custom_theme ?? false,
+      is_price_radar_enabled: wishlist.is_price_radar_enabled ?? false,
     });
     setWishlistEditOpen(true);
   }
@@ -144,6 +190,10 @@ export function WishlistDetailPage() {
             ? t("create.errors.coverFileType")
             : message === "image_too_large"
               ? t("create.errors.coverFileSize")
+              : message === "storage_bucket_not_found"
+                ? t("create.errors.coverBucket")
+                : message === "storage_permission_denied"
+                  ? t("create.errors.coverPermission")
               : t("wishlist.editCoverError"),
       }));
     } finally {
@@ -211,6 +261,11 @@ export function WishlistDetailPage() {
       funding_goal_amount: gift.funding_goal_amount?.toString() || "",
       image_url: gift.image_url || "",
       description: gift.description || "",
+      price_tracking_enabled: gift.price_tracking_enabled ?? false,
+      current_price: gift.current_price?.toString() || "",
+      target_price: gift.target_price?.toString() || "",
+      price_radar_priority: gift.price_radar_priority || "must_buy",
+      price_alert_preferences: gift.price_alert_preferences ?? [],
     });
     setGiftToEditId(gift.id);
   }
@@ -244,6 +299,11 @@ export function WishlistDetailPage() {
           parsed.data.purchase_type === "collective" && parsed.data.funding_goal_amount
             ? Number(parsed.data.funding_goal_amount)
             : undefined,
+        price_tracking_enabled: parsed.data.price_tracking_enabled,
+        current_price: parsed.data.current_price ? Number(parsed.data.current_price) : undefined,
+        target_price: parsed.data.target_price ? Number(parsed.data.target_price) : undefined,
+        price_radar_priority: parsed.data.price_radar_priority,
+        price_alert_preferences: parsed.data.price_alert_preferences,
       });
       const refreshed = await getMyWishlist(wishlist.id);
       setWishlist(refreshed);
@@ -293,6 +353,31 @@ export function WishlistDetailPage() {
 
   const summary = buildWishlistSummary(wishlist, locale, t);
   const isPrivateWishlist = wishlist.visibility === "private";
+  const isPersonalWishlist = wishlist.type === "wishlist";
+  const canUseRadar = isPersonalWishlist && wishlist.is_price_radar_enabled;
+  const trackedGifts = wishlist.gifts.filter((gift) => gift.price_tracking_enabled);
+  const radarOpportunities = trackedGifts.filter((gift) => {
+    const recommendation = getPriceRecommendation(
+      {
+        currentPrice: gift.current_price ?? gift.estimated_price ?? null,
+        averagePrice: gift.average_price,
+        lowestPrice: gift.lowest_price,
+        highestPrice: gift.highest_price,
+        lastPrice: gift.original_price ?? gift.current_price ?? null,
+        priceHistory: gift.price_history,
+        targetPrice: gift.target_price,
+        currency: gift.currency,
+      },
+      locale,
+    );
+
+    return recommendation.status === "buy_now" || recommendation.status === "good_price";
+  });
+  const potentialSavings = trackedGifts.reduce((total, gift) => {
+    const current = gift.current_price ?? gift.estimated_price ?? 0;
+    const target = gift.target_price ?? gift.lowest_price ?? gift.average_price ?? current;
+    return total + Math.max(current - target, 0);
+  }, 0);
 
   async function handleGiftStatusChange(giftId: string, status: "available" | "purchased") {
     if (!wishlist) return;
@@ -308,6 +393,27 @@ export function WishlistDetailPage() {
       );
     } catch {
       setError(t("wishlist.giftUpdateError"));
+    }
+  }
+
+  async function handleToggleGiftRadar(gift: GiftRecord, enabled: boolean) {
+    if (!wishlist || !canUseRadar) {
+      return;
+    }
+
+    setError(null);
+    try {
+      await updateGiftRadarSettings(gift.id, {
+        price_tracking_enabled: enabled,
+        current_price: gift.current_price ?? gift.estimated_price,
+        target_price: gift.target_price,
+        price_radar_priority: gift.price_radar_priority || "must_buy",
+        price_alert_preferences: gift.price_alert_preferences ?? [],
+      });
+      const refreshed = await getMyWishlist(wishlist.id);
+      setWishlist(refreshed);
+    } catch {
+      setError(t("priceRadar.updateError"));
     }
   }
 
@@ -380,6 +486,70 @@ export function WishlistDetailPage() {
         </div>
       </section>
 
+      {isPersonalWishlist ? (
+        <section className="grid gap-4 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+              <h2 className="mt-1 text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
+              <p className="mt-2 text-sm leading-6 text-warm-500">{t("priceRadar.dashboardBody")}</p>
+            </div>
+            <span className="rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
+              {wishlist.is_price_radar_enabled ? t("priceRadar.enabled") : t("priceRadar.disabled")}
+            </span>
+          </div>
+
+          {canUseRadar ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[24px] bg-blush/50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">{t("priceRadar.stats.monitored")}</p>
+                  <p className="mt-2 text-2xl font-bold text-warm-900">{trackedGifts.length}</p>
+                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.monitoredBody")}</p>
+                </div>
+                <div className="rounded-[24px] bg-skysoft/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-800">{t("priceRadar.stats.opportunities")}</p>
+                  <p className="mt-2 text-2xl font-bold text-warm-900">{radarOpportunities.length}</p>
+                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.opportunitiesBody")}</p>
+                </div>
+                <div className="rounded-[24px] bg-warm-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-warm-500">{t("priceRadar.stats.potentialSavings")}</p>
+                  <p className="mt-2 text-2xl font-bold text-warm-900">
+                    {formatCurrency(
+                      potentialSavings,
+                      locale,
+                      wishlist.gifts[0]?.currency || (locale === "pt-BR" ? "BRL" : "USD"),
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.potentialSavingsBody")}</p>
+                </div>
+              </div>
+
+              {trackedGifts.length === 0 ? (
+                <EmptyState title={t("priceRadar.emptyTitle")} body={t("priceRadar.emptyBody")} />
+              ) : null}
+            </>
+          ) : (
+            <div className="grid gap-4 rounded-[28px] border border-dashed border-coral/25 bg-blush/35 p-5">
+              <p className="text-lg font-bold text-warm-900">{t("priceRadar.paywallTitle")}</p>
+              <p className="text-sm leading-6 text-warm-600">{t("priceRadar.paywallBody")}</p>
+              <ul className="grid gap-2 text-sm text-warm-600">
+                <li>• {t("priceRadar.benefitTracking")}</li>
+                <li>• {t("priceRadar.benefitHistory")}</li>
+                <li>• {t("priceRadar.benefitAlerts")}</li>
+                <li>• {t("priceRadar.benefitTarget")}</li>
+              </ul>
+              <Link
+                to="/premium/radar-de-precos"
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-terracotta focus:outline-none focus:ring-4 focus:ring-coral/25 sm:w-auto"
+              >
+                {t("priceRadar.upgradeCta")}
+              </Link>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       <section className="grid gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-warm-900">{t("wishlist.giftIdeas")}</h2>
@@ -389,6 +559,21 @@ export function WishlistDetailPage() {
         </div>
         {wishlist.gifts.length ? (
           wishlist.gifts.map((gift: GiftRecord) => {
+            const currentPrice = gift.current_price ?? gift.estimated_price ?? null;
+            const giftRecommendation = getPriceRecommendation(
+              {
+                currentPrice,
+                averagePrice: gift.average_price,
+                lowestPrice: gift.lowest_price,
+                highestPrice: gift.highest_price,
+                lastPrice: gift.original_price ?? gift.current_price ?? null,
+                priceHistory: gift.price_history,
+                targetPrice: gift.target_price,
+                currency: gift.currency,
+              },
+              locale,
+            );
+            const historyPoints = getPriceRadarHistoryPoints(gift.price_history);
             const cardGift: GiftCardModel = {
               id: gift.id,
               name: gift.name,
@@ -416,38 +601,103 @@ export function WishlistDetailPage() {
             };
 
             return (
-              <GiftCard
-                key={gift.id}
-                gift={cardGift}
-                suppressOwnerStatusNote={isPrivateWishlist}
-                ownerAction={
-                  <>
-                    {isPrivateWishlist && gift.status !== "purchased" ? (
-                      <SecondaryButton onClick={() => void handleGiftStatusChange(gift.id, "purchased")}>
-                        {t("actions.markPurchased")}
+              <div key={gift.id} className="grid gap-3">
+                <GiftCard
+                  gift={cardGift}
+                  suppressOwnerStatusNote={isPrivateWishlist}
+                  ownerAction={
+                    <>
+                      {isPrivateWishlist && gift.status !== "purchased" ? (
+                        <SecondaryButton onClick={() => void handleGiftStatusChange(gift.id, "purchased")}>
+                          {t("actions.markPurchased")}
+                        </SecondaryButton>
+                      ) : null}
+                      {isPrivateWishlist && gift.status === "purchased" ? (
+                        <SecondaryButton onClick={() => void handleGiftStatusChange(gift.id, "available")}>
+                          {t("actions.markAvailable")}
+                        </SecondaryButton>
+                      ) : null}
+                      {!isPrivateWishlist && gift.status === "reserved" ? (
+                        <SecondaryButton onClick={() => void handleMarkPurchased(gift.id)}>
+                          {t("actions.markPurchased")}
+                        </SecondaryButton>
+                      ) : null}
+                      <SecondaryButton onClick={() => openGiftEditor(gift)}>
+                        <Pencil size={16} aria-hidden="true" />
+                        {t("wishlist.editGift")}
                       </SecondaryButton>
-                    ) : null}
-                    {isPrivateWishlist && gift.status === "purchased" ? (
-                      <SecondaryButton onClick={() => void handleGiftStatusChange(gift.id, "available")}>
-                        {t("actions.markAvailable")}
+                      <SecondaryButton onClick={() => setGiftToDeleteId(gift.id)}>
+                        <Trash2 size={16} aria-hidden="true" />
+                        {t("actions.deleteGift")}
                       </SecondaryButton>
-                    ) : null}
-                    {!isPrivateWishlist && gift.status === "reserved" ? (
-                      <SecondaryButton onClick={() => void handleMarkPurchased(gift.id)}>
-                        {t("actions.markPurchased")}
+                    </>
+                  }
+                />
+                {canUseRadar ? (
+                  <section className="mt-3 rounded-[24px] border border-warm-100 bg-warm-50/70 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                          {t("priceRadar.itemLabel")}
+                        </p>
+                        <h4 className="mt-1 text-sm font-semibold text-warm-900">{giftRecommendation.title}</h4>
+                        <p className="mt-1 text-sm leading-6 text-warm-600">{giftRecommendation.message}</p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          giftRecommendation.severity === "positive"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : giftRecommendation.severity === "warning"
+                              ? "bg-blush text-terracotta"
+                              : "bg-warm-100 text-warm-600"
+                        }`}
+                      >
+                        {giftRecommendation.score}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <PriceSparkline
+                      points={historyPoints}
+                      accent="var(--wishlist-primary)"
+                      softAccent="var(--wishlist-secondary-soft)"
+                      emptyLabel={t("priceRadar.noHistory")}
+                    />
+                      <div className="grid gap-2 text-xs text-warm-500">
+                        <p>
+                          {t("priceRadar.current")}:{" "}
+                          {currentPrice !== null
+                            ? formatGiftPrice(currentPrice, locale, gift.currency, t("giftForm.estimated"))
+                            : t("priceRadar.noCurrentPrice")}
+                        </p>
+                        <p>
+                          {t("priceRadar.lowest")}:{" "}
+                          {gift.lowest_price !== null
+                            ? formatGiftPrice(gift.lowest_price, locale, gift.currency, t("giftForm.estimated"))
+                            : "—"}
+                        </p>
+                        <p>
+                          {t("priceRadar.average")}:{" "}
+                          {gift.average_price !== null
+                            ? formatGiftPrice(gift.average_price, locale, gift.currency, t("giftForm.estimated"))
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <SecondaryButton
+                        type="button"
+                        onClick={() => void handleToggleGiftRadar(gift, !gift.price_tracking_enabled)}
+                      >
+                        {gift.price_tracking_enabled ? t("priceRadar.disable") : t("priceRadar.activate")}
                       </SecondaryButton>
-                    ) : null}
-                    <SecondaryButton onClick={() => openGiftEditor(gift)}>
-                      <Pencil size={16} aria-hidden="true" />
-                      {t("wishlist.editGift")}
-                    </SecondaryButton>
-                    <SecondaryButton onClick={() => setGiftToDeleteId(gift.id)}>
-                      <Trash2 size={16} aria-hidden="true" />
-                      {t("actions.deleteGift")}
-                    </SecondaryButton>
-                  </>
-                }
-              />
+                      <SecondaryButton type="button" onClick={() => openGiftEditor(gift)}>
+                        <Target size={16} aria-hidden="true" />
+                        {t("priceRadar.setTarget")}
+                      </SecondaryButton>
+                    </div>
+                  </section>
+                ) : null}
+              </div>
             );
           })
         ) : (
@@ -474,22 +724,54 @@ export function WishlistDetailPage() {
             />
             {wishlistEditErrors.title ? <span className="text-xs text-terracotta">{wishlistEditErrors.title}</span> : null}
           </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold text-warm-700">{t("create.listType")}</span>
+            <select
+              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              value={wishlistValues.type}
+              onChange={(event) =>
+                setWishlistValues((current) => {
+                  const nextType = event.target.value === "wishlist" ? "wishlist" : "event";
+                  return {
+                    ...current,
+                    type: nextType,
+                    occasion: nextType === "wishlist" ? "wishlist" : current.occasion === "wishlist" ? "birthday" : current.occasion,
+                    visibility: nextType === "wishlist" ? "private" : current.visibility,
+                    is_price_radar_enabled: nextType === "wishlist" ? current.is_price_radar_enabled : false,
+                  };
+                })
+              }
+            >
+              <option value="event">{t("wishlistType.event")}</option>
+              <option value="wishlist">{t("wishlistType.wishlist")}</option>
+            </select>
+            <span className="text-xs leading-6 text-warm-500">{t("create.listTypeHint")}</span>
+          </label>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-warm-700">{t("create.occasion")}</span>
-              <select
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
-                value={wishlistValues.occasion}
-                onChange={(event) => setWishlistValues((current) => ({ ...current, occasion: event.target.value }))}
-              >
-                <option value="birthday">{t("occasions.birthday")}</option>
-                <option value="babyShower">{t("occasions.babyShower")}</option>
-                <option value="wedding">{t("occasions.wedding")}</option>
-                <option value="christmas">{t("occasions.christmas")}</option>
-                <option value="newHome">{t("occasions.newHome")}</option>
-                <option value="secretSanta">{t("occasions.secretSanta")}</option>
-              </select>
-            </label>
+            {wishlistValues.type === "event" ? (
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-warm-700">{t("create.occasion")}</span>
+                <select
+                  className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                  value={wishlistValues.occasion}
+                  onChange={(event) => setWishlistValues((current) => ({ ...current, occasion: event.target.value }))}
+                >
+                  <option value="birthday">{t("occasions.birthday")}</option>
+                  <option value="babyShower">{t("occasions.babyShower")}</option>
+                  <option value="wedding">{t("occasions.wedding")}</option>
+                  <option value="christmas">{t("occasions.christmas")}</option>
+                  <option value="newHome">{t("occasions.newHome")}</option>
+                  <option value="secretSanta">{t("occasions.secretSanta")}</option>
+                </select>
+              </label>
+            ) : (
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold text-warm-700">{t("create.occasion")}</span>
+                <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+                  {t("wishlistType.wishlist")}
+                </div>
+              </label>
+            )}
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("create.eventDate")}</span>
               <input
@@ -500,6 +782,44 @@ export function WishlistDetailPage() {
               />
             </label>
           </div>
+          {wishlistValues.type === "wishlist" ? (
+            <label className="grid gap-3 rounded-[28px] border border-warm-100 bg-warm-50/60 p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+                  <Radar size={18} aria-hidden="true" />
+                </span>
+                <div className="grid gap-1">
+                  <span className="text-sm font-semibold text-warm-800">{t("create.radarTitle")}</span>
+                  <span className="text-xs leading-6 text-warm-500">{t("create.radarHint")}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-warm-700">{t("create.radarToggle")}</span>
+                <button
+                  type="button"
+                  aria-pressed={wishlistValues.is_price_radar_enabled}
+                  onClick={() =>
+                    setWishlistValues((current) => ({
+                      ...current,
+                      is_price_radar_enabled: !current.is_price_radar_enabled,
+                    }))
+                  }
+                  className={`relative inline-flex h-10 w-[72px] items-center rounded-full border transition ${
+                    wishlistValues.is_price_radar_enabled
+                      ? "border-coral bg-coral/15"
+                      : "border-warm-200 bg-white"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-8 w-8 rounded-full bg-white shadow-sm transition ${
+                      wishlistValues.is_price_radar_enabled ? "translate-x-8 bg-coral" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-xs leading-6 text-warm-500">{t("create.radarToggleHint")}</p>
+            </label>
+          ) : null}
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("create.message")}</span>
             <textarea
@@ -530,22 +850,57 @@ export function WishlistDetailPage() {
             </label>
             {wishlistEditErrors.cover_image_url ? <span className="text-xs text-terracotta">{wishlistEditErrors.cover_image_url}</span> : null}
           </label>
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold text-warm-700">{t("create.visibility")}</span>
-            <select
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
-              value={wishlistValues.visibility}
-              onChange={(event) => setWishlistValues((current) => ({ ...current, visibility: event.target.value as "private" | "public_link" }))}
-            >
-              <option value="public_link">{t("common.publicLink")}</option>
-              <option value="private">{t("common.private")}</option>
-            </select>
-            <span className="text-xs leading-6 text-warm-500">
-              {wishlistValues.visibility === "private"
-                ? t("create.visibilityPrivateHint")
-                : t("create.visibilityPublicHint")}
-            </span>
-          </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold text-warm-700">{t("create.visibility")}</span>
+              {wishlistValues.type === "wishlist" ? (
+                <>
+                  <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+                    {t("common.private")}
+                  </div>
+                  <span className="text-xs leading-6 text-warm-500">{t("create.visibilityPrivateHint")}</span>
+                </>
+              ) : (
+                <>
+                  <select
+                    className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                    value={wishlistValues.visibility}
+                    onChange={(event) =>
+                      setWishlistValues((current) => ({ ...current, visibility: event.target.value as "private" | "public_link" }))
+                    }
+                  >
+                    <option value="public_link">{t("common.publicLink")}</option>
+                    <option value="private">{t("common.private")}</option>
+                  </select>
+                  <span className="text-xs leading-6 text-warm-500">
+                    {wishlistValues.visibility === "private"
+                      ? t("create.visibilityPrivateHint")
+                      : t("create.visibilityPublicHint")}
+                  </span>
+                </>
+              )}
+            </label>
+          <WishlistThemeSection
+            values={{
+              theme_preset: wishlistValues.theme_preset,
+              theme_primary_color: wishlistValues.theme_primary_color,
+              theme_secondary_color: wishlistValues.theme_secondary_color,
+              use_custom_theme: wishlistValues.use_custom_theme,
+            }}
+            t={t}
+            onChange={(name, value) =>
+              setWishlistValues((current) => {
+                if (name === "theme_preset") {
+                  return { ...current, theme_preset: value as typeof current.theme_preset };
+                }
+
+                if (name === "use_custom_theme") {
+                  return { ...current, use_custom_theme: Boolean(value) };
+                }
+
+                return { ...current, [name]: value };
+              })
+            }
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <SecondaryButton onClick={() => setWishlistEditOpen(false)} disabled={wishlistEditLoading || wishlistCoverUploading}>
               {t("actions.cancel")}
@@ -642,6 +997,35 @@ export function WishlistDetailPage() {
               />
               {giftEditErrors.funding_goal_amount ? <span className="text-xs text-terracotta">{giftEditErrors.funding_goal_amount}</span> : null}
             </label>
+          ) : null}
+          {wishlistValues.type === "wishlist" ? (
+              <PriceRadarFields
+                enabled={giftValues.price_tracking_enabled}
+                priceTrackingAllowed={
+                trackedGifts.length < 2 ||
+                giftValues.price_tracking_enabled
+              }
+              values={{
+                price_tracking_enabled: giftValues.price_tracking_enabled,
+                current_price: giftValues.current_price,
+                target_price: giftValues.target_price,
+                price_radar_priority: giftValues.price_radar_priority,
+                price_alert_preferences: giftValues.price_alert_preferences,
+              }}
+              errors={giftEditErrors}
+              t={t}
+              onChange={(name, value) =>
+                setGiftValues((current) => {
+                  if (name === "price_tracking_enabled") {
+                    return { ...current, price_tracking_enabled: Boolean(value) };
+                  }
+                  if (name === "price_alert_preferences" && Array.isArray(value)) {
+                    return { ...current, price_alert_preferences: value as typeof current.price_alert_preferences };
+                  }
+                  return { ...current, [name]: value };
+                })
+              }
+            />
           ) : null}
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.productImage")}</span>

@@ -5,6 +5,7 @@ import type { Profile } from "../types/domain";
 export type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
+  isAdmin: boolean;
   loading: boolean;
   signOutUser: () => Promise<void>;
   refreshProfile: () => Promise<void>;

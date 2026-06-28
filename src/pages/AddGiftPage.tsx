@@ -29,6 +29,13 @@ export function AddGiftPage() {
     funding_goal_amount: string;
     image_url: string;
     description: string;
+    price_tracking_enabled: boolean;
+    current_price: string;
+    target_price: string;
+    price_radar_priority: "must_buy" | "maybe_buy" | "sale_only" | "future_gift";
+    price_alert_preferences: Array<
+      "any_drop" | "drop_5" | "drop_10" | "below_target" | "back_to_low" | "weekly_summary" | "relevant_only"
+    >;
   }>({
     wishlist_id: "",
     name: "",
@@ -40,6 +47,11 @@ export function AddGiftPage() {
     funding_goal_amount: "",
     image_url: "",
     description: "",
+    price_tracking_enabled: false,
+    current_price: "",
+    target_price: "",
+    price_radar_priority: "must_buy",
+    price_alert_preferences: [],
   });
 
   useEffect(() => {
@@ -75,6 +87,10 @@ export function AddGiftPage() {
     return <SetupNotice />;
   }
 
+  const selectedWishlist = wishlists.find((wishlist) => wishlist.id === values.wishlist_id);
+  const selectedTrackedGiftCount = selectedWishlist?.gifts.filter((gift) => gift.price_tracking_enabled).length ?? 0;
+  const priceTrackingAllowed = Boolean(selectedWishlist?.type === "wishlist" && selectedWishlist?.is_price_radar_enabled) && selectedTrackedGiftCount < 2;
+
   async function handleSubmit() {
     setSubmitError(null);
     const parsed = giftSchema.safeParse(values);
@@ -104,6 +120,11 @@ export function AddGiftPage() {
             ? Number(values.funding_goal_amount)
             : undefined,
         funding_currency: values.currency,
+        price_tracking_enabled: values.price_tracking_enabled,
+        current_price: values.current_price ? Number(values.current_price) : undefined,
+        target_price: values.target_price ? Number(values.target_price) : undefined,
+        price_radar_priority: values.price_radar_priority,
+        price_alert_preferences: values.price_alert_preferences,
       });
       navigate(`/lists/${values.wishlist_id}`);
     } catch (error) {
@@ -142,14 +163,27 @@ export function AddGiftPage() {
           wishlistOptions={wishlists.map((wishlist) => ({
             id: wishlist.id,
             title: wishlist.title,
+            type: wishlist.type,
+            is_price_radar_enabled: wishlist.is_price_radar_enabled,
           }))}
           errors={errors}
           loading={loading}
           t={t}
           onChange={(name, value) =>
-            setValues((current) => ({ ...current, [name]: value }))
+            setValues((current) => {
+              if (name === "price_alert_preferences" && Array.isArray(value)) {
+                return { ...current, price_alert_preferences: value as typeof current.price_alert_preferences };
+              }
+
+              if (name === "price_tracking_enabled") {
+                return { ...current, price_tracking_enabled: Boolean(value) };
+              }
+
+              return { ...current, [name]: value };
+            })
           }
           onSubmit={() => void handleSubmit()}
+          priceTrackingAllowed={priceTrackingAllowed}
         />
       </section>
     </div>

@@ -10,6 +10,7 @@ import { WishlyLogo } from "../components/WishlyLogo";
 import { featuredGift, localized, wishlists } from "../data/mockData";
 import { buildGiftRedirectPath } from "../lib/affiliate";
 import { hasSupabaseEnv } from "../lib/env";
+import { getWishlistThemeCssVars } from "../lib/wishlistAppearance";
 import { formatCurrency, formatDate } from "../i18n/formatters";
 import { useTranslation } from "../i18n/useTranslation";
 import { buildFundingSummary, formatGiftPrice, mapGiftPriority, mapGiftStatus } from "../lib/presenters";
@@ -149,6 +150,10 @@ export function VisitorPage() {
     setContributionLoading(true);
     setError(null);
     try {
+      if (!import.meta.env.DEV) {
+        throw new Error("public_contributions_temporarily_unavailable");
+      }
+
       const result = await createContribution({
         shareId,
         giftId: selectedContributionGift.id,
@@ -162,7 +167,12 @@ export function VisitorPage() {
       setSelectedContributionGiftId(null);
       navigate(result.checkout_url);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t("common.error"));
+      const message = submitError instanceof Error ? submitError.message : t("common.error");
+      setError(
+        message.includes("public_contributions_temporarily_unavailable")
+          ? t("giftFunding.temporarilyUnavailable")
+          : message,
+      );
     } finally {
       setContributionLoading(false);
     }
@@ -254,13 +264,16 @@ export function VisitorPage() {
     );
   }
 
+  const wishlistThemeVars = getWishlistThemeCssVars(wishlist);
+
   return (
-    <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6">
+    <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6" style={wishlistThemeVars}>
       <div className="mx-auto grid max-w-3xl gap-6">
         <div className="flex items-center justify-between gap-3">
           <Link
             to="/"
-            className="inline-flex w-fit items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4"
+            style={{ boxShadow: "0 0 0 6px transparent" }}
           >
             <ArrowLeft size={16} aria-hidden="true" />
             <WishlyLogo size="sm" />
@@ -274,13 +287,19 @@ export function VisitorPage() {
             alt=""
             className="h-56 w-full object-cover"
           />
-          <div className="p-5">
-            <p className="inline-flex items-center gap-2 rounded-full bg-skysoft px-3 py-1 text-xs font-semibold text-sky-800">
+          <div className="p-5" style={{ backgroundImage: "var(--wishlist-header-gradient)" }}>
+            <p
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{
+                backgroundColor: "var(--wishlist-secondary-soft)",
+                color: "var(--wishlist-badge)",
+              }}
+            >
               <ShieldCheck size={14} aria-hidden="true" />
               {t("visitor.noLogin")}
             </p>
             <h1 className="mt-4 text-3xl font-bold text-warm-900">{wishlist.title}</h1>
-            <p className="mt-2 text-sm font-medium text-coral">
+            <p className="mt-2 text-sm font-medium" style={{ color: "var(--wishlist-primary)" }}>
               {t(`occasions.${wishlist.occasion}`)} ·{" "}
               {wishlist.event_date ? formatDate(wishlist.event_date, locale) : "-"}
             </p>
@@ -329,6 +348,7 @@ export function VisitorPage() {
                 key={gift.id}
                 gift={cardGift}
                 mode="visitor"
+                themed
                 onReserve={(giftId) => {
                   setReservationSuccess(false);
                   setSelectedGiftId(giftId);

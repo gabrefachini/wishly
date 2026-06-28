@@ -12,7 +12,6 @@ type MerchantFormValues = {
   strategy: AffiliateMerchantRecord["strategy"];
   deeplink_template: string;
   tracking_param_name: string;
-  tracking_param_value: string;
   tracking_param_value_env_key: string;
   notes: string;
 };
@@ -24,7 +23,6 @@ const initialValues: MerchantFormValues = {
   strategy: "passthrough" as const,
   deeplink_template: "",
   tracking_param_name: "",
-  tracking_param_value: "",
   tracking_param_value_env_key: "",
   notes: "",
 };
@@ -69,7 +67,6 @@ export function AdminAffiliatesPage() {
             strategy: merchant.strategy,
             deeplink_template: merchant.deeplink_template || "",
             tracking_param_name: merchant.tracking_param_name || "",
-            tracking_param_value: merchant.tracking_param_value || "",
             tracking_param_value_env_key: merchant.tracking_param_value_env_key || "",
             notes: merchant.notes || "",
           }
@@ -210,14 +207,10 @@ export function AdminAffiliatesPage() {
                 <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_name} onChange={(event) => setValues((current) => ({ ...current, tracking_param_name: event.target.value }))} />
               </label>
               <label className="grid gap-2">
-                <span className="text-sm font-semibold text-warm-700">Tracking value</span>
-                <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_value} onChange={(event) => setValues((current) => ({ ...current, tracking_param_value: event.target.value }))} />
+                <span className="text-sm font-semibold text-warm-700">Vault env key</span>
+                <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_value_env_key} onChange={(event) => setValues((current) => ({ ...current, tracking_param_value_env_key: event.target.value }))} />
               </label>
             </div>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-warm-700">Env key</span>
-              <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_value_env_key} onChange={(event) => setValues((current) => ({ ...current, tracking_param_value_env_key: event.target.value }))} />
-            </label>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">Notes</span>
               <textarea className="min-h-24 rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.notes} onChange={(event) => setValues((current) => ({ ...current, notes: event.target.value }))} />

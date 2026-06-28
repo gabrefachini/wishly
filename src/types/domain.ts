@@ -1,6 +1,7 @@
 export type Locale = "en" | "pt-BR";
 
 export type WishlistVisibility = "private" | "public_link";
+export type WishlistType = "event" | "wishlist";
 export type GiftPriority = "must_have" | "nice_to_have" | "surprise_me";
 export type GiftStatus = "available" | "reserved" | "purchased";
 export type ReservationStatus = "reserved" | "purchased" | "cancelled";
@@ -13,8 +14,38 @@ export type ContributionPaymentStatus = "pending" | "paid" | "failed" | "refunde
 export type SponsoredItemStatus = "draft" | "active" | "paused" | "archived";
 export type SponsoredItemLocale = "en" | "pt-BR" | "all";
 export type WishlistThemeColor = "coral" | "blush" | "terracotta" | "lavender" | "sky" | "sage";
+export type WishlistThemePreset = "default" | "baby" | "wedding" | "birthday" | "christmas" | "newHome" | "minimal";
 export type EventRsvpResponse = "yes" | "no" | "maybe";
 export type AffiliateConversionStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type PriceRadarTier = "free" | "premium";
+export type PriceTrend = "up" | "down" | "stable" | "unknown";
+export type PriceRecommendationStatus = "buy_now" | "good_price" | "normal_price" | "wait" | "high_price" | "no_data";
+export type PriceRecommendationSeverity = "positive" | "neutral" | "warning";
+export type PriceRadarPriority = "must_buy" | "maybe_buy" | "sale_only" | "future_gift";
+export type PriceAlertPreference =
+  | "any_drop"
+  | "drop_5"
+  | "drop_10"
+  | "below_target"
+  | "back_to_low"
+  | "weekly_summary"
+  | "relevant_only";
+
+export type GiftPriceHistoryEntry = {
+  checked_at: string;
+  price: number;
+  currency: string;
+  store_name: string | null;
+  source_url: string | null;
+};
+
+export type GiftPriceOffer = {
+  store_name: string;
+  price: number;
+  url: string;
+  availability: string;
+  last_checked_at: string;
+};
 
 export type Profile = {
   id: string;
@@ -23,6 +54,7 @@ export type Profile = {
   email: string;
   avatar_url: string | null;
   locale: Locale;
+  price_radar_tier: PriceRadarTier;
   created_at: string;
   updated_at: string;
 };
@@ -30,12 +62,18 @@ export type Profile = {
 export type WishlistRecord = {
   id: string;
   owner_id: string;
+  type: WishlistType;
   title: string;
   occasion: string;
   event_date: string | null;
   message: string | null;
   cover_image_url: string | null;
   theme_color: WishlistThemeColor | null;
+  theme_preset: WishlistThemePreset;
+  theme_primary_color: string | null;
+  theme_secondary_color: string | null;
+  use_custom_theme: boolean;
+  is_price_radar_enabled: boolean;
   slug: string | null;
   visibility: WishlistVisibility;
   share_id: string;
@@ -65,6 +103,22 @@ export type GiftRecord = {
   funding_currency: string;
   funding_received_amount: number;
   funding_status: FundingStatus;
+  price_tracking_enabled: boolean;
+  current_price: number | null;
+  original_price: number | null;
+  lowest_price: number | null;
+  highest_price: number | null;
+  average_price: number | null;
+  target_price: number | null;
+  last_checked_at: string | null;
+  price_change_percentage: number | null;
+  price_trend: PriceTrend;
+  opportunity_score: number | null;
+  recommendation_status: PriceRecommendationStatus;
+  price_radar_priority: PriceRadarPriority;
+  price_alert_preferences: PriceAlertPreference[];
+  price_history?: GiftPriceHistoryEntry[];
+  price_offers?: GiftPriceOffer[];
   source_sponsored_item_id: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -109,7 +163,6 @@ export type AffiliateMerchantRecord = {
   strategy: AffiliateStrategy;
   deeplink_template: string | null;
   tracking_param_name: string | null;
-  tracking_param_value: string | null;
   tracking_param_value_env_key: string | null;
   notes: string | null;
   created_at: string;

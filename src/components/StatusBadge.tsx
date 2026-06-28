@@ -11,6 +11,7 @@ type StatusBadgeProps = {
     | "groupGift"
     | "funded";
   tone?: "status" | "priority" | "neutral";
+  themed?: boolean;
 };
 
 const statusClasses: Record<string, string> = {
@@ -35,13 +36,19 @@ const labelKeys: Record<StatusBadgeProps["label"], string> = {
   funded: "giftFunding.fullyFunded",
 };
 
-export function StatusBadge({ label }: StatusBadgeProps) {
+export function StatusBadge({ label, themed = false }: StatusBadgeProps) {
   const { t } = useTranslation();
+  const isReserved = label === "reserved";
+  const isPrimaryAccent = label === "mustHave";
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-        statusClasses[label] ?? "bg-warm-50 text-warm-500 ring-warm-100"
+        themed && isReserved
+          ? "bg-[var(--wishlist-secondary-soft)] text-[var(--wishlist-badge)] ring-[var(--wishlist-secondary-soft)]"
+          : themed && isPrimaryAccent
+            ? "bg-[var(--wishlist-primary-soft)] text-[var(--wishlist-primary)] ring-[var(--wishlist-primary-soft)]"
+            : statusClasses[label] ?? "bg-warm-50 text-warm-500 ring-warm-100"
       }`}
     >
       {t(labelKeys[label])}

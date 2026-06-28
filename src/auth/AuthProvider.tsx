@@ -7,10 +7,12 @@ import { ensureProfile, getSession, onAuthStateChange, signOut } from "../servic
 import type { Session } from "@supabase/supabase-js";
 import { AuthContext } from "./authContext";
 import type { Profile } from "../types/domain";
+import { isCurrentUserAdmin } from "../lib/admin";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function load(sessionValue: Session | null) {
@@ -18,18 +20,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!sessionValue) {
       setProfile(null);
+      setIsAdmin(false);
       setLoading(false);
       return;
     }
 
     try {
-      const nextProfile = await ensureProfile(sessionValue);
+      const [nextProfile, nextIsAdmin] = await Promise.all([
+        ensureProfile(sessionValue),
+        isCurrentUserAdmin().catch(() => false),
+      ]);
       setProfile(nextProfile);
+      setIsAdmin(nextIsAdmin);
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error("auth_profile_load_failed", error);
       }
       setProfile(null);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -65,16 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut();
     setProfile(null);
     setSession(null);
+    setIsAdmin(false);
   }
 
   async function refreshProfile() {
-    const nextProfile = await ensureProfile(session);
+    const [nextProfile, nextIsAdmin] = await Promise.all([
+      ensureProfile(session),
+      session ? isCurrentUserAdmin().catch(() => false) : Promise.resolve(false),
+    ]);
     setProfile(nextProfile);
+    setIsAdmin(nextIsAdmin);
   }
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, signOutUser, refreshProfile }}
+      value={{ session, profile, isAdmin, loading, signOutUser, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

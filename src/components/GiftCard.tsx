@@ -34,6 +34,7 @@ type GiftCardProps = {
   onContribute?: (giftId: string) => void;
   ownerAction?: ReactNode;
   suppressOwnerStatusNote?: boolean;
+  themed?: boolean;
 };
 
 export function GiftCard({
@@ -43,6 +44,7 @@ export function GiftCard({
   onContribute,
   ownerAction,
   suppressOwnerStatusNote = false,
+  themed = false,
 }: GiftCardProps) {
   const { t } = useTranslation();
   const disabled = gift.status !== "available";
@@ -54,9 +56,9 @@ export function GiftCard({
         <img src={gift.image} alt={gift.name} className="h-28 w-full rounded-[22px] object-cover" />
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2">
-            <StatusBadge label={gift.status} />
-            <StatusBadge label={gift.priority} />
-            {isCollective ? <StatusBadge label={gift.funding?.isFunded ? "funded" : "groupGift"} /> : null}
+            <StatusBadge label={gift.status} themed={themed} />
+            <StatusBadge label={gift.priority} themed={themed} />
+            {isCollective ? <StatusBadge label={gift.funding?.isFunded ? "funded" : "groupGift"} themed={themed} /> : null}
           </div>
           <h3 className="mt-3 text-base font-bold text-warm-900">{gift.name}</h3>
           <p className="mt-1 text-sm text-warm-500">
@@ -74,15 +76,21 @@ export function GiftCard({
       {gift.note ? <p className="mt-4 text-sm text-warm-500">{gift.note}</p> : null}
 
       {gift.funding ? (
-        <div className="mt-4 grid gap-2 rounded-[22px] bg-warm-50/70 p-3">
+        <div
+          className={`mt-4 grid gap-2 rounded-[22px] p-3 ${themed ? "" : "bg-warm-50/70"}`}
+          style={themed ? { backgroundColor: "var(--wishlist-secondary-soft)" } : undefined}
+        >
           <div className="flex items-center justify-between gap-3 text-xs font-semibold text-warm-500">
             <span>{t("giftFunding.raised")}: {gift.funding.raisedLabel}</span>
             <span>{t("giftFunding.goal")}: {gift.funding.goalLabel}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-warm-100">
             <div
-              className="h-full rounded-full bg-coral transition-[width]"
-              style={{ width: `${gift.funding.progress}%` }}
+              className={`h-full rounded-full transition-[width] ${themed ? "" : "bg-coral"}`}
+              style={{
+                width: `${gift.funding.progress}%`,
+                backgroundColor: themed ? "var(--wishlist-progress)" : undefined,
+              }}
             />
           </div>
           <p className="text-xs text-warm-500">
@@ -106,7 +114,8 @@ export function GiftCard({
         {mode === "visitor" && gift.buyHref ? (
           <a
             href={gift.buyHref}
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 text-sm font-semibold text-warm-700 shadow-card transition ${themed ? "" : "hover:border-coral/35 hover:text-terracotta"}`}
+            style={themed ? { borderColor: "var(--wishlist-primary-soft)" } : undefined}
           >
             <ExternalLink size={16} aria-hidden="true" />
             {t("actions.buyWithAffiliate")}
@@ -124,6 +133,14 @@ export function GiftCard({
           <PrimaryButton
             disabled={disabled || (isCollective && gift.funding?.isFunded)}
             className="w-full disabled:cursor-not-allowed disabled:bg-warm-300"
+            style={
+              themed
+                ? {
+                    backgroundColor: "var(--wishlist-button)",
+                    boxShadow: "0 14px 28px var(--wishlist-primary-soft)",
+                  }
+                : undefined
+            }
             onClick={() => (isCollective ? onContribute?.(gift.id) : onReserve?.(gift.id))}
           >
             {isCollective ? <HeartHandshake size={17} aria-hidden="true" /> : <ShoppingBag size={17} aria-hidden="true" />}
@@ -134,12 +151,20 @@ export function GiftCard({
                 : t("actions.buyThis")}
           </PrimaryButton>
           {isCollective ? (
-            <SecondaryButton className="w-full" onClick={() => onContribute?.(gift.id)}>
+            <SecondaryButton
+              className="w-full"
+              style={themed ? { borderColor: "var(--wishlist-primary-soft)", color: "var(--wishlist-primary)" } : undefined}
+              onClick={() => onContribute?.(gift.id)}
+            >
               <HeartHandshake size={17} aria-hidden="true" />
               {t("actions.buyTogether")}
             </SecondaryButton>
           ) : (
-            <SecondaryButton className="w-full" onClick={() => onReserve?.(gift.id)}>
+            <SecondaryButton
+              className="w-full"
+              style={themed ? { borderColor: "var(--wishlist-primary-soft)", color: "var(--wishlist-primary)" } : undefined}
+              onClick={() => onReserve?.(gift.id)}
+            >
               <ShoppingBag size={17} aria-hidden="true" />
               {t("actions.reserveGift")}
             </SecondaryButton>

@@ -39,7 +39,6 @@ export function AdminSettingsPage() {
       <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
         <h2 className="text-lg font-bold text-warm-900">{t("admin.requiredEnv")}</h2>
         <ul className="mt-4 grid gap-2 text-sm text-warm-600">
-          <li>VITE_ADMIN_EMAILS</li>
           <li>VITE_AFFILIATE_DISCLOSURE_ENABLED</li>
           <li>MERCADOLIVRE_AFFILIATE_TAG in Supabase Vault</li>
           <li>SHEIN_AFFILIATE_TAG in Supabase Vault</li>

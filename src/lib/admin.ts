@@ -1,18 +1,20 @@
-import type { User } from "@supabase/supabase-js";
-import { env } from "./env";
 import { supabase } from "./supabase";
 
 export function normalizeAdminEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
 }
 
-export function getConfiguredAdminEmails() {
-  return env.adminEmails.map(normalizeAdminEmail).filter(Boolean);
-}
+export async function isCurrentUserAdmin() {
+  if (!supabase) {
+    return false;
+  }
 
-export function isAdminUser(user: Pick<User, "email"> | null | undefined) {
-  const email = normalizeAdminEmail(user?.email);
-  return Boolean(email) && getConfiguredAdminEmails().includes(email);
+  const { data, error } = await supabase.rpc("is_admin_user");
+  if (error) {
+    throw error;
+  }
+
+  return data === true;
 }
 
 export async function getCurrentAdminUser() {
@@ -20,8 +22,8 @@ export async function getCurrentAdminUser() {
     return null;
   }
 
-  const { data } = await supabase.auth.getUser();
-  return isAdminUser(data.user) ? data.user : null;
+  const [{ data }, isAdmin] = await Promise.all([supabase.auth.getUser(), isCurrentUserAdmin()]);
+  return isAdmin ? data.user : null;
 }
 
 export async function requireAdmin() {
@@ -34,7 +36,7 @@ export async function requireAdmin() {
     throw new Error("auth_required");
   }
 
-  if (!isAdminUser(data.user)) {
+  if (!(await isCurrentUserAdmin())) {
     throw new Error("admin_required");
   }
 

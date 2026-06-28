@@ -1,16 +1,31 @@
 import { supabase } from "../lib/supabase";
-import { createShareId } from "../lib/share";
 import { invariantSupabase } from "../lib/http";
-import type { GiftPurchaseType, GiftRecord, GiftStatus, ReservationRecord, WishlistRecord, WishlistWithGifts } from "../types/domain";
+import type {
+  GiftPurchaseType,
+  GiftRecord,
+  GiftStatus,
+  PriceAlertPreference,
+  PriceRadarPriority,
+  ReservationRecord,
+  WishlistRecord,
+  WishlistType,
+  WishlistWithGifts,
+} from "../types/domain";
 
 type CreateWishlistInput = {
   owner_id: string;
   title: string;
   occasion: string;
+  type: WishlistType;
   event_date?: string;
   message?: string;
   cover_image_url?: string;
   visibility: "private" | "public_link";
+  theme_preset: "default" | "baby" | "wedding" | "birthday" | "christmas" | "newHome" | "minimal";
+  theme_primary_color: string;
+  theme_secondary_color: string;
+  use_custom_theme: boolean;
+  is_price_radar_enabled: boolean;
   locale: "en" | "pt-BR";
 };
 
@@ -18,10 +33,16 @@ type UpdateWishlistInput = {
   id: string;
   title: string;
   occasion: string;
+  type: WishlistType;
   event_date?: string;
   message?: string;
   cover_image_url?: string;
   visibility: "private" | "public_link";
+  theme_preset: "default" | "baby" | "wedding" | "birthday" | "christmas" | "newHome" | "minimal";
+  theme_primary_color: string;
+  theme_secondary_color: string;
+  use_custom_theme: boolean;
+  is_price_radar_enabled: boolean;
 };
 
 type CreateGiftInput = {
@@ -36,6 +57,11 @@ type CreateGiftInput = {
   purchase_type: GiftPurchaseType;
   funding_goal_amount?: number;
   funding_currency?: string;
+  price_tracking_enabled: boolean;
+  current_price?: number;
+  target_price?: number;
+  price_radar_priority: PriceRadarPriority;
+  price_alert_preferences: PriceAlertPreference[];
 };
 
 type UpdateGiftInput = {
@@ -50,6 +76,11 @@ type UpdateGiftInput = {
   purchase_type: GiftPurchaseType;
   funding_goal_amount?: number;
   funding_currency?: string;
+  price_tracking_enabled: boolean;
+  current_price?: number;
+  target_price?: number;
+  price_radar_priority: PriceRadarPriority;
+  price_alert_preferences: PriceAlertPreference[];
 };
 
 export async function listMyWishlists() {
@@ -59,7 +90,7 @@ export async function listMyWishlists() {
 
   const { data, error } = await supabase!
     .from("wishlists")
-    .select("*, gifts(*)")
+    .select("*, gifts(*, price_history(*), price_alerts(*))")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -84,7 +115,7 @@ export async function getMyWishlist(id: string) {
 
   const { data, error } = await supabase!
     .from("wishlists")
-    .select("*, gifts(*)")
+    .select("*, gifts(*, price_history(*), price_alerts(*))")
     .eq("id", id)
     .maybeSingle();
 
@@ -111,10 +142,15 @@ export async function createWishlist(input: CreateWishlistInput) {
     .from("wishlists")
     .insert({
       ...input,
-      share_id: createShareId(),
       event_date: input.event_date || null,
       message: input.message || null,
       cover_image_url: input.cover_image_url || null,
+      type: input.type,
+      theme_preset: input.theme_preset,
+      theme_primary_color: input.theme_primary_color,
+      theme_secondary_color: input.theme_secondary_color,
+      use_custom_theme: input.use_custom_theme,
+      is_price_radar_enabled: input.is_price_radar_enabled,
     })
     .select("*")
     .single<WishlistRecord>();
@@ -136,10 +172,16 @@ export async function updateWishlist(input: UpdateWishlistInput) {
     .update({
       title: input.title,
       occasion: input.occasion,
+      type: input.type,
       event_date: input.event_date || null,
       message: input.message || null,
       cover_image_url: input.cover_image_url || null,
       visibility: input.visibility,
+      theme_preset: input.theme_preset,
+      theme_primary_color: input.theme_primary_color,
+      theme_secondary_color: input.theme_secondary_color,
+      use_custom_theme: input.use_custom_theme,
+      is_price_radar_enabled: input.is_price_radar_enabled,
     })
     .eq("id", input.id)
     .select("*")
@@ -172,6 +214,11 @@ export async function createGift(input: CreateGiftInput) {
         input.purchase_type === "collective"
           ? (input.funding_currency || input.currency).toUpperCase()
           : input.currency.toUpperCase(),
+      price_tracking_enabled: input.price_tracking_enabled,
+      current_price: input.current_price ?? null,
+      target_price: input.target_price ?? null,
+      price_radar_priority: input.price_radar_priority,
+      price_alert_preferences: input.price_alert_preferences,
     })
     .select("*")
     .single<GiftRecord>();
@@ -205,6 +252,11 @@ export async function updateGift(input: UpdateGiftInput) {
         input.purchase_type === "collective"
           ? (input.funding_currency || input.currency).toUpperCase()
           : input.currency.toUpperCase(),
+      price_tracking_enabled: input.price_tracking_enabled,
+      current_price: input.current_price ?? null,
+      target_price: input.target_price ?? null,
+      price_radar_priority: input.price_radar_priority,
+      price_alert_preferences: input.price_alert_preferences,
     })
     .eq("id", input.id)
     .select("*")
@@ -250,6 +302,40 @@ export async function deleteGift(giftId: string) {
   if (error) {
     throw error;
   }
+}
+
+export async function updateGiftRadarSettings(
+  giftId: string,
+  input: {
+    price_tracking_enabled: boolean;
+    current_price?: number | null;
+    target_price?: number | null;
+    price_radar_priority: PriceRadarPriority;
+    price_alert_preferences: PriceAlertPreference[];
+  },
+) {
+  if (!supabase) {
+    invariantSupabase();
+  }
+
+  const { data, error } = await supabase!
+    .from("gifts")
+    .update({
+      price_tracking_enabled: input.price_tracking_enabled,
+      current_price: input.current_price ?? null,
+      target_price: input.target_price ?? null,
+      price_radar_priority: input.price_radar_priority,
+      price_alert_preferences: input.price_alert_preferences,
+    })
+    .eq("id", giftId)
+    .select("*")
+    .single<GiftRecord>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export async function archiveWishlist(wishlistId: string) {
