@@ -7,7 +7,7 @@ import { resendSignupConfirmation, signInWithPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { SetupNotice } from "../components/SetupNotice";
 import { WishlyLogo } from "../components/WishlyLogo";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { updateMetadata } from "../lib/metadata";
 
 export function LoginPage() {
@@ -43,7 +43,7 @@ export function LoginPage() {
     }
   }, [location.search, t]);
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     return (
       <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">

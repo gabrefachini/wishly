@@ -1,3 +1,4 @@
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
 
@@ -29,6 +30,19 @@ export function validateImageFile(file: File) {
 }
 
 export async function uploadWishlistCover(file: File, authUserId: string) {
+  if (isDemoMode) {
+    validateImageFile(file);
+
+    const reader = new FileReader();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error || new Error("image_upload_failed"));
+      reader.readAsDataURL(file);
+    });
+
+    return dataUrl;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }

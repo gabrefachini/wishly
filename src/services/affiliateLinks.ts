@@ -1,6 +1,8 @@
 import { buildGiftRedirectPath, extractMerchantDomain } from "../lib/affiliate";
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
+import { resolveDemoGiftRedirect } from "../data/demoState";
 
 type ResolveGiftRedirectInput = {
   giftId: string;
@@ -16,6 +18,10 @@ export const AffiliateLinkService = {
 };
 
 export async function resolveGiftRedirect(input: ResolveGiftRedirectInput) {
+  if (isDemoMode) {
+    return resolveDemoGiftRedirect(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }

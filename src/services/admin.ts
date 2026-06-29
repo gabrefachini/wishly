@@ -1,6 +1,16 @@
+import { isDemoMode } from "../lib/env";
 import { requireAdmin } from "../lib/admin";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
+import {
+  deleteDemoAffiliateMerchant,
+  listDemoAdminAuditLogs,
+  listDemoAffiliateMerchants,
+  listDemoSponsoredItems,
+  saveDemoAffiliateMerchant,
+  saveDemoSponsoredItem,
+  updateDemoSponsoredItemStatus,
+} from "../data/demoState";
 import type {
   AdminAuditLogRecord,
   AffiliateMerchantRecord,
@@ -37,6 +47,10 @@ type SponsoredItemInput = {
 };
 
 async function insertAuditLog(payload: Omit<AdminAuditLogRecord, "id" | "created_at">) {
+  if (isDemoMode) {
+    return;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -48,6 +62,11 @@ async function insertAuditLog(payload: Omit<AdminAuditLogRecord, "id" | "created
 }
 
 export async function listAffiliateMerchants() {
+  if (isDemoMode) {
+    await requireAdmin();
+    return listDemoAffiliateMerchants();
+  }
+
   await requireAdmin();
   if (!supabase) {
     invariantSupabase();
@@ -69,6 +88,11 @@ export async function saveAffiliateMerchant(
   input: MerchantInput,
   existing?: AffiliateMerchantRecord | null,
 ) {
+  if (isDemoMode) {
+    await requireAdmin();
+    return saveDemoAffiliateMerchant(input, existing);
+  }
+
   const adminUser = await requireAdmin();
   if (!supabase) {
     invariantSupabase();
@@ -108,6 +132,12 @@ export async function saveAffiliateMerchant(
 }
 
 export async function deleteAffiliateMerchant(merchant: AffiliateMerchantRecord) {
+  if (isDemoMode) {
+    await requireAdmin();
+    deleteDemoAffiliateMerchant(merchant);
+    return;
+  }
+
   const adminUser = await requireAdmin();
   if (!supabase) {
     invariantSupabase();
@@ -130,6 +160,11 @@ export async function deleteAffiliateMerchant(merchant: AffiliateMerchantRecord)
 }
 
 export async function listSponsoredItems() {
+  if (isDemoMode) {
+    await requireAdmin();
+    return listDemoSponsoredItems();
+  }
+
   await requireAdmin();
   if (!supabase) {
     invariantSupabase();
@@ -152,6 +187,11 @@ export async function saveSponsoredItem(
   input: SponsoredItemInput,
   existing?: SponsoredItemRecord | null,
 ) {
+  if (isDemoMode) {
+    await requireAdmin();
+    return saveDemoSponsoredItem(input, existing);
+  }
+
   const adminUser = await requireAdmin();
   if (!supabase) {
     invariantSupabase();
@@ -197,6 +237,11 @@ export async function saveSponsoredItem(
 }
 
 export async function updateSponsoredItemStatus(item: SponsoredItemRecord, status: SponsoredItemStatus) {
+  if (isDemoMode) {
+    await requireAdmin();
+    return updateDemoSponsoredItemStatus(item, status);
+  }
+
   return saveSponsoredItem(
     {
       title: item.title,
@@ -219,6 +264,11 @@ export async function updateSponsoredItemStatus(item: SponsoredItemRecord, statu
 }
 
 export async function listAdminAuditLogs() {
+  if (isDemoMode) {
+    await requireAdmin();
+    return listDemoAdminAuditLogs();
+  }
+
   await requireAdmin();
   if (!supabase) {
     invariantSupabase();

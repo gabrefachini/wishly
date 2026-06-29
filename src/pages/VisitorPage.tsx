@@ -8,7 +8,7 @@ import { EmptyState, SuccessState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { featuredGift, localized, wishlists } from "../data/mockData";
 import { buildGiftRedirectPath } from "../lib/affiliate";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { getWishlistThemeCssVars } from "../lib/wishlistAppearance";
 import { formatCurrency, formatDate } from "../i18n/formatters";
 import { useTranslation } from "../i18n/useTranslation";
@@ -37,7 +37,7 @@ export function VisitorPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [wishlist, setWishlist] = useState<(WishlistRecord & { gifts: GiftRecord[] }) | null>(null);
-  const [loading, setLoading] = useState(hasSupabaseEnv);
+  const [loading, setLoading] = useState(hasSupabaseEnv || isDemoMode);
   const [error, setError] = useState<string | null>(null);
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null);
   const [selectedContributionGiftId, setSelectedContributionGiftId] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export function VisitorPage() {
   });
 
   useEffect(() => {
-    if (!hasSupabaseEnv || !shareId) {
+    if ((!hasSupabaseEnv && !isDemoMode) || !shareId) {
       return;
     }
 
@@ -90,7 +90,7 @@ export function VisitorPage() {
 
   const selectedGift = useMemo(() => {
     if (!selectedGiftId) return null;
-    if (!hasSupabaseEnv) {
+    if (!hasSupabaseEnv && !isDemoMode) {
       return featuredGift.id === selectedGiftId ? featuredGift : null;
     }
     return wishlist?.gifts.find((gift) => gift.id === selectedGiftId) ?? null;
@@ -177,7 +177,7 @@ export function VisitorPage() {
     }
   }
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     const demoWishlist = wishlists.find((item) => item.shareId === shareId) ?? wishlists[0];
 
     return (

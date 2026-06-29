@@ -5,6 +5,7 @@ import { EmptyState, SuccessState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { formatCurrency } from "../i18n/formatters";
 import { useTranslation } from "../i18n/useTranslation";
+import { isDemoMode } from "../lib/env";
 import { confirmMockContribution, getContributionCheckout } from "../services/contributions";
 
 export function MockCheckoutPage() {
@@ -14,7 +15,7 @@ export function MockCheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [paid, setPaid] = useState(false);
-  const mockCheckoutDisabled = !import.meta.env.DEV;
+  const mockCheckoutDisabled = !(import.meta.env.DEV || isDemoMode);
 
   useEffect(() => {
     if (mockCheckoutDisabled) {

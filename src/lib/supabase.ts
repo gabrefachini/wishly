@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { env, hasSupabaseEnv } from "./env";
+import { env, hasSupabaseEnv, isDemoMode } from "./env";
 
-export const supabase = hasSupabaseEnv
+export const supabase = hasSupabaseEnv && !isDemoMode
   ? createClient(env.supabaseUrl!, env.supabaseAnonKey!, {
       auth: {
         persistSession: true,

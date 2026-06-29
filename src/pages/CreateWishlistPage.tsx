@@ -4,7 +4,7 @@ import { useAuth } from "../auth/useAuth";
 import { CreateWishlistForm } from "../components/Forms";
 import { SetupNotice } from "../components/SetupNotice";
 import { getCreateWishlistErrorMessage } from "../lib/errors";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { createWishlistSchema } from "../lib/validation";
 import { useTranslation } from "../i18n/useTranslation";
 import { WISHLIST_THEME_PRESETS } from "../lib/wishlistAppearance";
@@ -49,7 +49,7 @@ export function CreateWishlistPage() {
   const [coverUploading, setCoverUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     return <SetupNotice />;
   }
 

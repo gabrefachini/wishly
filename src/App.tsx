@@ -18,12 +18,14 @@ import { LandingPage } from "./pages/LandingPage";
 import { DiscoverPage } from "./pages/DiscoverPage";
 import { ListIndexPage } from "./pages/ListIndexPage";
 import { PremiumRadarPage } from "./pages/PremiumRadarPage";
+import { PriceRadarPreviewPage } from "./pages/PriceRadarPreviewPage";
 import { LoginPage } from "./pages/LoginPage";
 import { MockCheckoutPage } from "./pages/MockCheckoutPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SignupPage } from "./pages/SignupPage";
 import { VisitorPage } from "./pages/VisitorPage";
 import { WishlistDetailPage } from "./pages/WishlistDetailPage";
+import { isDemoMode } from "./lib/env";
 
 export default function App() {
   return (
@@ -58,9 +60,10 @@ export default function App() {
         </Route>
       </Route>
       <Route path="/go/gift/:giftId" element={<GoGiftPage />} />
-      {import.meta.env.DEV ? (
+      {import.meta.env.DEV || isDemoMode ? (
         <Route path="/checkout/mock/:contributionId" element={<MockCheckoutPage />} />
       ) : null}
+      {import.meta.env.DEV ? <Route path="/dev/price-radar-preview" element={<PriceRadarPreviewPage />} /> : null}
       <Route path="/w/:shareId" element={<VisitorPage />} />
     </Routes>
   );

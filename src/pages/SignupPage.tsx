@@ -8,7 +8,7 @@ import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { SetupNotice } from "../components/SetupNotice";
 import { SuccessState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { updateMetadata } from "../lib/metadata";
 
 export function SignupPage() {
@@ -28,7 +28,7 @@ export function SignupPage() {
     });
   }, [t]);
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     return (
       <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">

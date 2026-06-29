@@ -4,7 +4,7 @@ import { useAuth } from "../auth/useAuth";
 import { AddGiftForm } from "../components/Forms";
 import { EmptyState } from "../components/States";
 import { SetupNotice } from "../components/SetupNotice";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { normalizeMonetaryInput } from "../lib/money";
 import { normalizeProductUrl } from "../lib/productPreview";
 import { giftSchema } from "../lib/validation";
@@ -172,7 +172,7 @@ export function AddGiftPage() {
     };
   }, [t, values.store_url]);
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     return <SetupNotice />;
   }
 

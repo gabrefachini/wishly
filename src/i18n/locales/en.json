@@ -411,7 +411,12 @@
     "freeLimit": "Free accounts can monitor up to 2 items.",
     "currentPrice": "Current price",
     "targetPrice": "Target price",
-    "priority": "Tracking priority",
+    "priority": {
+      "mustBuy": "I really want it",
+      "maybeBuy": "Maybe I'll buy it",
+      "saleOnly": "Only if it goes on sale",
+      "futureGift": "Future gift"
+    },
     "current": "Current",
     "lowest": "Lowest",
     "average": "Average",
@@ -452,11 +457,34 @@
       "weeklySummary": "Weekly summary",
       "relevantOnly": "Only relevant opportunities"
     },
-    "priority": {
-      "mustBuy": "I really want it",
-      "maybeBuy": "Maybe I'll buy it",
-      "saleOnly": "Only if it goes on sale",
-      "futureGift": "Future gift"
+    "summary": {
+      "title": "Compact radar summary",
+      "body": "The current price is highlighted, with history and opportunity signals organized in a single card.",
+      "realtime": "Continuous reading",
+      "updatedOften": "Frequent checks",
+      "learning": "Collecting history"
+    },
+    "item": {
+      "active": "Radar active",
+      "inactive": "Radar inactive",
+      "status": "Price analysis",
+      "currentPrice": "Current price",
+      "lowestPrice": "Lowest price",
+      "averagePrice": "Average",
+      "targetPrice": "Target price",
+      "noTarget": "No target set",
+      "monitoringSince": "Monitoring since",
+      "lastChecked": "Last checked",
+      "noHistory": "No history yet",
+      "collectingHistoryShort": "Collecting history for this item",
+      "collectingHistoryTitle": "We are still collecting history for this item.",
+      "collectingHistoryBody": "Monitoring since today. Soon you will see trend, lowest price, and average.",
+      "historyCaptured": "Enough history to show a trend.",
+      "unknownStore": "Unknown store",
+      "trendDown": "Price is falling",
+      "trendUp": "Price is rising",
+      "trendStable": "Price is stable",
+      "trendUnknown": "Trend not defined yet"
     }
   },
   "theme": {

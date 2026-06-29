@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { isDemoMode } from "../lib/env";
 import { useTranslation } from "../i18n/useTranslation";
 
 export function PublicOnlyRoute() {
@@ -10,7 +11,7 @@ export function PublicOnlyRoute() {
     return <div className="py-20 text-center text-sm text-warm-500">{t("common.loading")}</div>;
   }
 
-  if (session) {
+  if (session && !isDemoMode) {
     return <Navigate to="/app" replace />;
   }
 

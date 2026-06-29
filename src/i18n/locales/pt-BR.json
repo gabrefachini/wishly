@@ -411,7 +411,12 @@
     "freeLimit": "Contas gratuitas podem monitorar até 2 itens.",
     "currentPrice": "Preço atual",
     "targetPrice": "Preço-alvo",
-    "priority": "Prioridade do monitoramento",
+    "priority": {
+      "mustBuy": "Quero muito",
+      "maybeBuy": "Talvez compre",
+      "saleOnly": "Só se entrar em promoção",
+      "futureGift": "Presente futuro"
+    },
     "current": "Atual",
     "lowest": "Menor",
     "average": "Média",
@@ -452,11 +457,34 @@
       "weeklySummary": "Resumo semanal",
       "relevantOnly": "Somente oportunidades relevantes"
     },
-    "priority": {
-      "mustBuy": "Quero muito",
-      "maybeBuy": "Talvez compre",
-      "saleOnly": "Só se entrar em promoção",
-      "futureGift": "Presente futuro"
+    "summary": {
+      "title": "Resumo compacto do radar",
+      "body": "O preço atual fica em destaque, com histórico e sinais de oportunidade organizados em um único card.",
+      "realtime": "Leitura contínua",
+      "updatedOften": "Checagens frequentes",
+      "learning": "Coletando histórico"
+    },
+    "item": {
+      "active": "Radar ativo",
+      "inactive": "Radar inativo",
+      "status": "Análise do preço",
+      "currentPrice": "Preço atual",
+      "lowestPrice": "Menor preço",
+      "averagePrice": "Média",
+      "targetPrice": "Preço-alvo",
+      "noTarget": "Sem alvo definido",
+      "monitoringSince": "Monitorando desde",
+      "lastChecked": "Última checagem",
+      "noHistory": "Sem histórico ainda",
+      "collectingHistoryShort": "Coletando histórico deste item",
+      "collectingHistoryTitle": "Ainda estamos coletando histórico deste item.",
+      "collectingHistoryBody": "Monitorando desde hoje. Em breve você verá tendência, menor preço e média.",
+      "historyCaptured": "Histórico suficiente para mostrar tendência.",
+      "unknownStore": "Loja não identificada",
+      "trendDown": "Preço em queda",
+      "trendUp": "Preço em alta",
+      "trendStable": "Preço estável",
+      "trendUnknown": "Tendência ainda não definida"
     }
   },
   "theme": {

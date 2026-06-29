@@ -6,7 +6,7 @@ import { useTranslation } from "../i18n/useTranslation";
 import { resetPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { SetupNotice } from "../components/SetupNotice";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
@@ -15,7 +15,7 @@ export function ForgotPasswordPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!hasSupabaseEnv) {
+  if (!hasSupabaseEnv && !isDemoMode) {
     return (
       <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">

@@ -1,5 +1,7 @@
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
+import { reserveDemoGift } from "../data/demoState";
 
 type ReserveGiftInput = {
   shareId: string;
@@ -10,6 +12,10 @@ type ReserveGiftInput = {
 };
 
 export async function reserveGift(input: ReserveGiftInput) {
+  if (isDemoMode) {
+    return reserveDemoGift(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }

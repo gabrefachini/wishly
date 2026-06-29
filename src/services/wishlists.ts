@@ -1,5 +1,23 @@
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
+import {
+  archiveDemoWishlist,
+  createDemoGift,
+  createDemoWishlist,
+  deleteDemoGift,
+  getDemoPublicWishlist,
+  getDemoWishlist,
+  listDemoActiveWishlists,
+  listDemoReservationsForWishlist,
+  listDemoSponsoredItems,
+  listDemoWishlists,
+  restoreDemoWishlist,
+  updateDemoGift,
+  updateDemoGiftRadarSettings,
+  updateDemoGiftStatus,
+  updateDemoWishlist,
+} from "../data/demoState";
 import type {
   GiftPurchaseType,
   GiftRecord,
@@ -84,6 +102,10 @@ type UpdateGiftInput = {
 };
 
 export async function listMyWishlists() {
+  if (isDemoMode) {
+    return listDemoWishlists();
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -104,11 +126,19 @@ export async function listMyWishlists() {
 }
 
 export async function listActiveWishlists() {
+  if (isDemoMode) {
+    return listDemoActiveWishlists();
+  }
+
   const items = await listMyWishlists();
   return items.filter((wishlist) => wishlist.archived_at === null);
 }
 
 export async function getMyWishlist(id: string) {
+  if (isDemoMode) {
+    return getDemoWishlist(id);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -134,6 +164,10 @@ export async function getMyWishlist(id: string) {
 }
 
 export async function createWishlist(input: CreateWishlistInput) {
+  if (isDemoMode) {
+    return createDemoWishlist(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -163,6 +197,10 @@ export async function createWishlist(input: CreateWishlistInput) {
 }
 
 export async function updateWishlist(input: UpdateWishlistInput) {
+  if (isDemoMode) {
+    return updateDemoWishlist(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -195,6 +233,10 @@ export async function updateWishlist(input: UpdateWishlistInput) {
 }
 
 export async function createGift(input: CreateGiftInput) {
+  if (isDemoMode) {
+    return createDemoGift(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -231,6 +273,10 @@ export async function createGift(input: CreateGiftInput) {
 }
 
 export async function updateGift(input: UpdateGiftInput) {
+  if (isDemoMode) {
+    return updateDemoGift(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -270,6 +316,10 @@ export async function updateGift(input: UpdateGiftInput) {
 }
 
 export async function updateGiftStatus(giftId: string, status: GiftStatus) {
+  if (isDemoMode) {
+    return updateDemoGiftStatus(giftId, status);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -289,6 +339,10 @@ export async function updateGiftStatus(giftId: string, status: GiftStatus) {
 }
 
 export async function deleteGift(giftId: string) {
+  if (isDemoMode) {
+    return deleteDemoGift(giftId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -314,6 +368,10 @@ export async function updateGiftRadarSettings(
     price_alert_preferences: PriceAlertPreference[];
   },
 ) {
+  if (isDemoMode) {
+    return updateDemoGiftRadarSettings(giftId, input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -339,6 +397,10 @@ export async function updateGiftRadarSettings(
 }
 
 export async function archiveWishlist(wishlistId: string) {
+  if (isDemoMode) {
+    return archiveDemoWishlist(wishlistId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -355,6 +417,10 @@ export async function archiveWishlist(wishlistId: string) {
 }
 
 export async function restoreWishlist(wishlistId: string) {
+  if (isDemoMode) {
+    return restoreDemoWishlist(wishlistId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -370,6 +436,10 @@ export async function restoreWishlist(wishlistId: string) {
 }
 
 export async function listDiscoverSponsoredItems() {
+  if (isDemoMode) {
+    return listDemoSponsoredItems();
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -388,6 +458,10 @@ export async function listDiscoverSponsoredItems() {
 }
 
 export async function getPublicWishlist(shareId: string) {
+  if (isDemoMode) {
+    return getDemoPublicWishlist(shareId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -404,6 +478,10 @@ export async function getPublicWishlist(shareId: string) {
 }
 
 export async function listReservationsForWishlist(wishlistId: string) {
+  if (isDemoMode) {
+    return listDemoReservationsForWishlist(wishlistId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }

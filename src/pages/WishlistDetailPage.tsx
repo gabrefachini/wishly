@@ -8,10 +8,9 @@ import { Modal } from "../components/Modal";
 import { EmptyState } from "../components/States";
 import { WishlistThemeSection } from "../components/WishlistThemeSection";
 import { PriceRadarFields } from "../components/Forms";
-import { PriceSparkline } from "../components/PriceSparkline";
+import { PriceRadarBoard } from "../components/PriceRadarBoard";
 import { buildFundingSummary, buildWishlistSummary, formatGiftPrice, mapGiftPriority, mapGiftStatus } from "../lib/presenters";
-import { formatCurrency } from "../i18n/formatters";
-import { getPriceRadarHistoryPoints, getPriceRecommendation } from "../lib/priceRadar";
+import { getPriceRecommendation } from "../lib/priceRadar";
 import { useTranslation } from "../i18n/useTranslation";
 import { normalizeMonetaryInput } from "../lib/money";
 import { updateGiftSchema, updateWishlistSchema } from "../lib/validation";
@@ -496,67 +495,18 @@ export function WishlistDetailPage() {
       </section>
 
       {isPersonalWishlist ? (
-        <section className="grid gap-4 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
-              <h2 className="mt-1 text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
-              <p className="mt-2 text-sm leading-6 text-warm-500">{t("priceRadar.dashboardBody")}</p>
-            </div>
-            <span className="rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
-              {wishlist.is_price_radar_enabled ? t("priceRadar.enabled") : t("priceRadar.disabled")}
-            </span>
-          </div>
-
-          {canUseRadar ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[24px] bg-blush/50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">{t("priceRadar.stats.monitored")}</p>
-                  <p className="mt-2 text-2xl font-bold text-warm-900">{trackedGifts.length}</p>
-                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.monitoredBody")}</p>
-                </div>
-                <div className="rounded-[24px] bg-skysoft/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-800">{t("priceRadar.stats.opportunities")}</p>
-                  <p className="mt-2 text-2xl font-bold text-warm-900">{radarOpportunities.length}</p>
-                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.opportunitiesBody")}</p>
-                </div>
-                <div className="rounded-[24px] bg-warm-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-warm-500">{t("priceRadar.stats.potentialSavings")}</p>
-                  <p className="mt-2 text-2xl font-bold text-warm-900">
-                    {formatCurrency(
-                      potentialSavings,
-                      locale,
-                      wishlist.gifts[0]?.currency || (locale === "pt-BR" ? "BRL" : "USD"),
-                    )}
-                  </p>
-                  <p className="mt-1 text-sm text-warm-600">{t("priceRadar.stats.potentialSavingsBody")}</p>
-                </div>
-              </div>
-
-              {trackedGifts.length === 0 ? (
-                <EmptyState title={t("priceRadar.emptyTitle")} body={t("priceRadar.emptyBody")} />
-              ) : null}
-            </>
-          ) : (
-            <div className="grid gap-4 rounded-[28px] border border-dashed border-coral/25 bg-blush/35 p-5">
-              <p className="text-lg font-bold text-warm-900">{t("priceRadar.paywallTitle")}</p>
-              <p className="text-sm leading-6 text-warm-600">{t("priceRadar.paywallBody")}</p>
-              <ul className="grid gap-2 text-sm text-warm-600">
-                <li>• {t("priceRadar.benefitTracking")}</li>
-                <li>• {t("priceRadar.benefitHistory")}</li>
-                <li>• {t("priceRadar.benefitAlerts")}</li>
-                <li>• {t("priceRadar.benefitTarget")}</li>
-              </ul>
-              <Link
-                to="/premium/radar-de-precos"
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-terracotta focus:outline-none focus:ring-4 focus:ring-coral/25 sm:w-auto"
-              >
-                {t("priceRadar.upgradeCta")}
-              </Link>
-            </div>
-          )}
-        </section>
+        <PriceRadarBoard
+          wishlist={wishlist}
+          trackedGifts={trackedGifts}
+          radarOpportunities={radarOpportunities}
+          potentialSavings={potentialSavings}
+          canUseRadar={canUseRadar}
+          fallbackImageUrl={fallbackCover}
+          locale={locale}
+          t={t}
+          onToggleGiftRadar={(gift, enabled) => void handleToggleGiftRadar(gift, enabled)}
+          onOpenGiftEditor={openGiftEditor}
+        />
       ) : null}
 
       <section className="grid gap-3">
@@ -568,21 +518,6 @@ export function WishlistDetailPage() {
         </div>
         {wishlist.gifts.length ? (
           wishlist.gifts.map((gift: GiftRecord) => {
-            const currentPrice = gift.current_price ?? gift.estimated_price ?? null;
-            const giftRecommendation = getPriceRecommendation(
-              {
-                currentPrice,
-                averagePrice: gift.average_price,
-                lowestPrice: gift.lowest_price,
-                highestPrice: gift.highest_price,
-                lastPrice: gift.original_price ?? gift.current_price ?? null,
-                priceHistory: gift.price_history,
-                targetPrice: gift.target_price,
-                currency: gift.currency,
-              },
-              locale,
-            );
-            const historyPoints = getPriceRadarHistoryPoints(gift.price_history);
             const cardGift: GiftCardModel = {
               id: gift.id,
               name: gift.name,
@@ -635,6 +570,25 @@ export function WishlistDetailPage() {
                         <Pencil size={16} aria-hidden="true" />
                         {t("wishlist.editGift")}
                       </SecondaryButton>
+                      {canUseRadar ? (
+                        gift.price_tracking_enabled ? (
+                          <>
+                            <SecondaryButton onClick={() => void handleToggleGiftRadar(gift, false)}>
+                              <Radar size={16} aria-hidden="true" />
+                              {t("priceRadar.disable")}
+                            </SecondaryButton>
+                            <SecondaryButton onClick={() => openGiftEditor(gift)}>
+                              <Target size={16} aria-hidden="true" />
+                              {t("priceRadar.setTarget")}
+                            </SecondaryButton>
+                          </>
+                        ) : (
+                          <SecondaryButton onClick={() => void handleToggleGiftRadar(gift, true)}>
+                            <Radar size={16} aria-hidden="true" />
+                            {t("priceRadar.activate")}
+                          </SecondaryButton>
+                        )
+                      ) : null}
                       <SecondaryButton onClick={() => setGiftToDeleteId(gift.id)}>
                         <Trash2 size={16} aria-hidden="true" />
                         {t("actions.deleteGift")}
@@ -642,70 +596,6 @@ export function WishlistDetailPage() {
                     </>
                   }
                 />
-                {canUseRadar ? (
-                  <section className="mt-3 rounded-[24px] border border-warm-100 bg-warm-50/70 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
-                          {t("priceRadar.itemLabel")}
-                        </p>
-                        <h4 className="mt-1 text-sm font-semibold text-warm-900">{giftRecommendation.title}</h4>
-                        <p className="mt-1 text-sm leading-6 text-warm-600">{giftRecommendation.message}</p>
-                      </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          giftRecommendation.severity === "positive"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : giftRecommendation.severity === "warning"
-                              ? "bg-blush text-terracotta"
-                              : "bg-warm-100 text-warm-600"
-                        }`}
-                      >
-                        {giftRecommendation.score}
-                      </span>
-                    </div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                    <PriceSparkline
-                      points={historyPoints}
-                      accent="var(--wishlist-primary)"
-                      softAccent="var(--wishlist-secondary-soft)"
-                      emptyLabel={t("priceRadar.noHistory")}
-                    />
-                      <div className="grid gap-2 text-xs text-warm-500">
-                        <p>
-                          {t("priceRadar.current")}:{" "}
-                          {currentPrice !== null
-                            ? formatGiftPrice(currentPrice, locale, gift.currency, t("giftForm.estimated"))
-                            : t("priceRadar.noCurrentPrice")}
-                        </p>
-                        <p>
-                          {t("priceRadar.lowest")}:{" "}
-                          {gift.lowest_price !== null
-                            ? formatGiftPrice(gift.lowest_price, locale, gift.currency, t("giftForm.estimated"))
-                            : "—"}
-                        </p>
-                        <p>
-                          {t("priceRadar.average")}:{" "}
-                          {gift.average_price !== null
-                            ? formatGiftPrice(gift.average_price, locale, gift.currency, t("giftForm.estimated"))
-                            : "—"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <SecondaryButton
-                        type="button"
-                        onClick={() => void handleToggleGiftRadar(gift, !gift.price_tracking_enabled)}
-                      >
-                        {gift.price_tracking_enabled ? t("priceRadar.disable") : t("priceRadar.activate")}
-                      </SecondaryButton>
-                      <SecondaryButton type="button" onClick={() => openGiftEditor(gift)}>
-                        <Target size={16} aria-hidden="true" />
-                        {t("priceRadar.setTarget")}
-                      </SecondaryButton>
-                    </div>
-                  </section>
-                ) : null}
               </div>
             );
           })

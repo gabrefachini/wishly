@@ -1,10 +1,17 @@
+import type { User } from "@supabase/supabase-js";
+import { isDemoMode } from "./env";
 import { supabase } from "./supabase";
+import { getDemoUser } from "../data/demoState";
 
 export function normalizeAdminEmail(email: string | null | undefined) {
   return (email || "").trim().toLowerCase();
 }
 
 export async function isCurrentUserAdmin() {
+  if (isDemoMode) {
+    return true;
+  }
+
   if (!supabase) {
     return false;
   }
@@ -18,6 +25,10 @@ export async function isCurrentUserAdmin() {
 }
 
 export async function getCurrentAdminUser() {
+  if (isDemoMode) {
+    return getDemoUser() as User;
+  }
+
   if (!supabase) {
     return null;
   }
@@ -27,6 +38,10 @@ export async function getCurrentAdminUser() {
 }
 
 export async function requireAdmin() {
+  if (isDemoMode) {
+    return getDemoUser() as User;
+  }
+
   if (!supabase) {
     throw new Error("supabase_not_configured");
   }

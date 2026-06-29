@@ -6,7 +6,9 @@ import { SecondaryButton } from "../components/Buttons";
 import { EmptyState } from "../components/States";
 import { WishlistCard } from "../components/WishlistCard";
 import { buildWishlistSummary } from "../lib/presenters";
+import { getDemoDashboardSnapshot } from "../data/demoState";
 import { useTranslation } from "../i18n/useTranslation";
+import { isDemoMode } from "../lib/env";
 import { listActiveWishlists } from "../services/wishlists";
 import type { WishlistWithGifts } from "../types/domain";
 import { updateMetadata } from "../lib/metadata";
@@ -80,6 +82,7 @@ export function HomePage() {
     0,
   );
   const upcomingCount = wishlists.filter((wishlist) => wishlist.event_date).length;
+  const notificationCount = isDemoMode ? getDemoDashboardSnapshot().notificationCount : 0;
 
   return (
     <div className="grid gap-7">
@@ -93,10 +96,15 @@ export function HomePage() {
           </h1>
         </div>
         <button
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-porcelain text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15"
+          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-porcelain text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15"
           aria-label={t("home.notifications")}
         >
           <Bell size={20} aria-hidden="true" />
+          {notificationCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">
+              {notificationCount}
+            </span>
+          ) : null}
         </button>
       </header>
 

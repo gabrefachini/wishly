@@ -1,5 +1,11 @@
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
+import {
+  confirmDemoContribution,
+  createDemoContribution,
+  getDemoContributionCheckout,
+} from "../data/demoState";
 
 type CreateContributionInput = {
   shareId: string;
@@ -13,6 +19,10 @@ type CreateContributionInput = {
 };
 
 export async function createContribution(input: CreateContributionInput) {
+  if (isDemoMode) {
+    return createDemoContribution(input);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -40,6 +50,10 @@ export async function createContribution(input: CreateContributionInput) {
 }
 
 export async function getContributionCheckout(contributionId: string) {
+  if (isDemoMode) {
+    return getDemoContributionCheckout(contributionId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -66,6 +80,10 @@ export async function getContributionCheckout(contributionId: string) {
 }
 
 export async function confirmMockContribution(contributionId: string) {
+  if (isDemoMode) {
+    return confirmDemoContribution(contributionId);
+  }
+
   if (!supabase) {
     invariantSupabase();
   }

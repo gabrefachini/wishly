@@ -1,0 +1,397 @@
+import { Activity, ArrowDownRight, ArrowUpRight, Clock3, Store, Target } from "lucide-react";
+import type { ReactNode } from "react";
+import { SecondaryButton } from "./Buttons";
+import { PriceSparkline } from "./PriceSparkline";
+import { StatusBadge } from "./StatusBadge";
+import { formatCurrency, formatDate, type Locale } from "../i18n/formatters";
+import { getPriceRadarHistoryPoints, getPriceRecommendation, getPriceTrend } from "../lib/priceRadar";
+import type { GiftRecord, WishlistWithGifts } from "../types/domain";
+
+type PriceRadarBoardProps = {
+  wishlist: WishlistWithGifts;
+  trackedGifts: GiftRecord[];
+  radarOpportunities: GiftRecord[];
+  potentialSavings: number;
+  canUseRadar: boolean;
+  fallbackImageUrl: string;
+  locale: Locale;
+  t: (key: string) => string;
+  onToggleGiftRadar: (gift: GiftRecord, enabled: boolean) => void;
+  onOpenGiftEditor: (gift: GiftRecord) => void;
+};
+
+function formatDateTime(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "pt-BR" ? "pt-BR" : "en-US", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(value));
+}
+
+function formatSignedPercent(value: number | null, locale: Locale) {
+  if (value === null || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const formatter = new Intl.NumberFormat(locale === "pt-BR" ? "pt-BR" : "en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+    signDisplay: "always",
+  });
+
+  return `${formatter.format(value)}%`;
+}
+
+function toneClasses(severity: "positive" | "neutral" | "warning") {
+  if (severity === "positive") {
+    return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+  }
+
+  if (severity === "warning") {
+    return "bg-blush text-terracotta ring-coral/10";
+  }
+
+  return "bg-warm-100 text-warm-600 ring-warm-100";
+}
+
+function metricLabel(
+  label: string,
+  value: ReactNode,
+  subdued = false,
+) {
+  return (
+    <div className="grid gap-1 rounded-[20px] bg-white/90 p-3 ring-1 ring-warm-100">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{label}</p>
+      <div className={`text-sm font-semibold ${subdued ? "text-warm-600" : "text-warm-900"}`}>{value}</div>
+    </div>
+  );
+}
+
+function getHistoryBoundaries(gift: GiftRecord) {
+  const historyEntries = (gift.price_history ?? [])
+    .filter((entry) => Number.isFinite(entry.price))
+    .slice()
+    .sort((left, right) => left.checked_at.localeCompare(right.checked_at));
+
+  return {
+    historyEntries,
+    firstCheckedAt: historyEntries[0]?.checked_at ?? gift.created_at,
+    lastCheckedAt: gift.last_checked_at ?? historyEntries.at(-1)?.checked_at ?? null,
+  };
+}
+
+function getRadarStatusText({
+  gift,
+  locale,
+  t,
+}: {
+  gift: GiftRecord;
+  locale: Locale;
+  t: (key: string) => string;
+}) {
+  const currentPrice = gift.current_price ?? gift.estimated_price ?? null;
+  const recommendation = getPriceRecommendation(
+    {
+      currentPrice,
+      averagePrice: gift.average_price,
+      lowestPrice: gift.lowest_price,
+      highestPrice: gift.highest_price,
+      lastPrice: gift.original_price ?? gift.current_price ?? null,
+      priceHistory: gift.price_history,
+      targetPrice: gift.target_price,
+      currency: gift.currency,
+    },
+    locale,
+  );
+  const priceTrend = getPriceTrend(
+    currentPrice,
+    gift.original_price ?? gift.current_price ?? null,
+    gift.average_price,
+    gift.price_history,
+  );
+
+  const trendText =
+    priceTrend === "down"
+      ? t("priceRadar.item.trendDown")
+      : priceTrend === "up"
+        ? t("priceRadar.item.trendUp")
+        : priceTrend === "stable"
+          ? t("priceRadar.item.trendStable")
+          : t("priceRadar.item.trendUnknown");
+
+  const changeText =
+    formatSignedPercent(gift.price_change_percentage, locale) ||
+    (currentPrice !== null && gift.original_price ? formatSignedPercent(((currentPrice - gift.original_price) / gift.original_price) * 100, locale) : null);
+
+  return {
+    currentPrice,
+    recommendation,
+    trendText,
+    changeText,
+  };
+}
+
+export function PriceRadarBoard({
+  wishlist,
+  trackedGifts,
+  radarOpportunities,
+  potentialSavings,
+  canUseRadar,
+  fallbackImageUrl,
+  locale,
+  t,
+  onToggleGiftRadar,
+  onOpenGiftEditor,
+}: PriceRadarBoardProps) {
+  if (!canUseRadar) {
+    return (
+      <section className="grid gap-4 rounded-[32px] border border-dashed border-coral/25 bg-blush/35 p-5 shadow-card">
+        <div className="flex items-start justify-between gap-4">
+          <div className="grid gap-2">
+            <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+            <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
+            <p className="text-sm leading-6 text-warm-600">{t("priceRadar.paywallBody")}</p>
+          </div>
+          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-warm-100">
+            {t("priceRadar.disabled")}
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <p className="rounded-[22px] bg-white/80 p-4 text-sm text-warm-600 ring-1 ring-warm-100">
+            {t("priceRadar.benefitTracking")}
+          </p>
+          <p className="rounded-[22px] bg-white/80 p-4 text-sm text-warm-600 ring-1 ring-warm-100">
+            {t("priceRadar.benefitHistory")}
+          </p>
+          <p className="rounded-[22px] bg-white/80 p-4 text-sm text-warm-600 ring-1 ring-warm-100">
+            {t("priceRadar.benefitAlerts")}
+          </p>
+          <p className="rounded-[22px] bg-white/80 p-4 text-sm text-warm-600 ring-1 ring-warm-100">
+            {t("priceRadar.benefitTarget")}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  if (trackedGifts.length === 0) {
+    return (
+      <section className="grid gap-4 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+        <div className="flex items-start justify-between gap-4">
+          <div className="grid gap-2">
+            <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+            <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
+            <p className="text-sm leading-6 text-warm-600">{t("priceRadar.dashboardBody")}</p>
+          </div>
+          <span className="rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
+            {wishlist.is_price_radar_enabled ? t("priceRadar.enabled") : t("priceRadar.disabled")}
+          </span>
+        </div>
+        <div className="rounded-[28px] border border-dashed border-warm-200 bg-warm-50/60 p-5">
+          <p className="text-sm font-semibold text-warm-800">{t("priceRadar.emptyTitle")}</p>
+          <p className="mt-2 text-sm leading-6 text-warm-600">{t("priceRadar.emptyBody")}</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="grid gap-5 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-2">
+              <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+              <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
+              <p className="max-w-2xl text-sm leading-6 text-warm-600">{t("priceRadar.dashboardBody")}</p>
+            </div>
+            <span className="rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
+              {t("priceRadar.enabled")}
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {metricLabel(t("priceRadar.stats.monitored"), trackedGifts.length)}
+            {metricLabel(t("priceRadar.stats.opportunities"), radarOpportunities.length)}
+            {potentialSavings > 0
+              ? metricLabel(
+                  t("priceRadar.stats.potentialSavings"),
+                  formatCurrency(
+                    potentialSavings,
+                    locale,
+                    wishlist.gifts[0]?.currency || (locale === "pt-BR" ? "BRL" : "USD"),
+                  ),
+                )
+              : metricLabel(t("priceRadar.stats.potentialSavings"), t("priceRadar.summary.learning"), true)}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-dashed border-warm-200 bg-warm-50/70 p-4">
+          <p className="text-sm font-semibold text-warm-800">{t("priceRadar.summary.title")}</p>
+          <p className="mt-2 text-sm leading-6 text-warm-600">{t("priceRadar.summary.body")}</p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-warm-600">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 ring-1 ring-warm-100">
+              <Activity size={13} aria-hidden="true" />
+              {t("priceRadar.summary.realtime")}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 ring-1 ring-warm-100">
+              <Clock3 size={13} aria-hidden="true" />
+              {t("priceRadar.summary.updatedOften")}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        {trackedGifts.map((gift) => {
+          const { historyEntries, firstCheckedAt, lastCheckedAt } = getHistoryBoundaries(gift);
+          const historyPoints = getPriceRadarHistoryPoints(gift.price_history);
+          const { currentPrice, recommendation, trendText, changeText } = getRadarStatusText({
+            gift,
+            locale,
+            t,
+          });
+          const targetPrice = gift.target_price;
+          const lowestPrice = gift.lowest_price;
+          const averagePrice = gift.average_price;
+          const startDateLabel = formatDate(firstCheckedAt, locale);
+          const lastCheckLabel = lastCheckedAt ? formatDateTime(lastCheckedAt, locale) : t("priceRadar.item.noHistory");
+          const currentPriceLabel =
+            currentPrice !== null
+              ? formatCurrency(currentPrice, locale, gift.currency || (locale === "pt-BR" ? "BRL" : "USD"))
+              : t("priceRadar.noCurrentPrice");
+          const hasHistory = historyEntries.length >= 2;
+          const storeName = gift.store_url
+            ? (() => {
+                try {
+                  return new URL(gift.store_url).hostname.replace(/^www\./, "");
+                } catch {
+                  return t("priceRadar.item.unknownStore");
+                }
+              })()
+            : t("priceRadar.item.unknownStore");
+
+          return (
+            <article
+              key={gift.id}
+              className="grid gap-4 rounded-[28px] border border-warm-100 bg-white p-4 shadow-card transition hover:shadow-soft sm:p-5"
+            >
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:items-start">
+                <div className="grid gap-4">
+                  <div className="flex gap-4">
+                    <img
+                      src={gift.image_url || fallbackImageUrl}
+                      alt=""
+                      className="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-1 ring-warm-100"
+                    />
+                    <div className="min-w-0 grid gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full bg-[var(--wishlist-primary-soft)] px-3 py-1 text-xs font-semibold text-[var(--wishlist-primary)]">
+                          {gift.price_tracking_enabled ? t("priceRadar.item.active") : t("priceRadar.item.inactive")}
+                        </span>
+                        <StatusBadge label={gift.status} />
+                        <span className="inline-flex items-center rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-warm-100">
+                          {storeName}
+                        </span>
+                        {changeText ? (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+                              changeText.startsWith("-") ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-blush text-terracotta ring-coral/10"
+                            }`}
+                          >
+                            {changeText.startsWith("-") ? <ArrowDownRight size={13} aria-hidden="true" /> : <ArrowUpRight size={13} aria-hidden="true" />}
+                            {trendText} · {changeText}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-warm-100">
+                            {trendText}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid gap-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                          {t("priceRadar.item.currentPrice")}
+                        </p>
+                        <div className="text-3xl font-bold tracking-tight text-warm-900">{currentPriceLabel}</div>
+                        <p className="text-sm leading-6 text-warm-600">{recommendation.title}</p>
+                      </div>
+
+                      <div className="grid gap-2 text-sm text-warm-600">
+                        <p className="inline-flex flex-wrap items-center gap-1.5">
+                          <Store size={14} aria-hidden="true" className="text-warm-400" />
+                          <span>{storeName}</span>
+                        </p>
+                        <p className="inline-flex flex-wrap items-center gap-1.5">
+                          <Clock3 size={14} aria-hidden="true" className="text-warm-400" />
+                          <span>
+                            {t("priceRadar.item.monitoringSince")}: {startDateLabel}
+                          </span>
+                        </p>
+                        <p className="inline-flex flex-wrap items-center gap-1.5">
+                          <Clock3 size={14} aria-hidden="true" className="text-warm-400" />
+                          <span>
+                            {t("priceRadar.item.lastChecked")}: {lastCheckLabel}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 rounded-[26px] bg-warm-50/70 p-4 ring-1 ring-warm-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="grid gap-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                        {t("priceRadar.item.status")}
+                      </p>
+                      <h3 className="text-lg font-bold text-warm-900">{recommendation.title}</h3>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${toneClasses(recommendation.severity)}`}>
+                      {recommendation.score}
+                    </span>
+                  </div>
+
+                  <p className="text-sm leading-6 text-warm-600">{recommendation.message}</p>
+
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(220px,0.85fr)] sm:items-start">
+                    <div className="rounded-[22px] bg-white p-3 ring-1 ring-warm-100">
+                      <PriceSparkline
+                        points={historyPoints}
+                        accent="var(--wishlist-primary)"
+                        softAccent="var(--wishlist-secondary-soft)"
+                        emptyLabel={t("priceRadar.item.collectingHistoryShort")}
+                      />
+                      <p className="mt-2 text-xs leading-5 text-warm-500">
+                        {hasHistory
+                          ? t("priceRadar.item.historyCaptured")
+                          : `${t("priceRadar.item.collectingHistoryTitle")} ${t("priceRadar.item.collectingHistoryBody")}`}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                      {metricLabel(t("priceRadar.item.lowestPrice"), lowestPrice !== null ? formatCurrency(lowestPrice, locale, gift.currency) : "—", true)}
+                      {metricLabel(t("priceRadar.item.averagePrice"), averagePrice !== null ? formatCurrency(averagePrice, locale, gift.currency) : "—", true)}
+                      {metricLabel(t("priceRadar.item.targetPrice"), targetPrice !== null ? formatCurrency(targetPrice, locale, gift.currency) : t("priceRadar.item.noTarget"), true)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <SecondaryButton type="button" onClick={() => onToggleGiftRadar(gift, !gift.price_tracking_enabled)}>
+                  {gift.price_tracking_enabled ? t("priceRadar.disable") : t("priceRadar.activate")}
+                </SecondaryButton>
+                <SecondaryButton type="button" onClick={() => onOpenGiftEditor(gift)}>
+                  <Target size={16} aria-hidden="true" />
+                  {t("priceRadar.setTarget")}
+                </SecondaryButton>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

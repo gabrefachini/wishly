@@ -1,10 +1,15 @@
-import { env, hasSupabaseEnv } from "../lib/env";
+import { env, hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { normalizeProductUrl, type ProductPreviewResult } from "../lib/productPreview";
+import { previewDemoProductUrl } from "../data/demoState";
 
 export async function fetchProductPreview(sourceUrl: string, signal?: AbortSignal): Promise<ProductPreviewResult> {
   const normalizedUrl = normalizeProductUrl(sourceUrl);
   if (!normalizedUrl) {
     throw new Error("invalid_product_url");
+  }
+
+  if (isDemoMode) {
+    return previewDemoProductUrl(normalizedUrl);
   }
 
   if (!hasSupabaseEnv) {

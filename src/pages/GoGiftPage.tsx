@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { useTranslation } from "../i18n/useTranslation";
-import { hasSupabaseEnv } from "../lib/env";
+import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { resolveGiftRedirect } from "../services/affiliateLinks";
 
 export function GoGiftPage() {
@@ -13,7 +13,7 @@ export function GoGiftPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasSupabaseEnv || !giftId) {
+    if ((!hasSupabaseEnv && !isDemoMode) || !giftId) {
       setError(t("common.error"));
       return;
     }

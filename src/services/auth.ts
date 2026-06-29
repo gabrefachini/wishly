@@ -1,9 +1,15 @@
 import type { AuthChangeEvent, AuthResponse, Session } from "@supabase/supabase-js";
+import { isDemoMode } from "../lib/env";
 import { supabase } from "../lib/supabase";
 import { invariantSupabase } from "../lib/http";
 import type { Locale, Profile } from "../types/domain";
+import { getDemoProfile, getDemoSession } from "../data/demoState";
 
 export async function getSession() {
+  if (isDemoMode) {
+    return getDemoSession() as unknown as Session;
+  }
+
   if (!supabase) {
     return null;
   }
@@ -13,6 +19,17 @@ export async function getSession() {
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<AuthResponse> {
+  if (isDemoMode) {
+    const session = getDemoSession() as unknown as Session;
+    return {
+      data: {
+        session,
+        user: session.user,
+      },
+      error: null,
+    } as AuthResponse;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -26,6 +43,17 @@ export async function signUpWithPassword(
   password: string,
   locale: Locale,
 ): Promise<AuthResponse> {
+  if (isDemoMode) {
+    const session = getDemoSession() as unknown as Session;
+    return {
+      data: {
+        session,
+        user: session.user,
+      },
+      error: null,
+    } as AuthResponse;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -43,6 +71,10 @@ export async function signUpWithPassword(
 }
 
 export async function resendSignupConfirmation(email: string) {
+  if (isDemoMode) {
+    return { data: {}, error: null } as unknown as AuthResponse;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -54,6 +86,10 @@ export async function resendSignupConfirmation(email: string) {
 }
 
 export async function signOut() {
+  if (isDemoMode) {
+    return;
+  }
+
   if (!supabase) {
     return;
   }
@@ -62,6 +98,10 @@ export async function signOut() {
 }
 
 export async function resetPassword(email: string) {
+  if (isDemoMode) {
+    return { data: {}, error: null } as unknown as AuthResponse;
+  }
+
   if (!supabase) {
     invariantSupabase();
   }
@@ -70,6 +110,10 @@ export async function resetPassword(email: string) {
 }
 
 export async function getProfileBySession(session: Session | null): Promise<Profile | null> {
+  if (isDemoMode) {
+    return session?.user ? getDemoProfile() : null;
+  }
+
   if (!supabase || !session?.user) {
     return null;
   }
@@ -91,6 +135,10 @@ export async function ensureProfile(
   session: Session | null,
   localeFallback: Locale = "en",
 ): Promise<Profile | null> {
+  if (isDemoMode) {
+    return session?.user ? getDemoProfile() : null;
+  }
+
   if (!supabase || !session?.user) {
     return null;
   }
@@ -130,6 +178,13 @@ export async function ensureProfile(
 export function onAuthStateChange(
   callback: (event: AuthChangeEvent, session: Session | null) => Promise<void>,
 ) {
+  if (isDemoMode) {
+    queueMicrotask(() => {
+      void callback("INITIAL_SESSION", getDemoSession() as unknown as Session);
+    });
+    return { data: { subscription: { unsubscribe() {} } } };
+  }
+
   if (!supabase) {
     return { data: { subscription: { unsubscribe() {} } } };
   }
