@@ -14,7 +14,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
-import { LanguageSelector } from "../components/LanguageSelector";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { updateMetadata } from "../lib/metadata";
@@ -116,7 +115,6 @@ export function LandingPage() {
           </nav>
 
           <div className="hidden items-center gap-3 lg:flex">
-            <LanguageSelector />
             {session ? (
               <Link to="/app">
                 <SecondaryButton>{t("landing.openApp")}</SecondaryButton>
@@ -137,7 +135,6 @@ export function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2 lg:hidden">
-            <LanguageSelector />
             <button
               type="button"
               aria-label={menuOpen ? t("landing.closeMenu") : t("landing.openMenu")}

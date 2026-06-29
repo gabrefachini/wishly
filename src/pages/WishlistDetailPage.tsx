@@ -13,6 +13,7 @@ import { buildFundingSummary, buildWishlistSummary, formatGiftPrice, mapGiftPrio
 import { formatCurrency } from "../i18n/formatters";
 import { getPriceRadarHistoryPoints, getPriceRecommendation } from "../lib/priceRadar";
 import { useTranslation } from "../i18n/useTranslation";
+import { normalizeMonetaryInput } from "../lib/money";
 import { updateGiftSchema, updateWishlistSchema } from "../lib/validation";
 import { WISHLIST_THEME_PRESETS } from "../lib/wishlistAppearance";
 import { uploadWishlistCover } from "../services/storage";
@@ -81,7 +82,7 @@ export function WishlistDetailPage() {
     name: "",
     store_url: "",
     estimated_price: "",
-    currency: "USD",
+    currency: "BRL",
     priority: "must_have" as "must_have" | "nice_to_have" | "surprise_me",
     purchase_type: "individual" as "individual" | "collective",
     funding_goal_amount: "",
@@ -275,7 +276,14 @@ export function WishlistDetailPage() {
     if (!giftToEditId || !wishlist) return;
     setError(null);
     setEditMessage(null);
-    const parsed = updateGiftSchema.safeParse(giftValues);
+    const normalizedGiftValues = {
+      ...giftValues,
+      estimated_price: normalizeMonetaryInput(giftValues.estimated_price),
+      funding_goal_amount: normalizeMonetaryInput(giftValues.funding_goal_amount),
+      current_price: normalizeMonetaryInput(giftValues.current_price),
+      target_price: normalizeMonetaryInput(giftValues.target_price),
+    };
+    const parsed = updateGiftSchema.safeParse(normalizedGiftValues);
     if (!parsed.success) {
       setGiftEditErrors(
         Object.fromEntries(parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message])),
@@ -709,6 +717,7 @@ export function WishlistDetailPage() {
       <Modal
         title={t("wishlist.editDetails")}
         open={wishlistEditOpen}
+        size="2xl"
         onClose={() => {
           if (!wishlistEditLoading && !wishlistCoverUploading) {
             setWishlistEditOpen(false);
@@ -911,6 +920,7 @@ export function WishlistDetailPage() {
                 return { ...current, [name]: value };
               })
             }
+            layout="split"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <SecondaryButton onClick={() => setWishlistEditOpen(false)} disabled={wishlistEditLoading || wishlistCoverUploading}>
@@ -952,27 +962,14 @@ export function WishlistDetailPage() {
             />
             {giftEditErrors.store_url ? <span className="text-xs text-terracotta">{giftEditErrors.store_url}</span> : null}
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-warm-700">{t("giftForm.estimatedPrice")}</span>
-              <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
-                value={giftValues.estimated_price}
-                onChange={(event) => setGiftValues((current) => ({ ...current, estimated_price: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold text-warm-700">{t("common.currency")}</span>
-              <select
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
-                value={giftValues.currency}
-                onChange={(event) => setGiftValues((current) => ({ ...current, currency: event.target.value }))}
-              >
-                <option value="USD">USD</option>
-                <option value="BRL">BRL</option>
-              </select>
-            </label>
-          </div>
+          <label className="grid gap-2">
+            <span className="text-sm font-semibold text-warm-700">{t("giftForm.estimatedPrice")}</span>
+            <input
+              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              value={giftValues.estimated_price}
+              onChange={(event) => setGiftValues((current) => ({ ...current, estimated_price: event.target.value }))}
+            />
+          </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("giftForm.priority")}</span>

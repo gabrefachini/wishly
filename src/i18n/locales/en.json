@@ -337,7 +337,7 @@
     "title": "Add something thoughtful",
     "body": "A store link, estimated price, and priority help guests choose with confidence.",
     "giftName": "Gift name",
-    "storeLink": "Store link",
+    "storeLink": "Product URL",
     "estimatedPrice": "Estimated price",
     "priority": "Priority",
     "productImage": "Product image",
@@ -357,6 +357,13 @@
     "priceRadarPriority": "Tracking priority",
     "priceRadarAlerts": "Alert preferences",
     "priceRadarActivate": "Activate radar"
+  },
+  "giftPreview": {
+    "loading": "Looking up product details...",
+    "fallback": "We couldn't fill this product automatically. You can complete the details manually.",
+    "manualFallbackHint": "Paste the product link and we'll try to fill in the title, price, and image automatically.",
+    "success": "Product details filled automatically.",
+    "successWithStore": "Product details filled automatically from {{store}}."
   },
   "giftFunding": {
     "groupGift": "Group gift",

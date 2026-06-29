@@ -10,34 +10,14 @@ import ptBR from "./locales/pt-BR.json";
 import type { Locale } from "./formatters";
 
 const STORAGE_KEY = "wishly.locale";
-const defaultLocale: Locale = "en";
-const supportedLocales: Locale[] = ["en", "pt-BR"];
+const defaultLocale: Locale = "pt-BR";
 const dictionaries: Record<Locale, TranslationNode> = {
   en,
   "pt-BR": ptBR,
 };
 
-function isLocale(value: string | null): value is Locale {
-  return supportedLocales.includes(value as Locale);
-}
-
 function detectInitialLocale(): Locale {
-  if (typeof window === "undefined") {
-    return defaultLocale;
-  }
-
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (isLocale(stored)) {
-    return stored;
-  }
-
-  const languages = window.navigator.languages?.length
-    ? window.navigator.languages
-    : [window.navigator.language];
-
-  return languages.some((language) => language.toLowerCase().startsWith("pt"))
-    ? "pt-BR"
-    : defaultLocale;
+  return defaultLocale;
 }
 
 function getNestedValue(dictionary: TranslationNode, key: string) {
@@ -67,7 +47,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(detectInitialLocale);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, locale);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, locale);
+    }
     document.documentElement.lang = locale;
   }, [locale]);
 

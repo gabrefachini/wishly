@@ -1,6 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
 import { BottomNavigation } from "./BottomNavigation";
-import { LanguageSelector } from "./LanguageSelector";
 import { WishlyLogo } from "./WishlyLogo";
 
 export function AppShell() {
@@ -15,7 +14,6 @@ export function AppShell() {
           >
             <WishlyLogo size="sm" />
           </Link>
-          <LanguageSelector />
         </div>
         <Outlet />
       </main>

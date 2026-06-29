@@ -5,7 +5,6 @@ import { normalizeErrorMessage } from "../lib/http";
 import { useTranslation } from "../i18n/useTranslation";
 import { resetPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
-import { LanguageSelector } from "../components/LanguageSelector";
 import { SetupNotice } from "../components/SetupNotice";
 import { hasSupabaseEnv } from "../lib/env";
 
@@ -20,9 +19,6 @@ export function ForgotPasswordPage() {
     return (
       <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
-          <div className="flex justify-end">
-            <LanguageSelector />
-          </div>
           <SetupNotice />
         </div>
       </main>
@@ -55,9 +51,6 @@ export function ForgotPasswordPage() {
   return (
     <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
       <div className="mx-auto grid max-w-md gap-6">
-        <div className="flex justify-end">
-          <LanguageSelector />
-        </div>
         <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">
           <p className="text-sm font-semibold text-coral">{t("auth.checkEmail")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("auth.resetPasswordTitle")}</h1>

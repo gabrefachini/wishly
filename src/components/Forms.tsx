@@ -274,6 +274,8 @@ type AddGiftFormProps = {
   };
   wishlistOptions: Array<{ id: string; title: string; type: WishlistType; is_price_radar_enabled: boolean }>;
   errors: Record<string, string | undefined>;
+  productLookupState?: "idle" | "loading" | "success" | "fallback";
+  productLookupMessage?: string | null;
   loading: boolean;
   t: (key: string) => string;
   onChange: (name: string, value: string | boolean | string[]) => void;
@@ -438,6 +440,8 @@ export function AddGiftForm({
   values,
   wishlistOptions,
   errors,
+  productLookupState = "idle",
+  productLookupMessage = null,
   loading,
   t,
   onChange,
@@ -488,6 +492,19 @@ export function AddGiftForm({
             placeholder="https://store.com/product"
           />
         </div>
+        {productLookupState === "loading" ? (
+          <p className="text-xs font-medium text-coral">{t("giftPreview.loading")}</p>
+        ) : productLookupMessage ? (
+          <p
+            className={`text-xs leading-6 ${
+              productLookupState === "fallback" ? "text-terracotta" : "text-warm-500"
+            }`}
+          >
+            {productLookupMessage}
+          </p>
+        ) : (
+          <p className="text-xs leading-6 text-warm-500">{t("giftPreview.manualFallbackHint")}</p>
+        )}
       </Field>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label={t("giftForm.estimatedPrice")} error={errors.estimated_price}>
@@ -496,16 +513,6 @@ export function AddGiftForm({
             value={values.estimated_price}
             onChange={(event) => onChange("estimated_price", event.target.value)}
           />
-        </Field>
-        <Field label={t("common.currency")}>
-          <select
-            className={inputClass}
-            value={values.currency}
-            onChange={(event) => onChange("currency", event.target.value)}
-          >
-            <option value="USD">USD</option>
-            <option value="BRL">BRL</option>
-          </select>
         </Field>
       </div>
       <Field label={t("giftForm.priority")}>

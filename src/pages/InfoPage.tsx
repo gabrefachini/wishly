@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LanguageSelector } from "../components/LanguageSelector";
 import { SecondaryButton } from "../components/Buttons";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { updateMetadata } from "../lib/metadata";
@@ -43,7 +42,6 @@ export function InfoPage() {
           <Link to="/" className="inline-flex rounded-full bg-porcelain px-4 py-3 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15">
             <WishlyLogo size="sm" />
           </Link>
-          <LanguageSelector />
         </div>
 
         <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">

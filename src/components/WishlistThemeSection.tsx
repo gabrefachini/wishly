@@ -20,9 +20,10 @@ type Props = {
   values: WishlistThemeValues;
   t: (key: string) => string;
   onChange: (name: keyof WishlistThemeValues, value: string | boolean) => void;
+  layout?: "stacked" | "split";
 };
 
-export function WishlistThemeSection({ values, t, onChange }: Props) {
+export function WishlistThemeSection({ values, t, onChange, layout = "stacked" }: Props) {
   const [open, setOpen] = useState(false);
   const presets = getWishlistThemePresetOptions();
   const contrastWarning = getWishlistThemeContrastWarning(values);
@@ -41,6 +42,24 @@ export function WishlistThemeSection({ values, t, onChange }: Props) {
 
   function restoreDefault() {
     setPreset("default");
+  }
+
+  if (layout === "split") {
+    return (
+      <section className="grid gap-3 rounded-[28px] border border-warm-100 bg-porcelain/90 p-4">
+        <AppearanceCustomizerPanel
+          values={values}
+          t={t}
+          presets={presets}
+          contrastWarning={contrastWarning}
+          onChange={onChange}
+          onSetPreset={setPreset}
+          onRestoreDefault={restoreDefault}
+          showCloseButton={false}
+          layout="split"
+        />
+      </section>
+    );
   }
 
   return (
@@ -64,7 +83,8 @@ export function WishlistThemeSection({ values, t, onChange }: Props) {
             onSetPreset={setPreset}
             onRestoreDefault={restoreDefault}
             onClose={() => setOpen(false)}
-            mobile={false}
+            showCloseButton
+            layout="stacked"
           />
         ) : null}
       </div>
@@ -134,7 +154,8 @@ function AppearanceCustomizerPanel({
   onSetPreset,
   onRestoreDefault,
   onClose,
-  mobile,
+  showCloseButton,
+  layout,
 }: {
   values: WishlistThemeValues;
   presets: Array<{ value: WishlistThemeValues["theme_preset"]; name: string; primary: string; secondary: string }>;
@@ -143,24 +164,121 @@ function AppearanceCustomizerPanel({
   onChange: (name: keyof WishlistThemeValues, value: string | boolean) => void;
   onSetPreset: (value: WishlistThemeValues["theme_preset"]) => void;
   onRestoreDefault: () => void;
-  onClose: () => void;
-  mobile: boolean;
+  onClose?: () => void;
+  showCloseButton?: boolean;
+  layout: "stacked" | "split";
 }) {
+  if (layout === "split") {
+    return (
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.16fr)_minmax(300px,0.84fr)] lg:items-start">
+        <div className="grid gap-4 rounded-[28px] bg-warm-50/60 p-4 ring-1 ring-warm-100">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-warm-900">{t("theme.title")}</h3>
+              <p className="mt-1 text-sm leading-6 text-warm-500">{t("theme.body")}</p>
+            </div>
+            {showCloseButton && onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-warm-100 bg-white text-warm-600 transition hover:border-coral/35 hover:text-terracotta"
+                aria-label={t("theme.close")}
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {presets.map((preset) => {
+              const active = values.theme_preset === preset.value && !values.use_custom_theme;
+              return (
+                <ThemePresetCard
+                  key={preset.value}
+                  name={preset.name}
+                  primary={preset.primary}
+                  secondary={preset.secondary}
+                  active={active}
+                  onClick={() => onSetPreset(preset.value)}
+                />
+              );
+            })}
+          </div>
+
+          <div className="grid gap-3">
+            <span className="text-sm font-semibold text-warm-700">{t("theme.customMode")}</span>
+            <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-warm-100">
+              <ModeToggle active={!values.use_custom_theme} onClick={() => onChange("use_custom_theme", false)}>
+                {t("theme.usePreset")}
+              </ModeToggle>
+              <ModeToggle active={values.use_custom_theme} onClick={() => onChange("use_custom_theme", true)}>
+                {t("theme.chooseMyColors")}
+              </ModeToggle>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CustomColorPicker
+              label={t("theme.primary")}
+              value={values.theme_primary_color}
+              disabled={!values.use_custom_theme}
+              onChange={(value) => onChange("theme_primary_color", value)}
+            />
+            <CustomColorPicker
+              label={t("theme.secondary")}
+              value={values.theme_secondary_color}
+              disabled={!values.use_custom_theme}
+              onChange={(value) => onChange("theme_secondary_color", value)}
+            />
+          </div>
+
+          {contrastWarning ? (
+            <p className="text-xs leading-6 text-terracotta">{t("theme.contrastWarning")}</p>
+          ) : (
+            <p className="text-xs leading-6 text-warm-500">{t("theme.contrastSafe")}</p>
+          )}
+
+          <div className="sticky bottom-0 z-10 mt-1 -mx-4 flex flex-wrap items-center gap-2 bg-gradient-to-t from-warm-50 via-warm-50/95 to-transparent px-4 pb-1 pt-3">
+            <SecondaryButton type="button" onClick={onRestoreDefault}>
+              <RotateCcw size={16} aria-hidden="true" />
+              {t("theme.reset")}
+            </SecondaryButton>
+            {showCloseButton && onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-terracotta"
+              >
+                {t("theme.apply")}
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="lg:sticky lg:top-4">
+          <WishlistThemePreview values={values} t={t} compact />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`grid gap-4 rounded-[28px] bg-warm-50/60 p-4 ring-1 ring-warm-100 ${mobile ? "md:hidden" : ""}`}>
+    <div className="grid gap-4 rounded-[28px] bg-warm-50/60 p-4 ring-1 ring-warm-100">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold text-warm-900">{t("theme.title")}</h3>
           <p className="mt-1 text-sm leading-6 text-warm-500">{t("theme.body")}</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-warm-100 bg-white text-warm-600 transition hover:border-coral/35 hover:text-terracotta"
-          aria-label={t("theme.close")}
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+        {showCloseButton && onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-warm-100 bg-white text-warm-600 transition hover:border-coral/35 hover:text-terracotta"
+            aria-label={t("theme.close")}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -182,16 +300,10 @@ function AppearanceCustomizerPanel({
       <div className="grid gap-3">
         <span className="text-sm font-semibold text-warm-700">{t("theme.customMode")}</span>
         <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-warm-100">
-          <ModeToggle
-            active={!values.use_custom_theme}
-            onClick={() => onChange("use_custom_theme", false)}
-          >
+          <ModeToggle active={!values.use_custom_theme} onClick={() => onChange("use_custom_theme", false)}>
             {t("theme.usePreset")}
           </ModeToggle>
-          <ModeToggle
-            active={values.use_custom_theme}
-            onClick={() => onChange("use_custom_theme", true)}
-          >
+          <ModeToggle active={values.use_custom_theme} onClick={() => onChange("use_custom_theme", true)}>
             {t("theme.chooseMyColors")}
           </ModeToggle>
         </div>
@@ -223,7 +335,7 @@ function AppearanceCustomizerPanel({
           <RotateCcw size={16} aria-hidden="true" />
           {t("theme.reset")}
         </SecondaryButton>
-        {mobile ? (
+        {showCloseButton && onClose ? (
           <button
             type="button"
             onClick={onClose}
@@ -234,7 +346,7 @@ function AppearanceCustomizerPanel({
         ) : null}
       </div>
 
-      <WishlistThemePreview values={values} t={t} />
+      <WishlistThemePreview values={values} t={t} compact />
     </div>
   );
 }
@@ -278,7 +390,8 @@ function AppearanceBottomSheet({
             onSetPreset={onSetPreset}
             onRestoreDefault={onRestoreDefault}
             onClose={onClose}
-            mobile
+            showCloseButton
+            layout="stacked"
           />
         </div>
       </div>
@@ -376,9 +489,11 @@ function ColorSwatch({ color }: { color: string }) {
 function WishlistThemePreview({
   values,
   t,
+  compact = false,
 }: {
   values: WishlistThemeValues;
   t: (key: string) => string;
+  compact?: boolean;
 }) {
   return (
     <div className="grid gap-3">
@@ -387,7 +502,7 @@ function WishlistThemePreview({
         <span className="text-xs text-warm-500">{t("theme.previewCompact")}</span>
       </div>
       <div
-        className="overflow-hidden rounded-[24px] bg-cream ring-1 ring-warm-100"
+        className={`overflow-hidden rounded-[24px] bg-cream ring-1 ring-warm-100 ${compact ? "lg:max-w-[380px]" : ""}`}
         style={getWishlistThemeCssVars(values)}
       >
         <div className="grid gap-3 p-4" style={{ backgroundImage: "var(--wishlist-header-gradient)" }}>

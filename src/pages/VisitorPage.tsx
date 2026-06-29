@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { GiftCard, type GiftCardModel } from "../components/GiftCard";
 import { ContributionForm, ReservationForm } from "../components/Forms";
-import { LanguageSelector } from "../components/LanguageSelector";
 import { Modal } from "../components/Modal";
 import { EmptyState, SuccessState } from "../components/States";
 import { WishlyLogo } from "../components/WishlyLogo";
@@ -192,7 +191,6 @@ export function VisitorPage() {
               <ArrowLeft size={16} aria-hidden="true" />
               <WishlyLogo size="sm" />
             </Link>
-            <LanguageSelector />
           </div>
           <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">
             <img src={demoWishlist.cover} alt="" className="h-56 w-full object-cover" />
@@ -242,7 +240,6 @@ export function VisitorPage() {
               <ArrowLeft size={16} aria-hidden="true" />
               <WishlyLogo size="sm" />
             </Link>
-            <LanguageSelector />
           </div>
           <p className="text-sm text-warm-500">{t("common.loading")}</p>
         </div>
@@ -278,7 +275,6 @@ export function VisitorPage() {
             <ArrowLeft size={16} aria-hidden="true" />
             <WishlyLogo size="sm" />
           </Link>
-          <LanguageSelector />
         </div>
 
         <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">

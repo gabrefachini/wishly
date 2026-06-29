@@ -337,7 +337,7 @@
     "title": "Adicione algo especial",
     "body": "Um link da loja, preço estimado e prioridade ajudam convidados a escolher com confiança.",
     "giftName": "Nome do presente",
-    "storeLink": "Link da loja",
+    "storeLink": "URL do produto",
     "estimatedPrice": "Preço estimado",
     "priority": "Prioridade",
     "productImage": "Imagem do produto",
@@ -357,6 +357,13 @@
     "priceRadarPriority": "Prioridade do monitoramento",
     "priceRadarAlerts": "Preferências de alerta",
     "priceRadarActivate": "Ativar radar"
+  },
+  "giftPreview": {
+    "loading": "Buscando informações do produto...",
+    "fallback": "Não conseguimos preencher automaticamente este produto. Você pode completar as informações manualmente.",
+    "manualFallbackHint": "Cole o link do produto para tentarmos preencher nome, preço e imagem automaticamente.",
+    "success": "Informações preenchidas automaticamente.",
+    "successWithStore": "Informações preenchidas automaticamente a partir de {{store}}."
   },
   "giftFunding": {
     "groupGift": "Presente coletivo",

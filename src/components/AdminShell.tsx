@@ -2,7 +2,6 @@ import { LayoutGrid, Megaphone, Settings2, Store, Undo2 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { WishlyLogo } from "./WishlyLogo";
 import { useTranslation } from "../i18n/useTranslation";
-import { LanguageSelector } from "./LanguageSelector";
 
 const navItems = [
   { to: "/admin", labelKey: "admin.dashboard", icon: LayoutGrid, end: true },
@@ -30,7 +29,6 @@ export function AdminShell() {
               <Undo2 size={16} aria-hidden="true" />
               {t("admin.backToApp")}
             </NavLink>
-            <LanguageSelector />
           </div>
         </div>
 

@@ -5,7 +5,6 @@ import { getFriendlyAuthErrorMessage } from "../lib/authErrors";
 import { useTranslation } from "../i18n/useTranslation";
 import { resendSignupConfirmation, signInWithPassword } from "../services/auth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
-import { LanguageSelector } from "../components/LanguageSelector";
 import { SetupNotice } from "../components/SetupNotice";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { hasSupabaseEnv } from "../lib/env";
@@ -48,9 +47,6 @@ export function LoginPage() {
     return (
       <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
-          <div className="flex justify-end">
-            <LanguageSelector />
-          </div>
           <SetupNotice />
         </div>
       </main>
@@ -119,9 +115,6 @@ export function LoginPage() {
   return (
     <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
       <div className="mx-auto grid max-w-md gap-6">
-        <div className="flex justify-end">
-          <LanguageSelector />
-        </div>
         <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">
           <div className="mb-5 flex justify-center">
             <WishlyLogo size="md" />
