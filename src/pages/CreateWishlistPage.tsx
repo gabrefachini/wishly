@@ -15,7 +15,7 @@ import type { WishlistThemePreset, WishlistType } from "../types/domain";
 
 export function CreateWishlistPage() {
   const { t, locale } = useTranslation();
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile } = useAuth();
   const navigate = useNavigate();
   const [values, setValues] = useState<{
     title: string;
@@ -55,6 +55,12 @@ export function CreateWishlistPage() {
 
   async function handleSubmit() {
     setSubmitError(null);
+
+    if (!session?.user) {
+      setSubmitError(t("create.errors.auth"));
+      return;
+    }
+
     const parsed = createWishlistSchema.safeParse(values);
     if (!parsed.success) {
       const nextErrors = Object.fromEntries(
@@ -73,7 +79,6 @@ export function CreateWishlistPage() {
         return;
       }
 
-      await refreshProfile();
       const wishlist = await createWishlist({
         owner_id: ownerProfile.id,
         title: values.title,

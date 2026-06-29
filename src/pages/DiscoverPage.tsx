@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 import { useTranslation } from "../i18n/useTranslation";
 import { listDiscoverSponsoredItems, listMyWishlists } from "../services/wishlists";
 import type { SponsoredItemRecord, WishlistWithGifts } from "../types/domain";
@@ -27,6 +28,7 @@ const priceFilters = [
 
 export function DiscoverPage() {
   const { t, locale } = useTranslation();
+  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<SponsoredItemRecord[]>([]);
   const [wishlists, setWishlists] = useState<WishlistWithGifts[]>([]);
@@ -45,6 +47,16 @@ export function DiscoverPage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoading(true);
+    setError(null);
+    setItems([]);
+    setWishlists([]);
 
     Promise.all([listDiscoverSponsoredItems(), listMyWishlists()])
       .then(([nextItems, nextWishlists]) => {
@@ -65,7 +77,7 @@ export function DiscoverPage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [authLoading, session?.user?.id, t]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {

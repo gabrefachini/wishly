@@ -453,9 +453,13 @@
     }
   },
   "theme": {
+    "appearanceLabel": "Wishlist appearance",
+    "personalize": "Personalize",
+    "appearanceOptional": "Optional",
     "title": "Personalize your list",
     "body": "Choose colors that match your moment.",
     "preview": "Preview",
+    "previewCompact": "Compact preview",
     "previewTitle": "Sofia's Birthday",
     "previewBody": "A warm, thoughtful page for sharing gift ideas with friends and family.",
     "primary": "Primary color",
@@ -464,6 +468,9 @@
     "usePreset": "Use preset",
     "chooseMyColors": "Choose my colors",
     "reset": "Restore default",
+    "close": "Close panel",
+    "apply": "Apply appearance",
+    "summaryCustom": "Custom theme",
     "contrastWarning": "We adjusted the accents to keep text readable and the overall layout clean.",
     "contrastSafe": "These colors keep the public page balanced and readable.",
     "presets": {

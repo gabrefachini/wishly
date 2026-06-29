@@ -16,7 +16,7 @@ const fallbackCover =
 
 export function HomePage() {
   const { t, locale } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [wishlists, setWishlists] = useState<WishlistWithGifts[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +31,15 @@ export function HomePage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoading(true);
+    setError(null);
+    setWishlists([]);
 
     listActiveWishlists()
       .then((data) => {
@@ -52,7 +61,7 @@ export function HomePage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [authLoading, session?.user?.id, t]);
 
   const firstWishlist = wishlists[0];
   const previewHref = firstWishlist ? `/w/${firstWishlist.share_id}` : "/create";

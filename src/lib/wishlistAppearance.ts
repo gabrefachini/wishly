@@ -119,6 +119,30 @@ export function getWishlistThemePresetOptions() {
   }));
 }
 
+export function getWishlistThemeDisplayName(
+  theme: Partial<ThemeInput> | null | undefined,
+  fallbackLabel: string,
+) {
+  const source = resolveWishlistThemeSource(theme);
+  if (source.useCustomTheme) {
+    return fallbackLabel;
+  }
+
+  return WISHLIST_THEME_PRESETS[source.presetKey].name;
+}
+
+export function getWishlistThemeSwatches(theme: Partial<ThemeInput> | null | undefined) {
+  const source = resolveWishlistThemeSource(theme);
+  return {
+    primary: source.useCustomTheme
+      ? normalizeHex(theme?.theme_primary_color, WISHLIST_THEME_PRESETS[source.presetKey].primary)
+      : WISHLIST_THEME_PRESETS[source.presetKey].primary,
+    secondary: source.useCustomTheme
+      ? normalizeHex(theme?.theme_secondary_color, WISHLIST_THEME_PRESETS[source.presetKey].secondary)
+      : WISHLIST_THEME_PRESETS[source.presetKey].secondary,
+  };
+}
+
 export function resolveWishlistThemeSource(theme: Partial<ThemeInput> | null | undefined) {
   const presetKey =
     theme?.theme_preset && theme.theme_preset in WISHLIST_THEME_PRESETS
@@ -189,4 +213,3 @@ export function getWishlistThemeContrastWarning(theme: Partial<ThemeInput> | nul
 
   return primaryContrast < 3 || secondaryContrast < 1.7;
 }
-

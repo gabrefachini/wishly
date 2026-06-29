@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 import { AddGiftForm } from "../components/Forms";
 import { EmptyState } from "../components/States";
 import { SetupNotice } from "../components/SetupNotice";
@@ -11,6 +12,7 @@ import type { WishlistWithGifts } from "../types/domain";
 
 export function AddGiftPage() {
   const { t } = useTranslation();
+  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [wishlists, setWishlists] = useState<WishlistWithGifts[]>([]);
@@ -56,6 +58,14 @@ export function AddGiftPage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoadingWishlists(true);
+    setWishlists([]);
 
     listMyWishlists()
       .then((data) => {
@@ -81,7 +91,7 @@ export function AddGiftPage() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, [authLoading, searchParams, session?.user?.id]);
 
   if (!hasSupabaseEnv) {
     return <SetupNotice />;

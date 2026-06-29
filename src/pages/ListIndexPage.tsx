@@ -1,6 +1,7 @@
 import { Archive, Link2, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 import { CreateButton, SecondaryButton } from "../components/Buttons";
 import { EmptyState } from "../components/States";
 import { buildWishlistSummary } from "../lib/presenters";
@@ -13,6 +14,7 @@ type FilterMode = "active" | "archived" | "all";
 
 export function ListIndexPage() {
   const { t, locale } = useTranslation();
+  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [wishlists, setWishlists] = useState<WishlistWithGifts[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,15 @@ export function ListIndexPage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setLoading(true);
+    setError(null);
+    setWishlists([]);
 
     listMyWishlists()
       .then((data) => {
@@ -51,7 +62,7 @@ export function ListIndexPage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [authLoading, session?.user?.id, t]);
 
   const filteredWishlists = useMemo(() => {
     return wishlists.filter((wishlist) => {

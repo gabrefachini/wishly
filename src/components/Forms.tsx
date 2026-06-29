@@ -1,5 +1,5 @@
 import { BellRing, HandCoins, ImagePlus, Link as LinkIcon, Mail, Radar, Sparkles, Target, Upload } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { PrimaryButton, SecondaryButton } from "./Buttons";
 import { WishlistThemeSection } from "./WishlistThemeSection";
@@ -63,6 +63,8 @@ export function CreateWishlistForm({
   onCoverUpload,
   onSubmit,
 }: CreateWishlistFormProps) {
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <form
       className="grid gap-5"
@@ -127,7 +129,8 @@ export function CreateWishlistForm({
           onChange={(event) => onChange("message", event.target.value)}
         />
       </Field>
-      <Field label={t("actions.chooseCover")} error={errors.cover_image_url}>
+      <div className="grid gap-2">
+        <span className="text-sm font-semibold text-warm-700">{t("actions.chooseCover")}</span>
         <div className="grid gap-3">
           <div className="relative">
             <ImagePlus
@@ -143,19 +146,24 @@ export function CreateWishlistForm({
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta">
+            <button
+              type="button"
+              onClick={() => coverFileInputRef.current?.click()}
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+            >
               <Upload size={17} aria-hidden="true" />
               {coverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  onCoverUpload(event.target.files?.[0] ?? null);
-                  event.currentTarget.value = "";
-                }}
-              />
-            </label>
+            </button>
+            <input
+              ref={coverFileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(event) => {
+                onCoverUpload(event.target.files?.[0] ?? null);
+                event.currentTarget.value = "";
+              }}
+            />
             <span className="text-xs leading-6 text-warm-500">{t("create.coverUploadHint")}</span>
           </div>
           {values.cover_image_url ? (
@@ -166,7 +174,8 @@ export function CreateWishlistForm({
             />
           ) : null}
         </div>
-      </Field>
+        {errors.cover_image_url ? <span className="text-xs text-terracotta">{errors.cover_image_url}</span> : null}
+      </div>
       <Field label={t("create.visibility")}>
         <div className="grid gap-2">
           {values.type === "wishlist" ? (
@@ -238,7 +247,7 @@ export function CreateWishlistForm({
         t={t}
         onChange={onChange}
       />
-      <PrimaryButton type="submit" className="w-full" disabled={loading}>
+      <PrimaryButton type="submit" className="w-full" disabled={loading || coverUploading}>
         {t("actions.createWishlist")}
       </PrimaryButton>
     </form>

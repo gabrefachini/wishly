@@ -453,9 +453,13 @@
     }
   },
   "theme": {
+    "appearanceLabel": "Aparência da lista",
+    "personalize": "Personalizar",
+    "appearanceOptional": "Opcional",
     "title": "Personalize sua lista",
     "body": "Escolha cores que combinem com o seu momento.",
     "preview": "Preview visual",
+    "previewCompact": "Preview compacto",
     "previewTitle": "Aniversário da Sofia",
     "previewBody": "Uma página acolhedora e elegante para compartilhar ideias de presente com quem importa.",
     "primary": "Cor principal",
@@ -464,6 +468,9 @@
     "usePreset": "Usar paleta",
     "chooseMyColors": "Escolher minhas cores",
     "reset": "Restaurar padrão",
+    "close": "Fechar painel",
+    "apply": "Aplicar aparência",
+    "summaryCustom": "Tema personalizado",
     "contrastWarning": "Ajustamos os acentos para manter boa leitura e preservar a estética da página.",
     "contrastSafe": "Essas cores mantêm a página pública equilibrada e legível.",
     "presets": {

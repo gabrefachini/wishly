@@ -1,5 +1,5 @@
 import { CheckCircle2, Pencil, Plus, Radar, Target, Trash2, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { GiftCard, type GiftCardModel } from "../components/GiftCard";
@@ -95,6 +95,7 @@ export function WishlistDetailPage() {
       "any_drop" | "drop_5" | "drop_10" | "below_target" | "back_to_low" | "weekly_summary" | "relevant_only"
     >,
   });
+  const wishlistCoverFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -828,28 +829,38 @@ export function WishlistDetailPage() {
               onChange={(event) => setWishlistValues((current) => ({ ...current, message: event.target.value }))}
             />
           </label>
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("actions.chooseCover")}</span>
             <input
               className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
               value={wishlistValues.cover_image_url}
               onChange={(event) => setWishlistValues((current) => ({ ...current, cover_image_url: event.target.value }))}
             />
-            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta">
-              <Upload size={17} aria-hidden="true" />
-              {wishlistCoverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
+            <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+              <button
+                type="button"
+                onClick={() => wishlistCoverFileInputRef.current?.click()}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+              >
+                <Upload size={17} aria-hidden="true" />
+                {wishlistCoverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
+              </button>
               <input
+                ref={wishlistCoverFileInputRef}
                 type="file"
                 accept="image/*"
-                className="hidden"
+                className="sr-only"
                 onChange={(event) => {
                   void handleWishlistCoverUpload(event.target.files?.[0] ?? null);
                   event.currentTarget.value = "";
                 }}
               />
-            </label>
-            {wishlistEditErrors.cover_image_url ? <span className="text-xs text-terracotta">{wishlistEditErrors.cover_image_url}</span> : null}
-          </label>
+              <span className="text-xs leading-6 text-warm-500">{t("create.coverUploadHint")}</span>
+            </div>
+            {wishlistEditErrors.cover_image_url ? (
+              <span className="text-xs text-terracotta">{wishlistEditErrors.cover_image_url}</span>
+            ) : null}
+          </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("create.visibility")}</span>
               {wishlistValues.type === "wishlist" ? (

@@ -9,7 +9,7 @@ import { updateMetadata } from "../lib/metadata";
 
 export function ProfilePage() {
   const { t, locale } = useTranslation();
-  const { profile, signOutUser, isAdmin } = useAuth();
+  const { profile, session, loading: authLoading, signOutUser, isAdmin } = useAuth();
   const [wishlistCount, setWishlistCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -21,6 +21,13 @@ export function ProfilePage() {
 
   useEffect(() => {
     let active = true;
+    if (authLoading) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setWishlistCount(null);
 
     listMyWishlists()
       .then((items) => {
@@ -33,7 +40,7 @@ export function ProfilePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [authLoading, session?.user?.id]);
 
   if (!profile) {
     return (
