@@ -5,7 +5,7 @@ import { WishlyLogo } from "./WishlyLogo";
 export function AppShell() {
   return (
     <div className="min-h-screen bg-cream text-warm-900">
-      <main className="mx-auto min-h-screen w-full max-w-3xl px-4 pb-32 pt-5 sm:px-6">
+      <main className="mx-auto min-h-screen w-full max-w-6xl px-4 pb-32 pt-5 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <Link
             to="/app"

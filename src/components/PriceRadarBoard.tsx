@@ -199,7 +199,7 @@ export function PriceRadarBoard({
 
   return (
     <section className="grid gap-5 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)] lg:items-start">
         <div className="grid gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="grid gap-2">
@@ -227,10 +227,17 @@ export function PriceRadarBoard({
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-dashed border-warm-200 bg-warm-50/70 p-4">
-          <p className="text-sm font-semibold text-warm-800">{t("priceRadar.summary.title")}</p>
-          <p className="mt-2 text-sm leading-6 text-warm-600">{t("priceRadar.summary.body")}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-xs text-warm-600">
+        <div className="grid gap-3 rounded-[28px] bg-warm-50/70 p-4 ring-1 ring-warm-100">
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <p className="text-sm font-semibold text-warm-800">{t("priceRadar.summary.title")}</p>
+              <p className="text-sm leading-6 text-warm-600">{t("priceRadar.summary.body")}</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-warm-100">
+              {trackedGifts.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-warm-600">
             <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 ring-1 ring-warm-100">
               <Activity size={13} aria-hidden="true" />
               {t("priceRadar.summary.realtime")}
@@ -275,14 +282,14 @@ export function PriceRadarBoard({
           return (
             <article
               key={gift.id}
-              className="grid gap-4 rounded-[28px] border border-warm-100 bg-white p-4 shadow-card transition hover:shadow-soft sm:p-5"
+              className="overflow-hidden rounded-[28px] border border-warm-100 bg-white p-4 shadow-card transition hover:shadow-soft sm:p-5"
             >
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:items-start">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-start">
                 <div className="grid gap-4">
                   <div className="flex gap-4">
                     <img
                       src={gift.image_url || fallbackImageUrl}
-                      alt=""
+                      alt={gift.name}
                       className="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-1 ring-warm-100"
                     />
                     <div className="min-w-0 grid gap-3">
@@ -297,10 +304,16 @@ export function PriceRadarBoard({
                         {changeText ? (
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
-                              changeText.startsWith("-") ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-blush text-terracotta ring-coral/10"
+                              changeText.startsWith("-")
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                                : "bg-blush text-terracotta ring-coral/10"
                             }`}
                           >
-                            {changeText.startsWith("-") ? <ArrowDownRight size={13} aria-hidden="true" /> : <ArrowUpRight size={13} aria-hidden="true" />}
+                            {changeText.startsWith("-") ? (
+                              <ArrowDownRight size={13} aria-hidden="true" />
+                            ) : (
+                              <ArrowUpRight size={13} aria-hidden="true" />
+                            )}
                             {trendText} · {changeText}
                           </span>
                         ) : (
@@ -311,30 +324,31 @@ export function PriceRadarBoard({
                       </div>
 
                       <div className="grid gap-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
-                          {t("priceRadar.item.currentPrice")}
-                        </p>
-                        <div className="text-3xl font-bold tracking-tight text-warm-900">{currentPriceLabel}</div>
-                        <p className="text-sm leading-6 text-warm-600">{recommendation.title}</p>
-                      </div>
-
-                      <div className="grid gap-2 text-sm text-warm-600">
-                        <p className="inline-flex flex-wrap items-center gap-1.5">
-                          <Store size={14} aria-hidden="true" className="text-warm-400" />
-                          <span>{storeName}</span>
-                        </p>
-                        <p className="inline-flex flex-wrap items-center gap-1.5">
-                          <Clock3 size={14} aria-hidden="true" className="text-warm-400" />
+                        <h3 className="text-xl font-bold tracking-tight text-warm-900 sm:text-2xl">{gift.name}</h3>
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-warm-500">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Store size={14} aria-hidden="true" className="text-warm-400" />
+                            {storeName}
+                          </span>
+                          <span aria-hidden="true">•</span>
                           <span>
                             {t("priceRadar.item.monitoringSince")}: {startDateLabel}
                           </span>
-                        </p>
-                        <p className="inline-flex flex-wrap items-center gap-1.5">
-                          <Clock3 size={14} aria-hidden="true" className="text-warm-400" />
+                          <span aria-hidden="true">•</span>
                           <span>
                             {t("priceRadar.item.lastChecked")}: {lastCheckLabel}
                           </span>
                         </p>
+                      </div>
+
+                      <div className="grid gap-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                          {t("priceRadar.item.currentPrice")}
+                        </p>
+                        <div className="text-3xl font-bold tracking-tight text-warm-900 sm:text-[2.15rem]">
+                          {currentPriceLabel}
+                        </div>
+                        <p className="text-sm leading-6 text-warm-600">{recommendation.title}</p>
                       </div>
                     </div>
                   </div>
@@ -344,9 +358,9 @@ export function PriceRadarBoard({
                   <div className="flex items-start justify-between gap-3">
                     <div className="grid gap-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
-                        {t("priceRadar.item.status")}
+                        {t("priceRadar.item.analysisTitle")}
                       </p>
-                      <h3 className="text-lg font-bold text-warm-900">{recommendation.title}</h3>
+                      <h4 className="text-lg font-bold text-warm-900">{recommendation.title}</h4>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${toneClasses(recommendation.severity)}`}>
                       {recommendation.score}
@@ -355,10 +369,28 @@ export function PriceRadarBoard({
 
                   <p className="text-sm leading-6 text-warm-600">{recommendation.message}</p>
 
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(220px,0.85fr)] sm:items-start">
+                  <div className="grid gap-3">
                     <div className="rounded-[22px] bg-white p-3 ring-1 ring-warm-100">
+                      <div className="flex items-end justify-between gap-3">
+                        <div className="grid gap-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">
+                            {t("priceRadar.item.priceHistory")}
+                          </p>
+                          <p className="text-xs text-warm-500">{t("priceRadar.item.last30Days")}</p>
+                        </div>
+                        {targetPrice !== null ? (
+                          <span className="rounded-full bg-blush px-2.5 py-1 text-[11px] font-semibold text-terracotta ring-1 ring-coral/10">
+                            {t("priceRadar.item.targetPrice")}
+                          </span>
+                        ) : null}
+                      </div>
                       <PriceSparkline
                         points={historyPoints}
+                        referenceValue={targetPrice}
+                        referenceLabel={t("priceRadar.item.targetPrice")}
+                        currentLabel={t("priceRadar.item.currentMarker")}
+                        startLabel={t("priceRadar.item.timelineStart")}
+                        endLabel={t("priceRadar.item.timelineEnd")}
                         accent="var(--wishlist-primary)"
                         softAccent="var(--wishlist-secondary-soft)"
                         emptyLabel={t("priceRadar.item.collectingHistoryShort")}
@@ -370,16 +402,28 @@ export function PriceRadarBoard({
                       </p>
                     </div>
 
-                    <div className="grid gap-2">
-                      {metricLabel(t("priceRadar.item.lowestPrice"), lowestPrice !== null ? formatCurrency(lowestPrice, locale, gift.currency) : "—", true)}
-                      {metricLabel(t("priceRadar.item.averagePrice"), averagePrice !== null ? formatCurrency(averagePrice, locale, gift.currency) : "—", true)}
-                      {metricLabel(t("priceRadar.item.targetPrice"), targetPrice !== null ? formatCurrency(targetPrice, locale, gift.currency) : t("priceRadar.item.noTarget"), true)}
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {metricLabel(
+                        t("priceRadar.item.lowestPrice"),
+                        lowestPrice !== null ? formatCurrency(lowestPrice, locale, gift.currency) : "—",
+                        true,
+                      )}
+                      {metricLabel(
+                        t("priceRadar.item.averagePrice"),
+                        averagePrice !== null ? formatCurrency(averagePrice, locale, gift.currency) : "—",
+                        true,
+                      )}
+                      {metricLabel(
+                        t("priceRadar.item.targetPrice"),
+                        targetPrice !== null ? formatCurrency(targetPrice, locale, gift.currency) : t("priceRadar.item.noTarget"),
+                        true,
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 pt-1">
                 <SecondaryButton type="button" onClick={() => onToggleGiftRadar(gift, !gift.price_tracking_enabled)}>
                   {gift.price_tracking_enabled ? t("priceRadar.disable") : t("priceRadar.activate")}
                 </SecondaryButton>

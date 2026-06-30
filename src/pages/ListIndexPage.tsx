@@ -157,7 +157,7 @@ export function ListIndexPage() {
         />
       ) : null}
 
-      <div className="grid gap-3">
+      <div className="grid gap-3 xl:grid-cols-2">
         {filteredWishlists.map((wishlist) => {
           const summary = buildWishlistSummary(wishlist, locale, t);
           return (

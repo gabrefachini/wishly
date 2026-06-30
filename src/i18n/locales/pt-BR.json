@@ -279,6 +279,8 @@
     "saveDetails": "Salvar lista",
     "editGift": "Editar presente",
     "saveGift": "Salvar presente",
+    "summaryTitle": "Resumo da lista",
+    "actionsTitle": "Ações rápidas",
     "updateError": "Não foi possível salvar as alterações da lista. Tente novamente.",
     "giftUpdateError": "Não foi possível salvar as alterações do presente. Tente novamente.",
     "editCoverError": "Não foi possível enviar essa nova imagem de capa agora.",
@@ -480,11 +482,17 @@
       "collectingHistoryTitle": "Ainda estamos coletando histórico deste item.",
       "collectingHistoryBody": "Monitorando desde hoje. Em breve você verá tendência, menor preço e média.",
       "historyCaptured": "Histórico suficiente para mostrar tendência.",
+      "analysisTitle": "Análise do preço",
+      "priceHistory": "Histórico de preços",
+      "last30Days": "Últimos 30 dias",
       "unknownStore": "Loja não identificada",
       "trendDown": "Preço em queda",
       "trendUp": "Preço em alta",
       "trendStable": "Preço estável",
-      "trendUnknown": "Tendência ainda não definida"
+      "trendUnknown": "Tendência ainda não definida",
+      "timelineStart": "Início",
+      "timelineEnd": "Hoje",
+      "currentMarker": "Atual"
     }
   },
   "theme": {
@@ -605,7 +613,8 @@
   "summary": {
     "gifts": "presentes",
     "reserved": "reservados",
-    "shared": "Compartilhada"
+    "shared": "Compartilhada",
+    "visibility": "Visibilidade"
   },
   "occasions": {
     "birthday": "Aniversário",

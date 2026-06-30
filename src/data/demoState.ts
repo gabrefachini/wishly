@@ -2862,8 +2862,11 @@ function readState(): DemoState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
-        memoryState = JSON.parse(raw) as DemoState;
-        return memoryState;
+        const parsed = JSON.parse(raw) as DemoState;
+        if (Array.isArray(parsed.wishlists) && parsed.wishlists.length > 0) {
+          memoryState = parsed;
+          return memoryState;
+        }
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
       }

@@ -279,6 +279,8 @@
     "saveDetails": "Save wishlist",
     "editGift": "Edit gift",
     "saveGift": "Save gift",
+    "summaryTitle": "List summary",
+    "actionsTitle": "Quick actions",
     "updateError": "We couldn't save the wishlist changes. Please try again.",
     "giftUpdateError": "We couldn't save the gift changes. Please try again.",
     "editCoverError": "We couldn't upload this new cover image right now.",
@@ -484,7 +486,10 @@
       "trendDown": "Price is falling",
       "trendUp": "Price is rising",
       "trendStable": "Price is stable",
-      "trendUnknown": "Trend not defined yet"
+      "trendUnknown": "Trend not defined yet",
+      "timelineStart": "Start",
+      "timelineEnd": "Today",
+      "currentMarker": "Current"
     }
   },
   "theme": {
@@ -605,7 +610,8 @@
   "summary": {
     "gifts": "gifts",
     "reserved": "reserved",
-    "shared": "Shared"
+    "shared": "Shared",
+    "visibility": "Visibility"
   },
   "occasions": {
     "birthday": "Birthday",

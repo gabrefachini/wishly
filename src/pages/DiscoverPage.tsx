@@ -181,7 +181,7 @@ export function DiscoverPage() {
         />
       ) : null}
 
-      <div className="grid gap-4">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {filteredItems.map((item) => (
           <SponsoredItemCard
             key={item.id}

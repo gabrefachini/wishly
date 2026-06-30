@@ -386,6 +386,11 @@ export function WishlistDetailPage() {
     const target = gift.target_price ?? gift.lowest_price ?? gift.average_price ?? current;
     return total + Math.max(current - target, 0);
   }, 0);
+  const dashboardMetrics = [
+    { label: summary.giftCountLabel, value: String(wishlist.gifts.length) },
+    { label: summary.reservedCountLabel, value: String(wishlist.gifts.filter((gift) => gift.status === "reserved").length) },
+    { label: t("wishlist.visibility"), value: summary.visibilityLabel },
+  ];
 
   async function handleGiftStatusChange(giftId: string, status: "available" | "purchased") {
     if (!wishlist) return;
@@ -426,7 +431,8 @@ export function WishlistDetailPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)] xl:items-start">
+      <div className="grid gap-6">
       <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">
         <img
           src={wishlist.cover_image_url || fallbackCover}
@@ -517,7 +523,8 @@ export function WishlistDetailPage() {
           </p>
         </div>
         {wishlist.gifts.length ? (
-          wishlist.gifts.map((gift: GiftRecord) => {
+          <div className="grid gap-3 xl:grid-cols-2">
+          {wishlist.gifts.map((gift: GiftRecord) => {
             const cardGift: GiftCardModel = {
               id: gift.id,
               name: gift.name,
@@ -598,11 +605,38 @@ export function WishlistDetailPage() {
                 />
               </div>
             );
-          })
+          })}
+          </div>
         ) : (
           <EmptyState title={t("wishlist.emptyTitle")} body={t("wishlist.emptyBody")} />
         )}
       </section>
+      </div>
+
+      <aside className="grid gap-4 xl:sticky xl:top-6">
+        <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+          <p className="text-sm font-semibold text-coral">{t("wishlist.summaryTitle")}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            {dashboardMetrics.map((metric) => (
+              <div key={metric.label} className="rounded-[22px] bg-warm-50/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{metric.label}</p>
+                <p className="mt-2 text-sm font-semibold text-warm-900">{metric.value}</p>
+              </div>
+            ))}
+            <div className="rounded-[22px] bg-blush/45 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-coral">
+                {canUseRadar ? t("priceRadar.enabled") : t("priceRadar.disabled")}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-warm-900">
+                {canUseRadar ? t("priceRadar.dashboardTitle") : t("priceRadar.paywallBody")}
+              </p>
+            </div>
+          </div>
+          {isPrivateWishlist ? (
+            <p className="mt-4 text-sm leading-6 text-warm-600">{t("wishlist.privateOwnerHint")}</p>
+          ) : null}
+        </section>
+      </aside>
 
       <Modal
         title={t("wishlist.editDetails")}

@@ -40,7 +40,7 @@ export function BottomNavigation() {
   return (
     <nav
       aria-label={t("nav.primary")}
-      className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-3xl px-4 pb-4"
+      className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8"
     >
       <div className="grid grid-cols-4 rounded-[28px] border border-warm-100 bg-porcelain/95 p-2 shadow-soft backdrop-blur">
         {items.map((item) => (
