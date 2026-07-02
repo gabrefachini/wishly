@@ -101,16 +101,25 @@ function contrastRatio(hexA: string, hexB: string) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-function ensureReadableAccent(accent: string, background = "#F6F4F0", minContrast = 4.5) {
+function ensureReadableAccent(
+  accent: string,
+  background = "#F6F4F0",
+  minContrast = 4.5,
+  lighten = false,
+) {
   let current = accent;
   let attempts = 0;
 
   while (contrastRatio(current, background) < minContrast && attempts < 8) {
-    current = mixColors(current, "#241815", 0.18);
+    current = mixColors(current, lighten ? "#FFFFFF" : "#241815", 0.18);
     attempts += 1;
   }
 
   return current;
+}
+
+function prefersDarkScheme() {
+  return typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-color-scheme: dark)").matches);
 }
 
 export function getWishlistThemePresetOptions() {
@@ -168,21 +177,27 @@ export function resolveWishlistThemeSource(theme: Partial<ThemeInput> | null | u
 
 export function getWishlistTheme(theme: Partial<ThemeInput> | null | undefined) {
   const source = resolveWishlistThemeSource(theme);
-  const primary = ensureReadableAccent(source.primary);
+  const dark = prefersDarkScheme();
+  const pageBg = dark ? "#14120F" : "#F6F4F0";
+  const surfaceMix = dark ? "#1E1B18" : "#F6F4F0";
+  const surfaceMixStrong = dark ? "#1E1B18" : "#FFFFFF";
+  // Accents must read against the page; in dark mode we lighten instead of darken.
+  const primary = ensureReadableAccent(source.primary, pageBg, 4.5, dark);
   const secondary = source.secondary;
 
   return {
     ...source,
     primary,
-    primarySoft: mixColors(primary, "#F6F4F0", 0.84),
+    primarySoft: mixColors(primary, surfaceMix, 0.84),
     secondary,
-    secondarySoft: mixColors(secondary, "#F6F4F0", 0.62),
-    headerSurface: mixColors(secondary, "#FFFFFF", 0.58),
-    buttonColor: primary,
-    badgeReservedColor: ensureReadableAccent(mixColors(secondary, "#5E7188", 0.28), "#F6F4F0", 2.4),
+    secondarySoft: mixColors(secondary, surfaceMix, dark ? 0.82 : 0.62),
+    headerSurface: mixColors(secondary, surfaceMixStrong, dark ? 0.8 : 0.58),
+    // Buttons carry white labels, so their contrast target is the label, not the page.
+    buttonColor: ensureReadableAccent(source.primary, "#FFFFFF", 3.5),
+    badgeReservedColor: ensureReadableAccent(mixColors(secondary, "#5E7188", 0.28), pageBg, 2.4, dark),
     progressColor: primary,
-    focusRingColor: mixColors(primary, "#FFFFFF", 0.55),
-    surfaceTint: mixColors(secondary, "#FFFFFF", 0.78),
+    focusRingColor: mixColors(primary, dark ? "#000000" : "#FFFFFF", 0.55),
+    surfaceTint: mixColors(secondary, surfaceMixStrong, 0.78),
   };
 }
 

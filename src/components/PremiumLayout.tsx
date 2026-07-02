@@ -32,7 +32,7 @@ type BentoCardProps = {
 const toneClasses: Record<NonNullable<BentoCardProps["tone"]>, string> = {
   default: "bg-surface text-warm-900 ring-border shadow-card",
   soft: "bg-sunken text-warm-900 ring-border shadow-card",
-  dark: "bg-warm-900 text-white ring-warm-900 shadow-soft",
+  dark: "bg-espresso text-white ring-espresso shadow-soft",
   accent: "bg-sunken text-warm-900 ring-border shadow-card",
 };
 
@@ -88,15 +88,15 @@ type MetricBentoCardProps = {
   label: string;
   value: string;
   note?: string;
-  accent?: "coral" | "lavender" | "emerald" | "sky";
+  accent?: "primary" | "info" | "emerald" | "neutral";
   className?: string;
 };
 
 const metricAccentClasses = {
-  coral: "bg-sunken text-primary-strong",
-  lavender: "bg-info-soft text-warm-900",
+  primary: "bg-sunken text-primary-strong",
+  info: "bg-info-soft text-warm-900",
   emerald: "bg-emerald-50 text-emerald-700",
-  sky: "bg-sunken text-warm-700",
+  neutral: "bg-sunken text-warm-700",
 };
 
 export function MetricBentoCard({
@@ -104,7 +104,7 @@ export function MetricBentoCard({
   label,
   value,
   note,
-  accent = "coral",
+  accent = "primary",
   className = "",
 }: MetricBentoCardProps) {
   return (
@@ -138,7 +138,7 @@ export function ActionBentoCard({
 }: ActionBentoCardProps) {
   return (
     <BentoCard className={joinClasses("grid gap-4", className)} tone="soft">
-      <div className="inline-flex h-12 w-12 items-center justify-center rounded-ctrl bg-warm-900 text-white shadow-card">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-ctrl bg-espresso text-white shadow-card">
         <Icon size={18} aria-hidden="true" />
       </div>
       <div>

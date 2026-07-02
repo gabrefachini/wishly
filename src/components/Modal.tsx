@@ -88,7 +88,7 @@ export function Modal({ title, open, onClose, children, size = "lg" }: ModalProp
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-ink/25 p-4 sm:items-center sm:p-6"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center sm:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

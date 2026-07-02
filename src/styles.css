@@ -9,7 +9,7 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color-scheme: light;
+  color-scheme: light dark;
 
   /* Semantic tokens — Stone & Spruce. Re-skin the app here.
      RGB triplets feed Tailwind's alpha modifiers (bg-primary/15 etc);
@@ -31,6 +31,18 @@
   --info-rgb: 94 113 136;
   --info-soft-rgb: 228 233 239;
 
+  /* Warm neutral scale: 50 = subtlest bg, 900 = strongest text (both schemes) */
+  --warm-50-rgb: 250 249 246;
+  --warm-100-rgb: 239 236 230;
+  --warm-200-rgb: 227 223 215;
+  --warm-300-rgb: 201 195 185;
+  --warm-400-rgb: 155 148 139;
+  --warm-500-rgb: 110 104 97;
+  --warm-600-rgb: 87 81 75;
+  --warm-700-rgb: 66 61 56;
+  --warm-800-rgb: 47 43 39;
+  --warm-900-rgb: 33 30 27;
+
   --page-bg: rgb(var(--page-bg-rgb));
   --surface: rgb(var(--surface-rgb));
   --surface-alt: rgb(var(--surface-alt-rgb));
@@ -48,6 +60,48 @@
   --info: rgb(var(--info-rgb));
   --info-soft: rgb(var(--info-soft-rgb));
   --ring: rgba(49, 97, 79, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f2eee8;
+    background: #14120f;
+
+    --page-bg-rgb: 20 18 15;
+    --surface-rgb: 30 27 24;
+    --surface-alt-rgb: 40 36 32;
+    --border-rgb: 54 48 40;
+    --border-strong-rgb: 69 62 53;
+    --text-primary-rgb: 242 238 232;
+    --text-secondary-rgb: 163 156 146;
+    --primary-rgb: 78 139 114;
+    --primary-strong-rgb: 107 169 141;
+    --primary-soft-rgb: 36 53 44;
+    --highlight-rgb: 216 166 98;
+    --highlight-soft-rgb: 58 47 28;
+    --danger-rgb: 199 122 108;
+    --danger-soft-rgb: 61 38 32;
+    --info-rgb: 143 163 186;
+    --info-soft-rgb: 38 44 53;
+
+    --warm-50-rgb: 38 34 30;
+    --warm-100-rgb: 50 45 40;
+    --warm-200-rgb: 62 56 49;
+    --warm-300-rgb: 87 80 71;
+    --warm-400-rgb: 131 123 113;
+    --warm-500-rgb: 163 156 146;
+    --warm-600-rgb: 190 183 173;
+    --warm-700-rgb: 214 208 199;
+    --warm-800-rgb: 231 226 219;
+    --warm-900-rgb: 242 238 232;
+
+    --ring: rgba(107, 169, 141, 0.35);
+  }
+
+  /* The wordmark PNG has near-black letters — render it white on dark. */
+  img[alt="Wishly"] {
+    filter: brightness(0) invert(0.94);
+  }
 }
 
 * {

@@ -137,7 +137,7 @@ export function HomePage() {
               </SecondaryButton>
             </Link>
           </div>
-          <div className="grid gap-3">
+          <div className="divide-y divide-border self-center rounded-modal border border-border bg-surface shadow-card">
             <SummaryCard icon={Gift} label={t("home.activeLists")} value={String(activeListCount)} />
             <SummaryCard icon={Share2} label={t("home.reservedGifts")} value={String(reservedGiftCount)} />
             <SummaryCard icon={HandCoins} label={t("home.receivedContributions")} value={fundedAmountLabel} />
@@ -150,14 +150,14 @@ export function HomePage() {
             label={t("home.notifications")}
             value={String(notificationCount)}
             note={t("home.upcomingLists")}
-            accent="lavender"
+            accent="info"
           />
           <MetricBentoCard
             icon={CalendarDays}
             label={t("home.upcomingEvents")}
             value={String(upcomingCount)}
             note={upcomingWishlists[0] ? upcomingWishlists[0].title : t("home.emptyBody")}
-            accent="coral"
+            accent="primary"
           />
         </BentoGrid>
       </section>
@@ -269,10 +269,14 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="rounded-modal border border-border bg-surface p-4 shadow-card">
-      <Icon size={18} aria-hidden="true" className="text-primary-strong" />
-      <p className="mt-3 text-2xl font-bold tracking-[-0.03em] text-warm-900">{value}</p>
-      <p className="mt-1 text-sm text-warm-600">{label}</p>
+    <div className="flex items-center gap-4 px-4 py-3.5">
+      <span className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-ctrl bg-primary-soft text-primary-strong">
+        <Icon size={17} aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xl font-bold tracking-[-0.03em] text-warm-900">{value}</p>
+        <p className="text-xs text-warm-500">{label}</p>
+      </div>
     </div>
   );
 }

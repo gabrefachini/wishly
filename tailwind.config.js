@@ -35,32 +35,28 @@ export default {
           soft: token("info-soft"),
         },
 
-        // Deprecated hue aliases — keep compiling while the sweep finishes
-        cream: token("page-bg"),
-        porcelain: token("surface"),
-        "surface-alt": token("surface-alt"),
-        coral: token("primary"),
-        terracotta: token("primary-strong"),
-        blush: token("surface-alt"),
-        lavender: token("info-soft"),
-        sage: token("primary-soft"),
-        skysoft: token("surface-alt"),
-        warning: token("highlight"),
-        "warning-soft": token("highlight-soft"),
         "danger-soft": token("danger-soft"),
 
-        // Warm neutral scale, now complete (200/400/600/800 were missing)
+        // Ink blocks that must stay dark in BOTH color schemes (dark heroes,
+        // active tabs with white text). Never use warm-900 for backgrounds.
+        espresso: {
+          DEFAULT: "#211e1b",
+          light: "#423d38",
+        },
+
+        // Warm neutral scale, var-based so it inverts in dark mode.
+        // 50 = subtlest background, 900 = strongest text — in both schemes.
         warm: {
-          50: "#faf9f6",
-          100: "#efece6",
-          200: "#e3dfd7",
-          300: "#c9c3b9",
-          400: "#9b948b",
-          500: "#6e6861",
-          600: "#57514b",
-          700: "#423d38",
-          800: "#2f2b27",
-          900: "#211e1b",
+          50: token("warm-50"),
+          100: token("warm-100"),
+          200: token("warm-200"),
+          300: token("warm-300"),
+          400: token("warm-400"),
+          500: token("warm-500"),
+          600: token("warm-600"),
+          700: token("warm-700"),
+          800: token("warm-800"),
+          900: token("warm-900"),
         },
       },
       borderRadius: {

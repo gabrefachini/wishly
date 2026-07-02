@@ -446,7 +446,7 @@ function ModeToggle({
       type="button"
       onClick={onClick}
       className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-        active ? "bg-warm-900 text-white" : "text-warm-600"
+        active ? "bg-espresso text-white" : "text-warm-600"
       }`}
     >
       {children}

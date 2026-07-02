@@ -11,20 +11,20 @@ export function PremiumRadarPage() {
       <BentoCard tone="dark" className="overflow-hidden">
         <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_0.8fr] sm:items-center">
           <div className="grid gap-4">
-            <p className="text-sm font-semibold text-warm-100">{t("priceRadar.upgradeEyebrow")}</p>
+            <p className="text-sm font-semibold text-white/75">{t("priceRadar.upgradeEyebrow")}</p>
             <h1 className="text-3xl font-bold leading-tight">{t("priceRadar.upgradeTitle")}</h1>
-            <p className="text-sm leading-6 text-warm-100">{t("priceRadar.upgradeBody")}</p>
+            <p className="text-sm leading-6 text-white/75">{t("priceRadar.upgradeBody")}</p>
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/lists"
-                className="inline-flex min-h-12 items-center justify-center rounded-full border border-warm-700 bg-warm-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-warm-900 focus:outline-none focus:ring-4 focus:ring-white/20"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-espresso-light bg-espresso-light px-5 py-3 text-sm font-semibold text-white transition hover:bg-espresso focus:outline-none focus:ring-4 focus:ring-white/20"
               >
                 {t("actions.backToWishlist")}
               </Link>
             </div>
-            <p className="text-xs leading-6 text-warm-200">{t("priceRadar.freeLimit")}</p>
+            <p className="text-xs leading-6 text-white/60">{t("priceRadar.freeLimit")}</p>
           </div>
-          <div className="grid gap-3 rounded-modal bg-warm-700 p-4">
+          <div className="grid gap-3 rounded-modal bg-espresso-light p-4">
             <BenefitRow icon={BarChart3} title={t("priceRadar.benefitTracking")} />
             <BenefitRow icon={BellRing} title={t("priceRadar.benefitAlerts")} />
             <BenefitRow icon={Target} title={t("priceRadar.benefitTarget")} />
@@ -44,8 +44,8 @@ function BenefitRow({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-card bg-warm-900 px-4 py-3">
-      <Icon size={18} aria-hidden="true" className="text-warm-100" />
+    <div className="flex items-center gap-3 rounded-card bg-espresso px-4 py-3">
+      <Icon size={18} aria-hidden="true" className="text-white/75" />
       <p className="text-sm font-medium text-white">{title}</p>
     </div>
   );

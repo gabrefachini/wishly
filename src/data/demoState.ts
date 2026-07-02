@@ -129,7 +129,7 @@ type DemoState = {
   feed: DemoActivityRecord[];
 };
 
-const STORAGE_KEY = "wishly-demo-state-v1";
+const STORAGE_KEY = "wishly-demo-state-v2";
 const DEMO_USER_ID = "demo-auth-user-gabriel";
 const DEMO_PROFILE_ID = "demo-profile-gabriel";
 const DEMO_EMAIL = "gabriel@wishlyapp.com.br";
@@ -430,7 +430,7 @@ function buildSponsoredItems(): SponsoredItemRecord[] {
       title: "Philips Airfryer Série 5000",
       description: "Quick dinner ideas for a home setup wishlist.",
       image_url:
-        "https://images.unsplash.com/photo-1608039525955-0b1e5fd0b4b3?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80",
       destination_url: "https://www.philips.com.br/c-p/HD9202_90/airfryer",
       merchant_id: "merchant-magalu",
       category: "home",
@@ -470,7 +470,7 @@ function buildSponsoredItems(): SponsoredItemRecord[] {
       title: "Monitor LG UltraGear 27\"",
       description: "A frequent piece on Gabriel's upgrade shortlist.",
       image_url:
-        "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80",
       destination_url: "https://www.lg.com/br/monitores",
       merchant_id: "merchant-kabum",
       category: "tech",
@@ -490,7 +490,7 @@ function buildSponsoredItems(): SponsoredItemRecord[] {
       title: "Cafeteira Nespresso Vertuo",
       description: "Housewarming favorite with an easy conversion path.",
       image_url:
-        "https://images.unsplash.com/photo-1515825295580-5bb9e9a1a54f?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
       destination_url: "https://www.nespresso.com/br/pt/",
       merchant_id: "merchant-fast-shop",
       category: "home",
@@ -1055,7 +1055,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Magalu",
         storeUrl: "https://www.magazineluiza.com.br/carrinho-bebe",
         imageUrl:
-          "https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1566004100631-35d015d6a491?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 1480,
         currentPrice: 1399,
         lowestPrice: 1329,
@@ -1091,7 +1091,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Mercado Livre",
         storeUrl: "https://www.mercadolivre.com.br/mochila-maternidade",
         imageUrl:
-          "https://images.unsplash.com/photo-1527506933980-63f1b21c4e2f?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 289,
         currentPrice: 269,
         lowestPrice: 249,
@@ -1123,7 +1123,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=aquecedor+mamadeira",
         imageUrl:
-          "https://images.unsplash.com/photo-1512042374741-0c7a5f3c4f2d?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1544126592-807ade215a0b?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 219,
         currentPrice: 199,
         lowestPrice: 189,
@@ -1205,7 +1205,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Magalu",
         storeUrl: "https://www.magazineluiza.com.br/lava-e-seca-lg",
         imageUrl:
-          "https://images.unsplash.com/photo-1610629064850-4412a3d4f9c7?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 4187,
         currentPrice: 3989,
         lowestPrice: 3799,
@@ -1238,7 +1238,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=airfryer+philips",
         imageUrl:
-          "https://images.unsplash.com/photo-1608039525955-0b1e5fd0b4b3?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 629,
         currentPrice: 579,
         lowestPrice: 529,
@@ -1271,7 +1271,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Fast Shop",
         storeUrl: "https://www.fastshop.com.br/nespresso",
         imageUrl:
-          "https://images.unsplash.com/photo-1515825295580-5bb9e9a1a54f?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 799,
         currentPrice: 749,
         lowestPrice: 699,
@@ -1303,7 +1303,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Mercado Livre",
         storeUrl: "https://www.mercadolivre.com.br/robo-aspirador",
         imageUrl:
-          "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 1399,
         currentPrice: 1299,
         lowestPrice: 1249,
@@ -1369,7 +1369,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=quadro+botanico",
         imageUrl:
-          "https://images.unsplash.com/photo-1517543835838-96c65e8c2a5d?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1463320726281-696a485928c7?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 149,
         currentPrice: 129,
         lowestPrice: 119,
@@ -1485,7 +1485,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/echo-dot",
         imageUrl:
-          "https://images.unsplash.com/photo-1582192496308-7ef02f7b2e78?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1518444065439-e933c06ce9cd?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 399,
         currentPrice: 289,
         lowestPrice: 279,
@@ -1706,7 +1706,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "KaBuM!",
         storeUrl: "https://www.kabum.com.br/busca/lg-ultragear",
         imageUrl:
-          "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 2199,
         currentPrice: 1899,
         lowestPrice: 1799,
@@ -1771,7 +1771,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "KaBuM!",
         storeUrl: "https://www.kabum.com.br/busca/cadeira-gamer",
         imageUrl:
-          "https://images.unsplash.com/photo-1505843490701-5d8b6b28ce20?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 1299,
         currentPrice: 1199,
         lowestPrice: 1149,
@@ -1957,7 +1957,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=luminaria+ajustavel",
         imageUrl:
-          "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 249,
         currentPrice: 219,
         lowestPrice: 199,
@@ -2051,7 +2051,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=microfone+usb",
         imageUrl:
-          "https://images.unsplash.com/photo-1558377899-3f4b7d0f0e07?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 459,
         currentPrice: 419,
         lowestPrice: 399,
@@ -2415,7 +2415,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Little Studio",
         storeUrl: "https://www.amazon.com.br/s?k=camera+de+brinquedo",
         imageUrl:
-          "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 89,
         currentPrice: 79,
         lowestPrice: 69,
@@ -2482,7 +2482,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
     eventDate: "2026-08-24",
     message: "Montei essa listinha para ajudar quem pediu sugestões de presente 💛",
     coverImageUrl:
-      "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=1400&q=80",
     visibility: "public_link",
     themePreset: "birthday",
     themePrimaryColor: "#DE7762",
@@ -2497,7 +2497,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Little Studio",
         storeUrl: "https://www.amazon.com.br/s?k=camera+de+brinquedo+madeira",
         imageUrl:
-          "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 99,
         currentPrice: 89,
         lowestPrice: 79,
@@ -2621,7 +2621,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Little Studio",
         storeUrl: "https://www.amazon.com.br/s?k=camera+de+brinquedo+madeira",
         imageUrl:
-          "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 99,
         currentPrice: 89,
         lowestPrice: 79,
@@ -2672,7 +2672,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Amazon Brasil",
         storeUrl: "https://www.amazon.com.br/s?k=echo+dot",
         imageUrl:
-          "https://images.unsplash.com/photo-1582192496308-7ef02f7b2e78?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1518444065439-e933c06ce9cd?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 349,
         currentPrice: 289,
         lowestPrice: 279,
@@ -2703,7 +2703,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Fast Shop",
         storeUrl: "https://www.fastshop.com.br/nespresso",
         imageUrl:
-          "https://images.unsplash.com/photo-1515825295580-5bb9e9a1a54f?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 799,
         currentPrice: 749,
         lowestPrice: 699,
@@ -2770,7 +2770,7 @@ const wishlistSeeds: DemoWishlistSeed[] = [
         storeName: "Magalu",
         storeUrl: "https://www.magazineluiza.com.br/robo-aspirador-compacto",
         imageUrl:
-          "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=900&q=80",
+          "https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=900&q=80",
         estimatedPrice: 1399,
         currentPrice: 1299,
         lowestPrice: 1249,
@@ -3770,7 +3770,7 @@ export function previewDemoProductUrl(sourceUrl: string) {
       title: "Echo Dot",
       price: 289,
       imageUrl:
-        "https://images.unsplash.com/photo-1582192496308-7ef02f7b2e78?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1518444065439-e933c06ce9cd?auto=format&fit=crop&w=900&q=80",
       storeName: "Amazon Brasil",
     },
     {
@@ -3778,7 +3778,7 @@ export function previewDemoProductUrl(sourceUrl: string) {
       title: "Monitor LG UltraGear",
       price: 1899,
       imageUrl:
-        "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=900&q=80",
       storeName: "KaBuM!",
     },
     {
@@ -3794,7 +3794,7 @@ export function previewDemoProductUrl(sourceUrl: string) {
       title: "Air Fryer Philips",
       price: 579,
       imageUrl:
-        "https://images.unsplash.com/photo-1608039525955-0b1e5fd0b4b3?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80",
       storeName: "Amazon Brasil",
     },
     {
@@ -3802,7 +3802,7 @@ export function previewDemoProductUrl(sourceUrl: string) {
       title: "Cafeteira Nespresso",
       price: 749,
       imageUrl:
-        "https://images.unsplash.com/photo-1515825295580-5bb9e9a1a54f?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
       storeName: "Fast Shop",
     },
     {
@@ -3818,7 +3818,7 @@ export function previewDemoProductUrl(sourceUrl: string) {
       title: "Cadeira Gamer",
       price: 1199,
       imageUrl:
-        "https://images.unsplash.com/photo-1505843490701-5d8b6b28ce20?auto=format&fit=crop&w=900&q=80",
+        "https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=900&q=80",
       storeName: "KaBuM!",
     },
     {
