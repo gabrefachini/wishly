@@ -1,5 +1,3 @@
-import { useId } from "react";
-
 type PriceSparklineProps = {
   points: number[];
   referenceValue?: number | null;
@@ -23,8 +21,6 @@ export function PriceSparkline({
   softAccent = "#f6dad2",
   emptyLabel = "",
 }: PriceSparklineProps) {
-  const gradientId = useId();
-
   const validPoints = points.filter((point) => Number.isFinite(point));
   const scaleValues = [...validPoints];
   if (referenceValue !== null && Number.isFinite(referenceValue)) {
@@ -73,19 +69,12 @@ export function PriceSparkline({
         <span>{startLabel}</span>
         <span>{endLabel}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[132px] w-full" role="img" aria-label={referenceLabel ?? "Price history"}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[140px] w-full rounded-[24px] bg-surface-alt p-1" role="img" aria-label={referenceLabel ?? "Price history"}>
         {[0.25, 0.5, 0.75].map((ratio) => {
           const y = paddingTop + innerHeight * ratio;
-          return <line key={ratio} x1={paddingX} x2={width - paddingX} y1={y} y2={y} stroke="rgba(126, 106, 100, 0.08)" strokeWidth="1" />;
+          return <line key={ratio} x1={paddingX} x2={width - paddingX} y1={y} y2={y} stroke="rgba(126, 106, 100, 0.07)" strokeWidth="1" />;
         })}
-        <line x1={paddingX} x2={width - paddingX} y1={height - paddingBottom} y2={height - paddingBottom} stroke="rgba(126, 106, 100, 0.12)" strokeWidth="1.1" />
+        <line x1={paddingX} x2={width - paddingX} y1={height - paddingBottom} y2={height - paddingBottom} stroke="rgba(126, 106, 100, 0.1)" strokeWidth="1.1" />
 
         {referenceY !== null ? (
           <line
@@ -100,7 +89,7 @@ export function PriceSparkline({
           />
         ) : null}
 
-        <path d={areaPath} fill={`url(#${gradientId})`} />
+        <path d={areaPath} fill={softAccent} opacity="1" />
         <path d={path} fill="none" stroke={accent} strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round" />
 
         {validPoints.map((point, index) => {
@@ -126,7 +115,8 @@ export function PriceSparkline({
               width="64"
               height="20"
               fill="white"
-              opacity="0.96"
+              opacity="0.98"
+              stroke="rgba(126, 106, 100, 0.12)"
             />
             <text
               x={Math.min(lastPointX + 42, width - 42)}

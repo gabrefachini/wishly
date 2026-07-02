@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
+import { BentoCard, BentoGrid, PremiumPageShell, SectionHeader } from "../components/PremiumLayout";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { updateMetadata } from "../lib/metadata";
 import { useTranslation } from "../i18n/useTranslation";
@@ -96,8 +97,8 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-cream text-warm-900">
-      <header className="sticky top-0 z-30 border-b border-warm-100/80 bg-cream/92 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-border bg-cream">
+        <div className="mx-auto flex max-w-[1380px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link to="/" className="inline-flex items-center gap-3 rounded-full focus:outline-none focus:ring-4 focus:ring-coral/15">
             <WishlyLogo size="sm" />
           </Link>
@@ -147,8 +148,8 @@ export function LandingPage() {
         </div>
 
         {menuOpen ? (
-          <div className="border-t border-warm-100 bg-porcelain lg:hidden">
-            <div className="mx-auto grid max-w-6xl gap-3 px-4 py-4 sm:px-6">
+          <div className="border-t border-border bg-surface lg:hidden">
+            <div className="mx-auto grid max-w-[1380px] gap-3 px-4 py-4 sm:px-6 lg:px-8">
               {navLinks.map((item) => (
                 <a
                   key={item.href}
@@ -181,58 +182,85 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl gap-10 px-4 pb-14 pt-10 sm:px-6 md:pb-20 md:pt-14 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card">
-              <CheckCircle2 size={16} className="text-coral" aria-hidden="true" />
-              {t("landing.eyebrow")}
-            </div>
-            <h1 className="mt-5 max-w-xl text-4xl font-bold leading-tight text-warm-900 sm:text-5xl">
-              {t("landing.heroTitle")}
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-warm-500">
-              {t("landing.heroBody")}
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link to={session ? "/app" : "/signup"}>
-                <PrimaryButton className="w-full sm:w-auto">
-                  {session ? t("landing.openApp") : t("landing.heroPrimaryCta")}
-                  <ArrowRight size={16} aria-hidden="true" />
-                </PrimaryButton>
-              </Link>
-              <a href="#how-it-works">
-                <SecondaryButton className="w-full sm:w-auto">{t("landing.heroSecondaryCta")}</SecondaryButton>
-              </a>
-            </div>
-            <p className="mt-4 text-sm font-semibold text-coral">{t("landing.heroMicrocopy")}</p>
-            <p className="mt-6 max-w-lg text-sm leading-6 text-warm-500">
-              {t("landing.socialProof")}
-            </p>
-          </div>
-
-          <HeroMockup />
-        </section>
-
-        <section className="border-y border-warm-100/80 bg-porcelain/75">
-          <div className="mx-auto grid max-w-6xl gap-3 px-4 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-            {trustItems.map((item) => (
-              <div key={item} className="inline-flex items-center gap-2 rounded-2xl bg-porcelain px-4 py-3 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100/80">
-                <CheckCircle2 size={16} className="text-coral" aria-hidden="true" />
-                {item}
+        <PremiumPageShell className="mx-auto max-w-[1380px] px-4 pb-16 pt-10 sm:px-6 md:pb-20 md:pt-14 lg:px-8">
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_420px]">
+            <BentoCard tone="accent" className="grid gap-8 p-7 sm:p-8 lg:min-h-[540px] lg:grid-cols-[minmax(0,1fr)_220px] lg:items-end">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card">
+                  <CheckCircle2 size={16} className="text-coral" aria-hidden="true" />
+                  {t("landing.eyebrow")}
+                </div>
+                <h1 className="mt-6 max-w-2xl text-[clamp(2.6rem,6vw,4.9rem)] font-bold leading-[0.98] tracking-[-0.05em] text-warm-900">
+                  {t("landing.heroTitle")}
+                </h1>
+                <p className="mt-5 max-w-xl text-base leading-8 text-warm-600 sm:text-lg">
+                  {t("landing.heroBody")}
+                </p>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <Link to={session ? "/app" : "/signup"}>
+                    <PrimaryButton className="w-full sm:w-auto">
+                      {session ? t("landing.openApp") : t("landing.heroPrimaryCta")}
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </PrimaryButton>
+                  </Link>
+                  <a href="#how-it-works">
+                    <SecondaryButton className="w-full sm:w-auto">{t("landing.heroSecondaryCta")}</SecondaryButton>
+                  </a>
+                </div>
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <p className="text-sm font-semibold text-terracotta">{t("landing.heroMicrocopy")}</p>
+                  <span className="hidden h-1 w-1 rounded-full bg-warm-300 sm:inline-flex" />
+                  <p className="max-w-lg text-sm leading-6 text-warm-500">{t("landing.socialProof")}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </section>
 
-        <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-          <SectionIntro eyebrow={t("landing.howEyebrow")} title={t("landing.howTitle")} body={t("landing.howBody")} />
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <div className="grid gap-3">
+                {trustItems.slice(0, 3).map((item, index) => (
+                  <div
+                    key={item}
+                    className={`rounded-[26px] border border-border bg-surface p-4 shadow-card ${
+                      index === 0 ? "lg:translate-x-2" : index === 2 ? "lg:-translate-x-2" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blush text-terracotta">
+                        <CheckCircle2 size={16} aria-hidden="true" />
+                      </span>
+                      <p className="text-sm font-semibold leading-6 text-warm-800">{item}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </BentoCard>
+
+            <BentoGrid className="grid-rows-[auto_auto]">
+              <HeroMockup />
+              <BentoCard tone="default" className="grid gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">{t("landing.featuresEyebrow")}</p>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  {featureCards.slice(0, 2).map((item) => (
+                    <div key={item.title} className="rounded-[24px] bg-surface-alt p-4 ring-1 ring-border">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-lavender text-warm-900">
+                        <item.icon size={17} aria-hidden="true" />
+                      </div>
+                      <h3 className="mt-3 text-base font-bold tracking-[-0.02em] text-warm-900">{item.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-warm-500">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </BentoCard>
+            </BentoGrid>
+          </section>
+
+          <section id="how-it-works" className="pt-4 md:pt-8">
+            <SectionHeader eyebrow={t("landing.howEyebrow")} title={t("landing.howTitle")} body={t("landing.howBody")} />
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
               { icon: Gift, step: "01", title: t("landing.stepOneTitle"), body: t("landing.stepOneBody") },
               { icon: Share2, step: "02", title: t("landing.stepTwoTitle"), body: t("landing.stepTwoBody") },
               { icon: Users, step: "03", title: t("landing.stepThreeTitle"), body: t("landing.stepThreeBody") },
             ].map((item) => (
-              <article key={item.step} className="rounded-[30px] bg-porcelain p-6 shadow-card ring-1 ring-warm-100">
+              <BentoCard key={item.step} tone={item.step === "02" ? "accent" : "default"} className="grid gap-5 p-6">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blush text-terracotta">
                     <item.icon size={20} aria-hidden="true" />
@@ -241,46 +269,43 @@ export function LandingPage() {
                 </div>
                 <h3 className="mt-5 text-xl font-bold text-warm-900">{item.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-warm-500">{item.body}</p>
-              </article>
+              </BentoCard>
             ))}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section id="features" className="bg-porcelain/60">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-            <SectionIntro eyebrow={t("landing.featuresEyebrow")} title={t("landing.featuresTitle")} body={t("landing.featuresBody")} />
+          <section id="features" className="pt-2 md:pt-4">
+            <SectionHeader eyebrow={t("landing.featuresEyebrow")} title={t("landing.featuresTitle")} body={t("landing.featuresBody")} />
             <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {featureCards.map((item) => (
-                <article key={item.title} className="rounded-[28px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-lavender/80 text-warm-900">
+                <BentoCard key={item.title} tone={item.title === featureCards[2].title ? "accent" : "default"} className="p-5">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-lavender text-warm-900">
                     <item.icon size={18} aria-hidden="true" />
                   </div>
                   <h3 className="mt-4 text-lg font-bold text-warm-900">{item.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-warm-500">{item.body}</p>
-                </article>
+                </BentoCard>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section id="use-cases" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-          <SectionIntro eyebrow={t("landing.occasionsEyebrow")} title={t("landing.occasionsTitle")} body={t("landing.occasionsBody")} />
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <section id="use-cases" className="pt-2 md:pt-4">
+            <SectionHeader eyebrow={t("landing.occasionsEyebrow")} title={t("landing.occasionsTitle")} body={t("landing.occasionsBody")} />
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {useCases.map((item) => (
-              <article key={item.title} className="rounded-[28px] bg-porcelain p-6 shadow-card ring-1 ring-warm-100">
+              <BentoCard key={item.title} tone="default" className="p-6">
                 <h3 className="text-lg font-bold text-warm-900">{item.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-warm-500">{item.body}</p>
-              </article>
+              </BentoCard>
             ))}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section id="faq" className="bg-porcelain/65">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-            <SectionIntro eyebrow={t("landing.faqEyebrow")} title={t("landing.faqTitle")} body={t("landing.faqBody")} />
+          <section id="faq" className="pt-2 md:pt-4">
+            <SectionHeader eyebrow={t("landing.faqEyebrow")} title={t("landing.faqTitle")} body={t("landing.faqBody")} />
             <div className="mt-8 grid gap-3">
               {faqItems.map((item) => (
-                <details key={item.q} className="group rounded-[28px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+                <details key={item.q} className="group rounded-[28px] bg-surface p-5 shadow-card ring-1 ring-border">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left text-base font-bold text-warm-900">
                     <span>{item.q}</span>
                     <ChevronDown size={18} className="text-warm-400 transition group-open:rotate-180" aria-hidden="true" />
@@ -289,13 +314,12 @@ export function LandingPage() {
                 </details>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
-          <div className="rounded-[34px] bg-porcelain p-8 text-center shadow-card ring-1 ring-warm-100">
-            <h2 className="text-3xl font-bold text-warm-900">{t("landing.finalTitle")}</h2>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-warm-500">{t("landing.finalBody")}</p>
+          <section className="pt-2 md:pt-4">
+          <BentoCard tone="dark" className="p-8 text-center md:p-10">
+            <h2 className="text-3xl font-bold text-white">{t("landing.finalTitle")}</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-warm-100/80">{t("landing.finalBody")}</p>
             <div className="mt-8 flex justify-center">
               <Link to={session ? "/app" : "/signup"}>
                 <PrimaryButton>
@@ -304,12 +328,13 @@ export function LandingPage() {
                 </PrimaryButton>
               </Link>
             </div>
-          </div>
-        </section>
+          </BentoCard>
+          </section>
+        </PremiumPageShell>
       </main>
 
-      <footer className="border-t border-warm-100 bg-porcelain/85">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1fr_auto] md:items-end">
+      <footer className="border-t border-border bg-surface">
+        <div className="mx-auto grid max-w-[1380px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1fr_auto] md:items-end lg:px-8">
           <div>
             <WishlyLogo size="sm" />
             <p className="mt-4 max-w-md text-sm leading-7 text-warm-500">{t("landing.footerTagline")}</p>
@@ -327,26 +352,14 @@ export function LandingPage() {
   );
 }
 
-function SectionIntro({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
-  return (
-    <div className="max-w-2xl">
-      <p className="text-sm font-semibold text-coral">{eyebrow}</p>
-      <h2 className="mt-2 text-3xl font-bold text-warm-900">{title}</h2>
-      <p className="mt-4 text-base leading-8 text-warm-500">{body}</p>
-    </div>
-  );
-}
-
 function HeroMockup() {
   const { t } = useTranslation();
 
   return (
-    <div className="relative mx-auto w-full max-w-[540px]">
-      <div className="absolute -left-6 top-10 hidden h-36 w-36 rounded-full bg-lavender/50 blur-3xl sm:block" />
-      <div className="absolute -bottom-6 right-0 hidden h-40 w-40 rounded-full bg-blush/70 blur-3xl sm:block" />
-      <div className="relative overflow-hidden rounded-[36px] bg-porcelain p-4 shadow-soft ring-1 ring-warm-100 sm:p-5">
+    <div className="relative mx-auto w-full">
+      <div className="relative overflow-hidden rounded-[36px] bg-surface p-4 shadow-soft ring-1 ring-border sm:p-5">
         <div className="overflow-hidden rounded-[28px] border border-warm-100 bg-white">
-          <div className="h-44 bg-[linear-gradient(135deg,#f6ded7_0%,#ece7f9_52%,#dcecf5_100%)] p-5">
+          <div className="h-44 bg-surface-alt p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-terracotta">{t("landing.mockupLabel")}</p>
@@ -355,7 +368,7 @@ function HeroMockup() {
                   {t("landing.mockupBody")}
                 </p>
               </div>
-              <div className="rounded-full bg-white/85 px-3 py-2 text-xs font-semibold text-warm-700 shadow-card">
+              <div className="rounded-full bg-surface px-3 py-2 text-xs font-semibold text-warm-700 shadow-card">
                 {t("landing.mockupShare")}
               </div>
             </div>
@@ -374,7 +387,7 @@ function HeroMockup() {
               status={t("landing.mockupReserved")}
               tone="reserved"
             />
-            <div className="rounded-[22px] border border-warm-100 bg-warm-50/70 p-4">
+            <div className="rounded-[22px] border border-warm-100 bg-surface-alt p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-warm-900">{t("landing.mockupGiftThreeTitle")}</p>
@@ -408,7 +421,7 @@ function MockGiftRow({
 }) {
   return (
     <div className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-[22px] border border-warm-100 bg-porcelain p-3">
-      <div className="h-16 rounded-[18px] bg-[linear-gradient(145deg,#f2ece4_0%,#fffdf9_100%)]" />
+      <div className="h-16 rounded-[18px] bg-surface-alt" />
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-warm-900">{title}</p>
         <p className="mt-1 text-xs font-medium text-warm-500">{price}</p>

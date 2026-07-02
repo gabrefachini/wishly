@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SecondaryButton, PrimaryButton } from "../components/Buttons";
+import { LoadingState } from "../components/LoadingState";
 import { useTranslation } from "../i18n/useTranslation";
 import { affiliateMerchantSchema } from "../lib/validation";
 import { deleteAffiliateMerchant, listAffiliateMerchants, saveAffiliateMerchant } from "../services/admin";
@@ -130,7 +131,18 @@ export function AdminAffiliatesPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-          {loading ? <p className="text-sm text-warm-500">{t("common.loading")}</p> : null}
+          {loading ? (
+            <LoadingState
+              title={t("common.loadingTitle")}
+              body={t("common.loadingBody")}
+              timeoutTitle={t("common.loadingTimeoutTitle")}
+              timeoutBody={t("common.loadingTimeoutBody")}
+              retryLabel={t("common.retry")}
+              redirectTo="/admin"
+              redirectLabel={t("admin.dashboard")}
+              onRetry={() => window.location.reload()}
+            />
+          ) : null}
           <div className="grid gap-3">
             {merchants.map((merchant) => (
               <div key={merchant.id} className="rounded-[24px] bg-warm-50/60 p-4">

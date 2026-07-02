@@ -9,16 +9,30 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
+  --page-bg: #fbf7f1;
+  --surface: #fffdf9;
+  --surface-alt: #f5efe7;
+  --border: #e5ddd2;
+  --text-primary: #29231f;
+  --text-secondary: #7f746c;
 }
 
 * {
   box-sizing: border-box;
 }
 
+*::selection {
+  background: rgba(217, 120, 99, 0.16);
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  line-height: 1.5;
 }
 
 button,
@@ -30,4 +44,8 @@ textarea {
 
 button:disabled {
   opacity: 0.72;
+}
+
+#root {
+  min-height: 100vh;
 }

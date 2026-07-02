@@ -5,7 +5,9 @@ import { useTranslation } from "../i18n/useTranslation";
 import { listDiscoverSponsoredItems, listMyWishlists } from "../services/wishlists";
 import type { SponsoredItemRecord, WishlistWithGifts } from "../types/domain";
 import { EmptyState } from "../components/States";
+import { LoadingState } from "../components/LoadingState";
 import { Modal } from "../components/Modal";
+import { BentoCard, PremiumPageShell } from "../components/PremiumLayout";
 import { SecondaryButton } from "../components/Buttons";
 import { SponsoredItemCard } from "../components/SponsoredItemCard";
 import { updateMetadata } from "../lib/metadata";
@@ -128,14 +130,14 @@ export function DiscoverPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <PremiumPageShell>
       <header>
-        <p className="text-sm font-semibold text-coral">{t("nav.discover")}</p>
-        <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("discover.title")}</h1>
-        <p className="mt-3 text-sm leading-6 text-warm-500">{t("discover.body")}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">{t("nav.discover")}</p>
+        <h1 className="mt-2 text-[clamp(2rem,4vw,3.3rem)] font-bold tracking-[-0.05em] text-warm-900">{t("discover.title")}</h1>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-warm-500">{t("discover.body")}</p>
       </header>
 
-      <section className="grid gap-3 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <BentoCard tone="accent" className="grid gap-5">
         <div>
           <p className="text-sm font-semibold text-warm-700">{t("discover.byOccasion")}</p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -167,9 +169,20 @@ export function DiscoverPage() {
             ))}
           </div>
         </div>
-      </section>
+      </BentoCard>
 
-      {loading ? <p className="text-sm text-warm-500">{t("common.loading")}</p> : null}
+      {loading ? (
+        <LoadingState
+          title={t("common.loadingTitle")}
+          body={t("common.loadingBody")}
+          timeoutTitle={t("common.loadingTimeoutTitle")}
+          timeoutBody={t("common.loadingTimeoutBody")}
+          retryLabel={t("common.retry")}
+          redirectTo="/app"
+          redirectLabel={t("nav.home")}
+          onRetry={() => window.location.reload()}
+        />
+      ) : null}
       {error ? <p className="text-sm text-terracotta">{error}</p> : null}
 
       {!loading && !error && filteredItems.length === 0 ? (
@@ -208,7 +221,7 @@ export function DiscoverPage() {
               key={wishlist.id}
               type="button"
               onClick={() => goToGiftCreation(wishlist.id)}
-              className="rounded-[24px] border border-warm-100 bg-warm-50/70 px-4 py-4 text-left transition hover:border-coral/35 hover:bg-blush/40"
+              className="rounded-[24px] border border-border bg-surface-alt px-4 py-4 text-left transition hover:border-coral/35 hover:bg-blush"
             >
               <p className="font-semibold text-warm-900">{wishlist.title}</p>
               <p className="mt-1 text-sm text-warm-500">{t(`occasions.${wishlist.occasion}`)}</p>
@@ -219,7 +232,7 @@ export function DiscoverPage() {
           </SecondaryButton>
         </div>
       </Modal>
-    </div>
+    </PremiumPageShell>
   );
 }
 
@@ -237,7 +250,9 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-        active ? "bg-blush text-terracotta" : "bg-warm-50 text-warm-600 hover:bg-warm-100"
+        active
+          ? "bg-surface text-terracotta shadow-card ring-1 ring-border"
+          : "bg-surface-alt text-warm-600 ring-1 ring-border hover:bg-surface"
       }`}
     >
       {label}

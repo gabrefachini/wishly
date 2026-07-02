@@ -4,6 +4,7 @@ import { useAuth } from "../auth/useAuth";
 import { AddGiftForm } from "../components/Forms";
 import { EmptyState } from "../components/States";
 import { SetupNotice } from "../components/SetupNotice";
+import { LoadingState } from "../components/LoadingState";
 import { hasSupabaseEnv, isDemoMode } from "../lib/env";
 import { normalizeMonetaryInput } from "../lib/money";
 import { normalizeProductUrl } from "../lib/productPreview";
@@ -231,7 +232,18 @@ export function AddGiftPage() {
   }
 
   if (loadingWishlists) {
-    return <p className="text-sm text-warm-500">{t("common.loading")}</p>;
+    return (
+      <LoadingState
+        title={t("common.loadingTitle")}
+        body={t("common.loadingBody")}
+        timeoutTitle={t("common.loadingTimeoutTitle")}
+        timeoutBody={t("common.loadingTimeoutBody")}
+        retryLabel={t("common.retry")}
+        redirectTo="/lists"
+        redirectLabel={t("nav.lists")}
+        onRetry={() => window.location.reload()}
+      />
+    );
   }
 
   if (wishlists.length === 0) {

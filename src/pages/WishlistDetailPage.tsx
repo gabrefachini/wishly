@@ -1,11 +1,14 @@
-import { CheckCircle2, Pencil, Plus, Radar, Target, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Radar, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { GiftCard, type GiftCardModel } from "../components/GiftCard";
 import { SecondaryButton, ShareButton } from "../components/Buttons";
+import { CardMenu } from "../components/CardMenu";
 import { Modal } from "../components/Modal";
 import { EmptyState } from "../components/States";
+import { LoadingState } from "../components/LoadingState";
+import { BentoCard, PremiumPageShell, SectionHeader } from "../components/PremiumLayout";
 import { WishlistThemeSection } from "../components/WishlistThemeSection";
 import { PriceRadarFields } from "../components/Forms";
 import { PriceRadarBoard } from "../components/PriceRadarBoard";
@@ -346,7 +349,18 @@ export function WishlistDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-warm-500">{t("common.loading")}</p>;
+    return (
+      <LoadingState
+        title={t("common.loadingTitle")}
+        body={t("common.loadingBody")}
+        timeoutTitle={t("common.loadingTimeoutTitle")}
+        timeoutBody={t("common.loadingTimeoutBody")}
+        retryLabel={t("common.retry")}
+        redirectTo="/lists"
+        redirectLabel={t("nav.lists")}
+        onRetry={() => window.location.reload()}
+      />
+    );
   }
 
   if (error || !wishlist) {
@@ -431,34 +445,35 @@ export function WishlistDetailPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)] xl:items-start">
+    <PremiumPageShell className="grid gap-6 xl:grid-cols-[minmax(0,1.38fr)_minmax(340px,0.62fr)] xl:items-start">
       <div className="grid gap-6">
-      <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">
+      <section className="overflow-hidden rounded-[38px] bg-surface shadow-soft ring-1 ring-border">
         <img
           src={wishlist.cover_image_url || fallbackCover}
           alt=""
-          className="h-64 w-full object-cover"
+          className="h-64 w-full object-cover lg:h-72"
         />
-        <div className="grid gap-5 p-5">
-          <div>
-            <p className="text-sm font-semibold text-coral">
+        <div className="grid gap-5 p-5 sm:p-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
+            <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">
               {summary.occasionLabel} · {summary.dateLabel}
             </p>
-            <h1 className="mt-1 text-3xl font-bold text-warm-900">{wishlist.title}</h1>
+            <h1 className="mt-2 text-[clamp(2rem,4vw,3.3rem)] font-bold tracking-[-0.05em] text-warm-900">{wishlist.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold text-warm-700">
+              <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
                 {summary.visibilityLabel}
               </span>
-              <span className="rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold text-warm-700">
+              <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
                 {summary.giftCountLabel}
               </span>
               {!isPrivateWishlist ? (
-                <span className="rounded-full bg-warm-100 px-3 py-1 text-xs font-semibold text-warm-700">
+                <span className="rounded-full bg-blush px-3 py-1 text-xs font-semibold text-terracotta">
                   {summary.reservedCountLabel}
                 </span>
               ) : null}
             </div>
-            <p className="mt-3 rounded-[24px] bg-blush/55 p-4 text-sm leading-6 text-warm-700">
+            <p className="mt-4 rounded-[28px] bg-surface-alt p-4 text-sm leading-7 text-warm-700">
               {wishlist.message || t("wishlist.message")}
             </p>
             {isPrivateWishlist ? (
@@ -483,6 +498,23 @@ export function WishlistDetailPage() {
               </p>
             ) : null}
             {error ? <p className="mt-3 text-sm text-terracotta">{error}</p> : null}
+            </div>
+            <div className="grid gap-3 rounded-[28px] bg-surface-alt p-4 ring-1 ring-border">
+              {dashboardMetrics.map((metric) => (
+                <div key={metric.label} className="rounded-[22px] bg-surface p-4 ring-1 ring-border">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{metric.label}</p>
+                  <p className="mt-2 text-sm font-semibold text-warm-900">{metric.value}</p>
+                </div>
+              ))}
+              <div className="rounded-[22px] bg-surface p-4 ring-1 ring-border">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-coral">
+                  {canUseRadar ? t("priceRadar.enabled") : t("priceRadar.disabled")}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-warm-900">
+                  {canUseRadar ? t("priceRadar.dashboardTitle") : t("priceRadar.paywallBody")}
+                </p>
+              </div>
+            </div>
           </div>
           <div className={`grid gap-3 ${isPrivateWishlist ? "sm:grid-cols-[auto_auto]" : "sm:grid-cols-[1fr_auto_auto]"}`}>
             {!isPrivateWishlist ? <ShareButton onClick={() => void handleShare()} /> : null}
@@ -516,12 +548,10 @@ export function WishlistDetailPage() {
       ) : null}
 
       <section className="grid gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-warm-900">{t("wishlist.giftIdeas")}</h2>
-          <p className="text-sm font-medium text-warm-500">
-            {wishlist.gifts.length} {t("wishlist.items")}
-          </p>
-        </div>
+        <SectionHeader
+          title={t("wishlist.giftIdeas")}
+          body={`${wishlist.gifts.length} ${t("wishlist.items")}`}
+        />
         {wishlist.gifts.length ? (
           <div className="grid gap-3 xl:grid-cols-2">
           {wishlist.gifts.map((gift: GiftRecord) => {
@@ -556,6 +586,60 @@ export function WishlistDetailPage() {
                 <GiftCard
                   gift={cardGift}
                   suppressOwnerStatusNote={isPrivateWishlist}
+                  onOpenDetails={() => openGiftEditor(gift)}
+                  menu={
+                    <CardMenu
+                      ariaLabel={t("common.moreOptions")}
+                      items={[
+                        {
+                          label: t("wishlist.editGift"),
+                          onSelect: () => openGiftEditor(gift),
+                        },
+                        ...(isPrivateWishlist && gift.status !== "purchased"
+                          ? [{
+                              label: t("actions.markPurchased"),
+                              onSelect: () => void handleGiftStatusChange(gift.id, "purchased"),
+                            }]
+                          : []),
+                        ...(isPrivateWishlist && gift.status === "purchased"
+                          ? [{
+                              label: t("actions.markAvailable"),
+                              onSelect: () => void handleGiftStatusChange(gift.id, "available"),
+                            }]
+                          : []),
+                        ...(!isPrivateWishlist && gift.status === "reserved"
+                          ? [{
+                              label: t("actions.markPurchased"),
+                              onSelect: () => void handleMarkPurchased(gift.id),
+                            }]
+                          : []),
+                        ...(canUseRadar
+                          ? gift.price_tracking_enabled
+                            ? [
+                                {
+                                  label: t("priceRadar.setTarget"),
+                                  onSelect: () => openGiftEditor(gift),
+                                },
+                                {
+                                  label: t("priceRadar.disable"),
+                                  onSelect: () => void handleToggleGiftRadar(gift, false),
+                                },
+                              ]
+                            : [
+                                {
+                                  label: t("priceRadar.activate"),
+                                  onSelect: () => void handleToggleGiftRadar(gift, true),
+                                },
+                              ]
+                          : []),
+                        {
+                          label: t("actions.deleteGift"),
+                          onSelect: () => setGiftToDeleteId(gift.id),
+                          tone: "danger",
+                        },
+                      ]}
+                    />
+                  }
                   ownerAction={
                     <>
                       {isPrivateWishlist && gift.status !== "purchased" ? (
@@ -573,33 +657,6 @@ export function WishlistDetailPage() {
                           {t("actions.markPurchased")}
                         </SecondaryButton>
                       ) : null}
-                      <SecondaryButton onClick={() => openGiftEditor(gift)}>
-                        <Pencil size={16} aria-hidden="true" />
-                        {t("wishlist.editGift")}
-                      </SecondaryButton>
-                      {canUseRadar ? (
-                        gift.price_tracking_enabled ? (
-                          <>
-                            <SecondaryButton onClick={() => void handleToggleGiftRadar(gift, false)}>
-                              <Radar size={16} aria-hidden="true" />
-                              {t("priceRadar.disable")}
-                            </SecondaryButton>
-                            <SecondaryButton onClick={() => openGiftEditor(gift)}>
-                              <Target size={16} aria-hidden="true" />
-                              {t("priceRadar.setTarget")}
-                            </SecondaryButton>
-                          </>
-                        ) : (
-                          <SecondaryButton onClick={() => void handleToggleGiftRadar(gift, true)}>
-                            <Radar size={16} aria-hidden="true" />
-                            {t("priceRadar.activate")}
-                          </SecondaryButton>
-                        )
-                      ) : null}
-                      <SecondaryButton onClick={() => setGiftToDeleteId(gift.id)}>
-                        <Trash2 size={16} aria-hidden="true" />
-                        {t("actions.deleteGift")}
-                      </SecondaryButton>
                     </>
                   }
                 />
@@ -614,16 +671,16 @@ export function WishlistDetailPage() {
       </div>
 
       <aside className="grid gap-4 xl:sticky xl:top-6">
-        <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+        <BentoCard tone="default" className="p-5">
           <p className="text-sm font-semibold text-coral">{t("wishlist.summaryTitle")}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {dashboardMetrics.map((metric) => (
-              <div key={metric.label} className="rounded-[22px] bg-warm-50/70 p-4">
+              <div key={metric.label} className="rounded-[22px] bg-surface-alt p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{metric.label}</p>
                 <p className="mt-2 text-sm font-semibold text-warm-900">{metric.value}</p>
               </div>
             ))}
-            <div className="rounded-[22px] bg-blush/45 p-4">
+            <div className="rounded-[22px] bg-blush p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-coral">
                 {canUseRadar ? t("priceRadar.enabled") : t("priceRadar.disabled")}
               </p>
@@ -635,7 +692,7 @@ export function WishlistDetailPage() {
           {isPrivateWishlist ? (
             <p className="mt-4 text-sm leading-6 text-warm-600">{t("wishlist.privateOwnerHint")}</p>
           ) : null}
-        </section>
+        </BentoCard>
       </aside>
 
       <Modal
@@ -1020,6 +1077,6 @@ export function WishlistDetailPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </PremiumPageShell>
   );
 }

@@ -132,7 +132,7 @@ export const wishlists: Wishlist[] = [
     date: "2026-09-12",
     cover:
       "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=900&q=80",
-    accent: "bg-skysoft",
+    accent: "bg-surface-alt",
     summary: {
       kind: "reserved",
       count: 5,

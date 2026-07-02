@@ -34,11 +34,11 @@ export function SponsoredItemCard({
   onAdd,
 }: SponsoredItemCardProps) {
   return (
-    <article className="overflow-hidden rounded-[28px] bg-porcelain shadow-card ring-1 ring-warm-100">
+    <article className="overflow-hidden rounded-[30px] bg-surface shadow-card ring-1 ring-border transition hover:shadow-soft">
       <img
         src={item.image_url || fallbackImage}
         alt=""
-        className="h-44 w-full object-cover"
+        className="h-52 w-full object-cover"
       />
       <div className="grid gap-4 p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -47,22 +47,22 @@ export function SponsoredItemCard({
           </span>
           {item.occasion ? <StatusBadge label="groupGift" /> : null}
           {occasionLabel ? (
-            <span className="inline-flex items-center rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
+            <span className="inline-flex items-center rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-600">
               {occasionLabel}
             </span>
           ) : null}
         </div>
         <div>
-          <h3 className="text-lg font-bold text-warm-900">{item.title}</h3>
+          <h3 className="text-lg font-bold tracking-[-0.02em] text-warm-900">{item.title}</h3>
           {item.description ? (
             <p className="mt-2 text-sm leading-6 text-warm-500">{item.description}</p>
           ) : null}
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-warm-700">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+          <p className="text-base font-semibold text-warm-700">
             {item.price !== null ? formatCurrency(item.price, locale, item.currency) : openLabel}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 md:justify-end">
             <a href={item.destination_url} target="_blank" rel="noreferrer">
               <SecondaryButton type="button">
                 <ExternalLink size={16} aria-hidden="true" />

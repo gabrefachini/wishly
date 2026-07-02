@@ -16,12 +16,12 @@ type StatusBadgeProps = {
 
 const statusClasses: Record<string, string> = {
   available: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-  reserved: "bg-lavender text-violet-700 ring-violet-100",
+  reserved: "bg-lavender text-warm-900 ring-border",
   purchased: "bg-warm-100 text-warm-500 ring-warm-100",
   mustHave: "bg-blush text-terracotta ring-coral/10",
-  niceToHave: "bg-skysoft text-sky-800 ring-sky-100",
+  niceToHave: "bg-surface-alt text-warm-700 ring-border",
   surpriseMe: "bg-porcelain text-warm-500 ring-warm-100",
-  groupGift: "bg-skysoft text-sky-800 ring-sky-100",
+  groupGift: "bg-lavender text-warm-900 ring-border",
   funded: "bg-emerald-50 text-emerald-700 ring-emerald-100",
 };
 

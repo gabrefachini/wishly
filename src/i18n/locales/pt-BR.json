@@ -45,7 +45,7 @@
     "deleteGift": "Excluir presente"
   },
   "common": {
-    "loading": "Carregando...",
+    "loading": "Aguarde",
     "error": "Algo deu errado",
     "empty": "Nada por aqui ainda",
     "notFound": "Não encontrado",
@@ -56,7 +56,13 @@
     "ownerOnly": "Área do dono",
     "copied": "Link copiado",
     "optional": "Opcional",
-    "or": "ou"
+    "or": "ou",
+    "loadingTitle": "Estamos preparando esta página",
+    "loadingBody": "Isso costuma levar apenas alguns segundos.",
+    "loadingTimeoutTitle": "Isso está demorando mais do que o normal",
+    "loadingTimeoutBody": "Tente novamente ou recarregue a página.",
+    "retry": "Tentar novamente",
+    "moreOptions": "Mais opções"
   },
   "wishlistType": {
     "event": "Lista de evento",

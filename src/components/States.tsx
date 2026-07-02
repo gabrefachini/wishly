@@ -12,7 +12,7 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, body, action, onAction, branded = false }: EmptyStateProps) {
   return (
-    <section className="rounded-[32px] bg-porcelain p-8 text-center shadow-card ring-1 ring-warm-100">
+    <section className="rounded-[34px] bg-surface p-8 text-center shadow-card ring-1 ring-border">
       {branded ? (
         <div className="mb-5 flex justify-center">
           <WishlyLogo size="md" />
@@ -34,7 +34,7 @@ export function EmptyState({ title, body, action, onAction, branded = false }: E
 
 export function SuccessState({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-[32px] bg-porcelain p-8 text-center shadow-card ring-1 ring-warm-100">
+    <section className="rounded-[34px] bg-surface p-8 text-center shadow-card ring-1 ring-border">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-600">
         <CheckCircle2 aria-hidden="true" />
       </div>

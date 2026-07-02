@@ -35,6 +35,8 @@ type GiftCardProps = {
   ownerAction?: ReactNode;
   suppressOwnerStatusNote?: boolean;
   themed?: boolean;
+  menu?: ReactNode;
+  onOpenDetails?: (giftId: string) => void;
 };
 
 export function GiftCard({
@@ -45,24 +47,44 @@ export function GiftCard({
   ownerAction,
   suppressOwnerStatusNote = false,
   themed = false,
+  menu,
+  onOpenDetails,
 }: GiftCardProps) {
   const { t } = useTranslation();
   const disabled = gift.status !== "available";
   const isCollective = gift.purchaseType === "collective" || gift.groupGift;
 
   return (
-    <article className="rounded-[28px] bg-porcelain p-3 shadow-card ring-1 ring-warm-100/80">
-      <div className="grid grid-cols-[96px_1fr] gap-4">
-        <img src={gift.image} alt={gift.name} className="h-28 w-full rounded-[22px] object-cover" />
+    <article className="rounded-[30px] bg-surface p-4 shadow-card ring-1 ring-border sm:p-5">
+      <div className="grid gap-4 sm:grid-cols-[112px_1fr]">
+        <button
+          type="button"
+          onClick={() => onOpenDetails?.(gift.id)}
+          className="overflow-hidden rounded-[24px] text-left focus:outline-none"
+        >
+          <img src={gift.image} alt={gift.name} className="h-48 w-full rounded-[24px] object-cover sm:h-32" />
+        </button>
         <div className="min-w-0">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
             <StatusBadge label={gift.status} themed={themed} />
-            <StatusBadge label={gift.priority} themed={themed} />
             {isCollective ? <StatusBadge label={gift.funding?.isFunded ? "funded" : "groupGift"} themed={themed} /> : null}
+            {!isCollective ? <StatusBadge label={gift.priority} themed={themed} /> : null}
+            </div>
+            {menu}
           </div>
-          <h3 className="mt-3 text-base font-bold text-warm-900">{gift.name}</h3>
+          <button
+            type="button"
+            onClick={() => onOpenDetails?.(gift.id)}
+            className="mt-4 block text-left focus:outline-none"
+          >
+            <h3 className="text-lg font-bold tracking-[-0.02em] text-warm-900">{gift.name}</h3>
+          </button>
+          <p className="mt-3 text-2xl font-bold tracking-[-0.03em] text-warm-900">
+            {gift.priceLabel}
+          </p>
           <p className="mt-1 text-sm text-warm-500">
-            {gift.store} · {gift.priceLabel}
+            {gift.store}
           </p>
           {mode === "owner" && gift.status !== "available" && !suppressOwnerStatusNote ? (
             <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-warm-500">
@@ -73,11 +95,11 @@ export function GiftCard({
         </div>
       </div>
 
-      {gift.note ? <p className="mt-4 text-sm text-warm-500">{gift.note}</p> : null}
+      {gift.note ? <p className="mt-4 line-clamp-2 text-sm leading-6 text-warm-500">{gift.note}</p> : null}
 
       {gift.funding ? (
         <div
-          className={`mt-4 grid gap-2 rounded-[22px] p-3 ${themed ? "" : "bg-warm-50/70"}`}
+          className={`mt-4 grid gap-2 rounded-[24px] p-4 ${themed ? "" : "bg-surface-alt"}`}
           style={themed ? { backgroundColor: "var(--wishlist-secondary-soft)" } : undefined}
         >
           <div className="flex items-center justify-between gap-3 text-xs font-semibold text-warm-500">
@@ -99,13 +121,13 @@ export function GiftCard({
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         {mode === "owner" && gift.storeUrl ? (
           <a
             href={gift.storeUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
           >
             <ExternalLink size={16} aria-hidden="true" />
             {gift.store}
@@ -114,7 +136,7 @@ export function GiftCard({
         {mode === "visitor" && gift.buyHref ? (
           <a
             href={gift.buyHref}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 text-sm font-semibold text-warm-700 shadow-card transition ${themed ? "" : "hover:border-coral/35 hover:text-terracotta"}`}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition ${themed ? "" : "hover:border-coral/35 hover:text-terracotta"}`}
             style={themed ? { borderColor: "var(--wishlist-primary-soft)" } : undefined}
           >
             <ExternalLink size={16} aria-hidden="true" />
@@ -129,7 +151,7 @@ export function GiftCard({
       ) : null}
 
       {mode === "visitor" ? (
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
           <PrimaryButton
             disabled={disabled || (isCollective && gift.funding?.isFunded)}
             className="w-full disabled:cursor-not-allowed disabled:bg-warm-300"

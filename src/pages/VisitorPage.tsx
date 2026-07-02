@@ -17,6 +17,7 @@ import { contributionSchema, reservationSchema } from "../lib/validation";
 import { createContribution } from "../services/contributions";
 import { reserveGift } from "../services/reservations";
 import { getPublicWishlist } from "../services/wishlists";
+import { LoadingState } from "../components/LoadingState";
 import type { GiftRecord, WishlistRecord } from "../types/domain";
 import { env } from "../lib/env";
 
@@ -186,16 +187,16 @@ export function VisitorPage() {
           <div className="flex items-center justify-between gap-3">
             <Link
               to="/"
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               <WishlyLogo size="sm" />
             </Link>
           </div>
-          <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">
+          <section className="overflow-hidden rounded-[36px] bg-surface shadow-soft ring-1 ring-border">
             <img src={demoWishlist.cover} alt="" className="h-56 w-full object-cover" />
             <div className="p-5">
-              <p className="inline-flex items-center gap-2 rounded-full bg-skysoft px-3 py-1 text-xs font-semibold text-sky-800">
+              <p className="inline-flex items-center gap-2 rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
                 <ShieldCheck size={14} aria-hidden="true" />
                 {t("visitor.noLogin")}
               </p>
@@ -235,13 +236,22 @@ export function VisitorPage() {
           <div className="flex items-center justify-between gap-3">
             <Link
               to="/"
-              className="inline-flex w-fit items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4 focus:ring-coral/15"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-coral/15"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               <WishlyLogo size="sm" />
             </Link>
           </div>
-          <p className="text-sm text-warm-500">{t("common.loading")}</p>
+          <LoadingState
+            title={t("common.loadingTitle")}
+            body={t("common.loadingBody")}
+            timeoutTitle={t("common.loadingTimeoutTitle")}
+            timeoutBody={t("common.loadingTimeoutBody")}
+            retryLabel={t("common.retry")}
+            redirectTo="/"
+            redirectLabel={t("nav.home")}
+            onRetry={() => window.location.reload()}
+          />
         </div>
       </main>
     );
@@ -269,7 +279,7 @@ export function VisitorPage() {
         <div className="flex items-center justify-between gap-3">
           <Link
             to="/"
-            className="inline-flex w-fit items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100 focus:outline-none focus:ring-4"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4"
             style={{ boxShadow: "0 0 0 6px transparent" }}
           >
             <ArrowLeft size={16} aria-hidden="true" />
@@ -277,13 +287,13 @@ export function VisitorPage() {
           </Link>
         </div>
 
-        <section className="overflow-hidden rounded-[36px] bg-porcelain shadow-soft ring-1 ring-warm-100">
+        <section className="overflow-hidden rounded-[36px] bg-surface shadow-soft ring-1 ring-border">
           <img
             src={wishlist.cover_image_url || fallbackCover}
             alt=""
             className="h-56 w-full object-cover"
           />
-          <div className="p-5" style={{ backgroundImage: "var(--wishlist-header-gradient)" }}>
+          <div className="p-5" style={{ backgroundColor: "var(--wishlist-header-surface)" }}>
             <p
               className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
               style={{

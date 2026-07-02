@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LoadingState } from "../components/LoadingState";
 import { listAdminAuditLogs, listAffiliateMerchants, listSponsoredItems } from "../services/admin";
 import type { AdminAuditLogRecord, AffiliateMerchantRecord, SponsoredItemRecord } from "../types/domain";
 import { useTranslation } from "../i18n/useTranslation";
@@ -48,7 +49,18 @@ export function AdminDashboardPage() {
   }, [t]);
 
   if (loading) {
-    return <p className="text-sm text-warm-500">{t("common.loading")}</p>;
+    return (
+      <LoadingState
+        title={t("common.loadingTitle")}
+        body={t("common.loadingBody")}
+        timeoutTitle={t("common.loadingTimeoutTitle")}
+        timeoutBody={t("common.loadingTimeoutBody")}
+        retryLabel={t("common.retry")}
+        redirectTo="/admin"
+        redirectLabel={t("admin.dashboard")}
+        onRetry={() => window.location.reload()}
+      />
+    );
   }
 
   if (error) {
@@ -99,4 +111,3 @@ export function AdminDashboardPage() {
     </div>
   );
 }
-

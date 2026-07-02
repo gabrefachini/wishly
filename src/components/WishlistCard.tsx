@@ -1,4 +1,4 @@
-import { CalendarDays, Gift, Lock, Share2 } from "lucide-react";
+import { Gift, Lock, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 type WishlistCardProps = {
@@ -32,30 +32,27 @@ export function WishlistCard({
   return (
     <Link
       to={to}
-      className="group grid grid-cols-[104px_1fr] gap-4 rounded-[28px] bg-porcelain p-3 shadow-card ring-1 ring-warm-100/80 transition hover:-translate-y-0.5 hover:shadow-soft focus:outline-none focus:ring-4 focus:ring-coral/20"
+      className="group grid gap-4 rounded-[30px] bg-surface p-3 shadow-card ring-1 ring-border transition hover:shadow-soft focus:outline-none focus:ring-4 focus:ring-coral/20 sm:grid-cols-[120px_1fr]"
     >
-      <img src={cover} alt="" className="h-28 w-full rounded-[22px] object-cover" />
+      <img src={cover} alt="" className="h-40 w-full rounded-[24px] object-cover sm:h-32" />
       <div className="flex min-w-0 flex-col justify-between py-1 pr-1">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">
             {occasionLabel}
           </p>
-          <h3 className="mt-1 truncate text-lg font-bold text-warm-900">{title}</h3>
+          <h3 className="mt-2 text-lg font-bold tracking-[-0.02em] text-warm-900 sm:text-[1.3rem]">{title}</h3>
+          <p className="mt-2 text-sm text-warm-500">{dateLabel}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-warm-500">
-          <span className="inline-flex items-center gap-1">
-            <CalendarDays size={14} aria-hidden="true" />
-            {dateLabel}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-warm-50 px-2.5 py-1 text-warm-700">
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium text-warm-500">
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-alt px-2.5 py-1 text-warm-700">
             <Gift size={14} aria-hidden="true" />
             {giftCountLabel}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-warm-50 px-2.5 py-1 text-warm-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-alt px-2.5 py-1 text-warm-700">
             {visibilityIcon}
             {visibilityLabel}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-warm-50 px-2.5 py-1 text-warm-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-blush px-2.5 py-1 text-terracotta">
             {reservedCountLabel}
           </span>
         </div>

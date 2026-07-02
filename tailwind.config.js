@@ -6,11 +6,19 @@ export default {
       colors: {
         cream: "#fbf7f1",
         porcelain: "#fffdf9",
+        surface: "#fffdf9",
+        "surface-alt": "#f5efe7",
+        border: "#e5ddd2",
         coral: "#d97863",
         terracotta: "#b95745",
         blush: "#f6ded7",
         lavender: "#ddd8fb",
-        skysoft: "#dcecf5",
+        sage: "#dfe8dc",
+        skysoft: "#efe6dc",
+        warning: "#d7b77a",
+        "warning-soft": "#f3e8d0",
+        danger: "#b85e53",
+        "danger-soft": "#f3dfdc",
         warm: {
           50: "#faf8f4",
           100: "#f2ece4",
@@ -27,6 +35,7 @@ export default {
       fontFamily: {
         sans: [
           "Inter",
+          "\"Helvetica Neue\"",
           "ui-sans-serif",
           "system-ui",
           "-apple-system",

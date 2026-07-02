@@ -1,9 +1,11 @@
-import { Archive, Link2, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { CreateButton, SecondaryButton } from "../components/Buttons";
+import { CardMenu } from "../components/CardMenu";
 import { EmptyState } from "../components/States";
+import { LoadingState } from "../components/LoadingState";
 import { buildWishlistSummary } from "../lib/presenters";
 import { useTranslation } from "../i18n/useTranslation";
 import { archiveWishlist, listMyWishlists, restoreWishlist } from "../services/wishlists";
@@ -113,7 +115,7 @@ export function ListIndexPage() {
         </Link>
       </header>
 
-      <section className="grid gap-3 rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <section className="grid gap-3 rounded-[32px] bg-surface p-5 shadow-card ring-1 ring-border">
         <div className="flex flex-wrap gap-2">
           {(["active", "archived", "all"] as FilterMode[]).map((item) => (
             <button
@@ -121,7 +123,7 @@ export function ListIndexPage() {
               type="button"
               onClick={() => setFilter(item)}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                filter === item ? "bg-blush text-terracotta" : "bg-warm-50 text-warm-600"
+                filter === item ? "bg-blush text-terracotta" : "bg-surface-alt text-warm-600"
               }`}
             >
               {t(`lists.filters.${item}`)}
@@ -135,7 +137,7 @@ export function ListIndexPage() {
             aria-hidden="true"
           />
           <input
-            className="min-h-12 w-full rounded-2xl border border-warm-100 bg-porcelain pl-11 pr-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-coral focus:ring-4 focus:ring-coral/15"
+            className="min-h-12 w-full rounded-2xl border border-border bg-surface pl-11 pr-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-coral focus:ring-4 focus:ring-coral/15"
             placeholder={t("lists.searchPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -143,7 +145,18 @@ export function ListIndexPage() {
         </label>
       </section>
 
-      {loading ? <p className="text-sm text-warm-500">{t("common.loading")}</p> : null}
+      {loading ? (
+        <LoadingState
+          title={t("common.loadingTitle")}
+          body={t("common.loadingBody")}
+          timeoutTitle={t("common.loadingTimeoutTitle")}
+          timeoutBody={t("common.loadingTimeoutBody")}
+          retryLabel={t("common.retry")}
+          redirectTo="/app"
+          redirectLabel={t("nav.home")}
+          onRetry={() => window.location.reload()}
+        />
+      ) : null}
       {error ? <p className="text-sm text-terracotta">{error}</p> : null}
       {actionMessage ? <p className="text-sm text-emerald-700">{actionMessage}</p> : null}
 
@@ -163,7 +176,7 @@ export function ListIndexPage() {
           return (
             <section
               key={wishlist.id}
-              className="rounded-[28px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100"
+              className="rounded-[30px] bg-surface p-5 shadow-card ring-1 ring-border"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -173,27 +186,33 @@ export function ListIndexPage() {
                   <h2 className="mt-1 text-xl font-bold text-warm-900">{wishlist.title}</h2>
                   <p className="mt-2 text-sm text-warm-500">{summary.dateLabel}</p>
                 </div>
-                <span className="rounded-full bg-warm-50 px-3 py-1 text-xs font-semibold text-warm-600">
-                  {wishlist.archived_at ? t("lists.filters.archived") : t("lists.filters.active")}
-                </span>
+                <CardMenu
+                  ariaLabel={t("common.moreOptions")}
+                  items={[
+                    {
+                      label: t("lists.edit"),
+                      onSelect: () => navigate(`/lists/${wishlist.id}`),
+                    },
+                    {
+                      label: t("lists.share"),
+                      onSelect: () => void handleShare(wishlist.share_id),
+                    },
+                    {
+                      label: wishlist.archived_at ? t("lists.restore") : t("lists.archive"),
+                      onSelect: () => void handleArchive(wishlist),
+                    },
+                  ]}
+                />
               </div>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-warm-600">
-                <span className="rounded-full bg-warm-50 px-3 py-1">{summary.giftCountLabel}</span>
-                <span className="rounded-full bg-warm-50 px-3 py-1">{summary.reservedCountLabel}</span>
-                <span className="rounded-full bg-warm-50 px-3 py-1">{summary.visibilityLabel}</span>
+                <span className="rounded-full bg-surface-alt px-3 py-1">{summary.giftCountLabel}</span>
+                <span className="rounded-full bg-blush px-3 py-1 text-terracotta">{summary.reservedCountLabel}</span>
+                <span className="rounded-full bg-surface-alt px-3 py-1">{summary.visibilityLabel}</span>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Link to={`/lists/${wishlist.id}`}>
                   <SecondaryButton>{t("lists.edit")}</SecondaryButton>
                 </Link>
-                <SecondaryButton type="button" onClick={() => void handleShare(wishlist.share_id)}>
-                  <Link2 size={16} aria-hidden="true" />
-                  {t("lists.share")}
-                </SecondaryButton>
-                <SecondaryButton type="button" onClick={() => void handleArchive(wishlist)}>
-                  <Archive size={16} aria-hidden="true" />
-                  {wishlist.archived_at ? t("lists.restore") : t("lists.archive")}
-                </SecondaryButton>
               </div>
             </section>
           );

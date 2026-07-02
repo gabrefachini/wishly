@@ -505,7 +505,7 @@ function WishlistThemePreview({
         className={`overflow-hidden rounded-[24px] bg-cream ring-1 ring-warm-100 ${compact ? "lg:max-w-[380px]" : ""}`}
         style={getWishlistThemeCssVars(values)}
       >
-        <div className="grid gap-3 p-4" style={{ backgroundImage: "var(--wishlist-header-gradient)" }}>
+        <div className="grid gap-3 p-4" style={{ backgroundColor: "var(--wishlist-header-surface)" }}>
           <div className="flex items-center justify-between gap-3">
             <span
               className="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
@@ -516,7 +516,7 @@ function WishlistThemePreview({
             >
               {t("common.publicLink")}
             </span>
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-warm-700">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface text-warm-700">
               <Sparkles size={14} aria-hidden="true" />
             </span>
           </div>

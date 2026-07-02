@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/States";
+import { LoadingState } from "../components/LoadingState";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { useTranslation } from "../i18n/useTranslation";
 import { hasSupabaseEnv, isDemoMode } from "../lib/env";
@@ -63,7 +64,17 @@ export function GoGiftPage() {
       <div className="mx-auto grid max-w-md justify-items-center gap-4 text-center">
         <WishlyLogo size="md" />
         <p className="text-sm font-semibold text-coral">{t("affiliate.redirecting")}</p>
-        <p className="text-sm text-warm-500">{t("common.loading")}</p>
+        <LoadingState
+          title={t("common.loadingTitle")}
+          body={t("common.loadingBody")}
+          timeoutTitle={t("common.loadingTimeoutTitle")}
+          timeoutBody={t("common.loadingTimeoutBody")}
+          retryLabel={t("common.retry")}
+          redirectTo={searchParams.get("shareId") ? `/w/${searchParams.get("shareId")}` : "/"}
+          redirectLabel={t("actions.backToWishlist")}
+          onRetry={() => window.location.reload()}
+          className="w-full"
+        />
       </div>
     </main>
   );

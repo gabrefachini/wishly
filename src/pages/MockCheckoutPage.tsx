@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SecondaryButton, PrimaryButton } from "../components/Buttons";
 import { EmptyState, SuccessState } from "../components/States";
+import { LoadingState } from "../components/LoadingState";
 import { WishlyLogo } from "../components/WishlyLogo";
 import { formatCurrency } from "../i18n/formatters";
 import { useTranslation } from "../i18n/useTranslation";
@@ -63,7 +64,17 @@ export function MockCheckoutPage() {
       <main className="min-h-screen bg-cream px-4 py-8">
         <div className="mx-auto grid max-w-md gap-4 text-center">
           <WishlyLogo size="md" />
-          <p className="text-sm text-warm-500">{t("common.loading")}</p>
+          <LoadingState
+            title={t("common.loadingTitle")}
+            body={t("common.loadingBody")}
+            timeoutTitle={t("common.loadingTimeoutTitle")}
+            timeoutBody={t("common.loadingTimeoutBody")}
+            retryLabel={t("common.retry")}
+            redirectTo="/"
+            redirectLabel={t("nav.home")}
+            onRetry={() => window.location.reload()}
+            className="w-full"
+          />
         </div>
       </main>
     );

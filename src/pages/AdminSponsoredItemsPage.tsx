@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
+import { LoadingState } from "../components/LoadingState";
 import { sponsoredItemSchema } from "../lib/validation";
 import { listAffiliateMerchants, listSponsoredItems, saveSponsoredItem, updateSponsoredItemStatus } from "../services/admin";
 import type { AffiliateMerchantRecord, SponsoredItemRecord } from "../types/domain";
@@ -164,7 +165,18 @@ export function AdminSponsoredItemsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-          {loading ? <p className="text-sm text-warm-500">{t("common.loading")}</p> : null}
+          {loading ? (
+            <LoadingState
+              title={t("common.loadingTitle")}
+              body={t("common.loadingBody")}
+              timeoutTitle={t("common.loadingTimeoutTitle")}
+              timeoutBody={t("common.loadingTimeoutBody")}
+              retryLabel={t("common.retry")}
+              redirectTo="/admin"
+              redirectLabel={t("admin.dashboard")}
+              onRetry={() => window.location.reload()}
+            />
+          ) : null}
           <div className="grid gap-3">
             {items.map((item) => (
               <div key={item.id} className="rounded-[24px] bg-warm-50/60 p-4">
