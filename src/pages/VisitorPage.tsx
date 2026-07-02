@@ -182,7 +182,7 @@ export function VisitorPage() {
     const demoWishlist = wishlists.find((item) => item.shareId === shareId) ?? wishlists[0];
 
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 text-warm-900 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -193,10 +193,10 @@ export function VisitorPage() {
               <WishlyLogo size="sm" />
             </Link>
           </div>
-          <section className="overflow-hidden rounded-[36px] bg-surface shadow-soft ring-1 ring-border">
+          <section className="overflow-hidden rounded-modal bg-surface shadow-soft ring-1 ring-border">
             <img src={demoWishlist.cover} alt="" className="h-56 w-full object-cover" />
             <div className="p-5">
-              <p className="inline-flex items-center gap-2 rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
+              <p className="inline-flex items-center gap-2 rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-700">
                 <ShieldCheck size={14} aria-hidden="true" />
                 {t("visitor.noLogin")}
               </p>
@@ -231,12 +231,12 @@ export function VisitorPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 text-warm-900 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
           <div className="flex items-center justify-between gap-3">
             <Link
               to="/"
-            className="inline-flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-coral/15"
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-primary/15"
             >
               <ArrowLeft size={16} aria-hidden="true" />
               <WishlyLogo size="sm" />
@@ -259,7 +259,7 @@ export function VisitorPage() {
 
   if (error || !wishlist) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 text-warm-900 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <EmptyState
             title={t("visitor.privateTitle")}
@@ -274,7 +274,7 @@ export function VisitorPage() {
   const wishlistThemeVars = getWishlistThemeCssVars(wishlist);
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-5 text-warm-900 sm:px-6" style={wishlistThemeVars}>
+    <main className="min-h-screen bg-page px-4 py-5 text-warm-900 sm:px-6" style={wishlistThemeVars}>
       <div className="mx-auto grid max-w-3xl gap-6">
         <div className="flex items-center justify-between gap-3">
           <Link
@@ -287,7 +287,7 @@ export function VisitorPage() {
           </Link>
         </div>
 
-        <section className="overflow-hidden rounded-[36px] bg-surface shadow-soft ring-1 ring-border">
+        <section className="overflow-hidden rounded-modal bg-surface shadow-soft ring-1 ring-border">
           <img
             src={wishlist.cover_image_url || fallbackCover}
             alt=""
@@ -318,7 +318,7 @@ export function VisitorPage() {
         {reservationSuccess ? (
           <SuccessState title={t("reservation.successTitle")} body={t("reservation.successBody")} />
         ) : null}
-        {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+        {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
 
         <section className="grid gap-3">
           {wishlist.gifts.map((gift) => {

@@ -50,10 +50,10 @@ function toneClasses(severity: "positive" | "neutral" | "warning") {
   }
 
   if (severity === "warning") {
-    return "bg-blush text-terracotta ring-coral/10";
+    return "bg-sunken text-primary-strong ring-primary/10";
   }
 
-  return "bg-warm-100 text-warm-600 ring-warm-100";
+  return "bg-warm-100 text-warm-600 ring-border";
 }
 
 function metricLabel(
@@ -62,7 +62,7 @@ function metricLabel(
   subdued = false,
 ) {
   return (
-    <div className="grid gap-1 rounded-[20px] bg-surface p-3 ring-1 ring-border">
+    <div className="grid gap-1 rounded-card bg-surface p-3 ring-1 ring-border">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{label}</p>
       <div className={`text-sm font-semibold ${subdued ? "text-warm-600" : "text-warm-900"}`}>{value}</div>
     </div>
@@ -147,10 +147,10 @@ export function PriceRadarBoard({
 }: PriceRadarBoardProps) {
   if (!canUseRadar) {
     return (
-      <section className="grid gap-4 rounded-[34px] border border-dashed border-coral/25 bg-blush p-5 shadow-card sm:p-6">
+      <section className="grid gap-4 rounded-modal border border-dashed border-primary/25 bg-sunken p-5 shadow-card sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="grid gap-2">
-            <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+            <p className="text-sm font-semibold text-primary">{t("priceRadar.eyebrow")}</p>
             <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
             <p className="text-sm leading-6 text-warm-600">{t("priceRadar.paywallBody")}</p>
           </div>
@@ -159,16 +159,16 @@ export function PriceRadarBoard({
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <p className="rounded-[22px] bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
+          <p className="rounded-card bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
             {t("priceRadar.benefitTracking")}
           </p>
-          <p className="rounded-[22px] bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
+          <p className="rounded-card bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
             {t("priceRadar.benefitHistory")}
           </p>
-          <p className="rounded-[22px] bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
+          <p className="rounded-card bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
             {t("priceRadar.benefitAlerts")}
           </p>
-          <p className="rounded-[22px] bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
+          <p className="rounded-card bg-surface p-4 text-sm text-warm-600 ring-1 ring-border">
             {t("priceRadar.benefitTarget")}
           </p>
         </div>
@@ -178,10 +178,10 @@ export function PriceRadarBoard({
 
   if (trackedGifts.length === 0) {
     return (
-      <section className="grid gap-4 rounded-[34px] bg-surface p-5 shadow-card ring-1 ring-border sm:p-6">
+      <section className="grid gap-4 rounded-modal bg-surface p-5 shadow-card ring-1 ring-border sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="grid gap-2">
-            <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+            <p className="text-sm font-semibold text-primary">{t("priceRadar.eyebrow")}</p>
             <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
             <p className="text-sm leading-6 text-warm-600">{t("priceRadar.dashboardBody")}</p>
           </div>
@@ -189,7 +189,7 @@ export function PriceRadarBoard({
             {wishlist.is_price_radar_enabled ? t("priceRadar.enabled") : t("priceRadar.disabled")}
           </span>
         </div>
-        <div className="rounded-[28px] border border-dashed border-border bg-surface-alt p-5">
+        <div className="rounded-modal border border-dashed border-border bg-sunken p-5">
           <p className="text-sm font-semibold text-warm-800">{t("priceRadar.emptyTitle")}</p>
           <p className="mt-2 text-sm leading-6 text-warm-600">{t("priceRadar.emptyBody")}</p>
         </div>
@@ -198,12 +198,12 @@ export function PriceRadarBoard({
   }
 
   return (
-    <section className="grid gap-5 rounded-[34px] bg-surface p-5 shadow-card ring-1 ring-border sm:p-6">
+    <section className="grid gap-5 rounded-modal bg-surface p-5 shadow-card ring-1 ring-border sm:p-6">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)] lg:items-start">
         <div className="grid gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="grid gap-2">
-              <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+              <p className="text-sm font-semibold text-primary">{t("priceRadar.eyebrow")}</p>
               <h2 className="text-xl font-bold text-warm-900">{t("priceRadar.dashboardTitle")}</h2>
               <p className="max-w-2xl text-sm leading-6 text-warm-600">{t("priceRadar.dashboardBody")}</p>
             </div>
@@ -227,7 +227,7 @@ export function PriceRadarBoard({
           </div>
         </div>
 
-        <div className="grid gap-3 rounded-[28px] bg-surface-alt p-4 ring-1 ring-border">
+        <div className="grid gap-3 rounded-modal bg-sunken p-4 ring-1 ring-border">
           <div className="flex items-start justify-between gap-3">
             <div className="grid gap-1">
               <p className="text-sm font-semibold text-warm-800">{t("priceRadar.summary.title")}</p>
@@ -282,7 +282,7 @@ export function PriceRadarBoard({
           return (
             <article
               key={gift.id}
-              className="overflow-hidden rounded-[30px] border border-border bg-surface p-4 shadow-card transition hover:shadow-soft sm:p-5"
+              className="overflow-hidden rounded-modal border border-border bg-surface p-4 shadow-card transition hover:shadow-soft sm:p-5"
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-start">
                 <div className="grid gap-4">
@@ -290,7 +290,7 @@ export function PriceRadarBoard({
                     <img
                       src={gift.image_url || fallbackImageUrl}
                       alt={gift.name}
-                      className="h-24 w-24 shrink-0 rounded-[24px] object-cover ring-1 ring-border"
+                      className="h-24 w-24 shrink-0 rounded-card object-cover ring-1 ring-border"
                     />
                     <div className="min-w-0 grid gap-3">
                       <div className="flex flex-wrap gap-2">
@@ -298,7 +298,7 @@ export function PriceRadarBoard({
                           {gift.price_tracking_enabled ? t("priceRadar.item.active") : t("priceRadar.item.inactive")}
                         </span>
                         <StatusBadge label={gift.status} />
-                        <span className="inline-flex items-center rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-border">
+                        <span className="inline-flex items-center rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-border">
                           {storeName}
                         </span>
                         {changeText ? (
@@ -306,7 +306,7 @@ export function PriceRadarBoard({
                             className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
                               changeText.startsWith("-")
                                 ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-                                : "bg-blush text-terracotta ring-coral/10"
+                                : "bg-sunken text-primary-strong ring-primary/10"
                             }`}
                           >
                             {changeText.startsWith("-") ? (
@@ -317,7 +317,7 @@ export function PriceRadarBoard({
                             {trendText} · {changeText}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-border">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-600 ring-1 ring-border">
                             {trendText}
                           </span>
                         )}
@@ -330,11 +330,11 @@ export function PriceRadarBoard({
                             <Store size={14} aria-hidden="true" className="text-warm-400" />
                             {storeName}
                           </span>
-                          <span aria-hidden="true">•</span>
+                          <span aria-hidden="true" className="hidden sm:inline">•</span>
                           <span>
                             {t("priceRadar.item.monitoringSince")}: {startDateLabel}
                           </span>
-                          <span aria-hidden="true">•</span>
+                          <span aria-hidden="true" className="hidden sm:inline">•</span>
                           <span>
                             {t("priceRadar.item.lastChecked")}: {lastCheckLabel}
                           </span>
@@ -342,7 +342,7 @@ export function PriceRadarBoard({
                       </div>
 
                       <div className="grid gap-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                           {t("priceRadar.item.currentPrice")}
                         </p>
                         <div className="text-3xl font-bold tracking-tight text-warm-900 sm:text-[2.15rem]">
@@ -354,10 +354,10 @@ export function PriceRadarBoard({
                   </div>
                 </div>
 
-                <div className="grid gap-4 rounded-[26px] bg-surface-alt p-4 ring-1 ring-border">
+                <div className="grid gap-4 rounded-modal bg-sunken p-4 ring-1 ring-border">
                   <div className="flex items-start justify-between gap-3">
                     <div className="grid gap-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                         {t("priceRadar.item.analysisTitle")}
                       </p>
                       <h4 className="text-lg font-bold text-warm-900">{recommendation.title}</h4>
@@ -370,7 +370,7 @@ export function PriceRadarBoard({
                   <p className="text-sm leading-6 text-warm-600">{recommendation.message}</p>
 
                   <div className="grid gap-3">
-                    <div className="rounded-[22px] bg-surface p-3 ring-1 ring-border">
+                    <div className="rounded-card bg-surface p-3 ring-1 ring-border">
                       <div className="flex items-end justify-between gap-3">
                         <div className="grid gap-1">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">
@@ -379,7 +379,7 @@ export function PriceRadarBoard({
                           <p className="text-xs text-warm-500">{t("priceRadar.item.last30Days")}</p>
                         </div>
                         {targetPrice !== null ? (
-                          <span className="rounded-full bg-blush px-2.5 py-1 text-[11px] font-semibold text-terracotta ring-1 ring-coral/10">
+                          <span className="rounded-full bg-sunken px-2.5 py-1 text-[11px] font-semibold text-primary-strong ring-1 ring-primary/10">
                             {t("priceRadar.item.targetPrice")}
                           </span>
                         ) : null}

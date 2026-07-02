@@ -18,6 +18,7 @@ import { getDemoDashboardSnapshot } from "../data/demoState";
 import { useTranslation } from "../i18n/useTranslation";
 import { isDemoMode } from "../lib/env";
 import { updateMetadata } from "../lib/metadata";
+import { formatCurrency } from "../i18n/formatters";
 import { buildWishlistSummary } from "../lib/presenters";
 import { listActiveWishlists } from "../services/wishlists";
 import type { WishlistWithGifts } from "../types/domain";
@@ -88,7 +89,14 @@ export function HomePage() {
       wishlist.gifts.reduce((giftTotal, gift) => giftTotal + (gift.funding_received_amount ?? 0), 0),
     0,
   );
-  const upcomingCount = wishlists.filter((wishlist) => wishlist.event_date).length;
+  const fundedCurrency =
+    wishlists.flatMap((wishlist) => wishlist.gifts).find((gift) => gift.funding_received_amount)?.funding_currency ??
+    undefined;
+  const fundedAmountLabel = formatCurrency(fundedAmount, locale, fundedCurrency);
+  const upcomingWishlists = wishlists
+    .filter((wishlist) => wishlist.event_date)
+    .sort((a, b) => (a.event_date! < b.event_date! ? -1 : 1));
+  const upcomingCount = upcomingWishlists.length;
   const notificationCount = isDemoMode ? getDemoDashboardSnapshot().notificationCount : 0;
 
   return (
@@ -103,12 +111,12 @@ export function HomePage() {
           </h1>
         </div>
         <button
-          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-surface text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-coral/15"
+          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-surface text-warm-700 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-primary/15"
           aria-label={t("home.notifications")}
         >
           <Bell size={20} aria-hidden="true" />
           {notificationCount > 0 ? (
-            <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
               {notificationCount}
             </span>
           ) : null}
@@ -118,13 +126,13 @@ export function HomePage() {
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]">
         <BentoCard tone="accent" className="grid gap-6 p-6 sm:p-7 lg:grid-cols-[minmax(0,1fr)_290px] lg:items-end">
           <div>
-            <p className="text-sm font-semibold text-terracotta">{t("home.question")}</p>
+            <p className="text-sm font-semibold text-primary-strong">{t("home.question")}</p>
             <h2 className="mt-3 max-w-2xl text-[clamp(2rem,4vw,3.45rem)] font-bold leading-[1.02] tracking-[-0.05em] text-warm-900">
               {t("home.heroTitle")}
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-warm-600 sm:text-base">{t("home.heroBody")}</p>
             <Link to="/create" className="mt-6 inline-flex">
-              <SecondaryButton className="bg-surface hover:text-terracotta">
+              <SecondaryButton className="bg-surface hover:text-primary-strong">
                 {t("home.createNew")}
               </SecondaryButton>
             </Link>
@@ -132,7 +140,7 @@ export function HomePage() {
           <div className="grid gap-3">
             <SummaryCard icon={Gift} label={t("home.activeLists")} value={String(activeListCount)} />
             <SummaryCard icon={Share2} label={t("home.reservedGifts")} value={String(reservedGiftCount)} />
-            <SummaryCard icon={HandCoins} label={t("home.receivedContributions")} value={String(fundedAmount)} />
+            <SummaryCard icon={HandCoins} label={t("home.receivedContributions")} value={fundedAmountLabel} />
           </div>
         </BentoCard>
 
@@ -148,7 +156,7 @@ export function HomePage() {
             icon={CalendarDays}
             label={t("home.upcomingEvents")}
             value={String(upcomingCount)}
-            note={firstWishlist ? firstWishlist.title : t("home.emptyBody")}
+            note={upcomingWishlists[0] ? upcomingWishlists[0].title : t("home.emptyBody")}
             accent="coral"
           />
         </BentoGrid>
@@ -162,7 +170,7 @@ export function HomePage() {
             action={
               <Link
                 to="/lists"
-                className="inline-flex items-center gap-1 text-sm font-semibold text-terracotta focus:outline-none focus:ring-4 focus:ring-coral/15"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/15"
               >
                 {t("actions.viewAll")}
                 <ArrowRight size={16} aria-hidden="true" />
@@ -182,7 +190,7 @@ export function HomePage() {
               onRetry={() => window.location.reload()}
             />
           ) : null}
-          {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+          {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
 
           {!loading && !error && wishlists.length === 0 ? (
             <EmptyState
@@ -226,7 +234,7 @@ export function HomePage() {
             }
           />
           <BentoCard tone="default" className="grid gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">{t("nav.lists")}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">{t("nav.lists")}</p>
             <div className="grid gap-3">
               <Link to="/create" className="contents">
                 <SecondaryButton className="w-full">
@@ -261,8 +269,8 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="rounded-[26px] border border-border bg-surface p-4 shadow-card">
-      <Icon size={18} aria-hidden="true" className="text-terracotta" />
+    <div className="rounded-modal border border-border bg-surface p-4 shadow-card">
+      <Icon size={18} aria-hidden="true" className="text-primary-strong" />
       <p className="mt-3 text-2xl font-bold tracking-[-0.03em] text-warm-900">{value}</p>
       <p className="mt-1 text-sm text-warm-600">{label}</p>
     </div>

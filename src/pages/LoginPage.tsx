@@ -45,7 +45,7 @@ export function LoginPage() {
 
   if (!hasSupabaseEnv && !isDemoMode) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
           <SetupNotice />
         </div>
@@ -113,9 +113,9 @@ export function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+    <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
       <div className="mx-auto grid max-w-md gap-6">
-        <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">
+        <section className="rounded-modal bg-surface p-6 shadow-soft ring-1 ring-border">
           <div className="mb-5 flex justify-center">
             <WishlyLogo size="md" />
           </div>
@@ -130,7 +130,7 @@ export function LoginPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.email")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 type="email"
                 autoComplete="email"
                 value={email}
@@ -140,7 +140,7 @@ export function LoginPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.password")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -148,7 +148,7 @@ export function LoginPage() {
               />
             </label>
             {notice ? <p className="text-sm text-warm-600">{notice}</p> : null}
-            {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+            {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
             {needsEmailConfirmation ? (
               <SecondaryButton
                 type="button"
@@ -163,7 +163,7 @@ export function LoginPage() {
               {t("actions.continue")}
             </PrimaryButton>
             <div className="flex items-center justify-between gap-3 text-sm">
-              <Link to="/forgot-password" className="font-semibold text-terracotta">
+              <Link to="/forgot-password" className="font-semibold text-primary-strong">
                 {t("auth.forgotPassword")}
               </Link>
               <Link to="/signup">

@@ -1,16 +1,17 @@
 import type { CSSProperties } from "react";
 import type { WishlistRecord } from "../types/domain";
 
+// Occasion palettes are deliberately gender-neutral: no occasion pairs blue with pink.
 export const WISHLIST_THEME_PRESETS = {
   default: {
     name: "Wishly original",
-    primary: "#DE7762",
-    secondary: "#DCD2FF",
+    primary: "#31614F",
+    secondary: "#E2EBE3",
   },
   baby: {
     name: "Chá de bebê",
-    primary: "#A7C7E7",
-    secondary: "#F6DAD2",
+    primary: "#8FAF97",
+    secondary: "#F1E8D8",
   },
   wedding: {
     name: "Casamento",
@@ -19,13 +20,13 @@ export const WISHLIST_THEME_PRESETS = {
   },
   birthday: {
     name: "Aniversário",
-    primary: "#DE7762",
-    secondary: "#DCD2FF",
+    primary: "#C3572F",
+    secondary: "#F4E9C9",
   },
   christmas: {
     name: "Natal",
-    primary: "#9F4F45",
-    secondary: "#D9E5D6",
+    primary: "#2F5D46",
+    secondary: "#EFDCD9",
   },
   newHome: {
     name: "Casa nova",
@@ -100,7 +101,7 @@ function contrastRatio(hexA: string, hexB: string) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-function ensureReadableAccent(accent: string, background = "#FBF7F1", minContrast = 3.2) {
+function ensureReadableAccent(accent: string, background = "#F6F4F0", minContrast = 4.5) {
   let current = accent;
   let attempts = 0;
 
@@ -173,12 +174,12 @@ export function getWishlistTheme(theme: Partial<ThemeInput> | null | undefined) 
   return {
     ...source,
     primary,
-    primarySoft: mixColors(primary, "#FBF7F1", 0.84),
+    primarySoft: mixColors(primary, "#F6F4F0", 0.84),
     secondary,
-    secondarySoft: mixColors(secondary, "#FBF7F1", 0.62),
-    headerSurface: mixColors(secondary, "#FFFDF9", 0.58),
+    secondarySoft: mixColors(secondary, "#F6F4F0", 0.62),
+    headerSurface: mixColors(secondary, "#FFFFFF", 0.58),
     buttonColor: primary,
-    badgeReservedColor: ensureReadableAccent(mixColors(secondary, "#7C5CC4", 0.28), "#FBF7F1", 2.4),
+    badgeReservedColor: ensureReadableAccent(mixColors(secondary, "#5E7188", 0.28), "#F6F4F0", 2.4),
     progressColor: primary,
     focusRingColor: mixColors(primary, "#FFFFFF", 0.55),
     surfaceTint: mixColors(secondary, "#FFFFFF", 0.78),
@@ -204,8 +205,8 @@ export function getWishlistThemeCssVars(theme: Partial<ThemeInput> | null | unde
 
 export function getWishlistThemeContrastWarning(theme: Partial<ThemeInput> | null | undefined) {
   const source = resolveWishlistThemeSource(theme);
-  const primaryContrast = contrastRatio(source.primary, "#FBF7F1");
-  const secondaryContrast = contrastRatio(source.secondary, "#FBF7F1");
+  const primaryContrast = contrastRatio(source.primary, "#F6F4F0");
+  const secondaryContrast = contrastRatio(source.secondary, "#F6F4F0");
 
   return primaryContrast < 3 || secondaryContrast < 1.7;
 }

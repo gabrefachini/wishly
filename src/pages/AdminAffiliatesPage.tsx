@@ -120,17 +120,17 @@ export function AdminAffiliatesPage() {
     <div className="grid gap-6">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-coral">{t("admin.admin")}</p>
+          <p className="text-sm font-semibold text-primary">{t("admin.admin")}</p>
           <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("admin.affiliateMerchants")}</h1>
         </div>
         <SecondaryButton onClick={() => startEditing(null)}>{t("admin.createMerchant")}</SecondaryButton>
       </header>
 
       {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+      {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+        <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
           {loading ? (
             <LoadingState
               title={t("common.loadingTitle")}
@@ -145,7 +145,7 @@ export function AdminAffiliatesPage() {
           ) : null}
           <div className="grid gap-3">
             {merchants.map((merchant) => (
-              <div key={merchant.id} className="rounded-[24px] bg-warm-50/60 p-4">
+              <div key={merchant.id} className="rounded-card bg-warm-50/60 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-warm-900">{merchant.name}</p>
@@ -172,25 +172,25 @@ export function AdminAffiliatesPage() {
           </div>
         </section>
 
-        <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+        <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
           <h2 className="text-lg font-bold text-warm-900">
             {selectedMerchant ? t("admin.editMerchant") : t("admin.createMerchant")}
           </h2>
           <div className="mt-4 grid gap-4">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("admin.merchant")}</span>
-              <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.name} onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))} />
-              {errors.name ? <span className="text-xs text-terracotta">{errors.name}</span> : null}
+              <input className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.name} onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))} />
+              {errors.name ? <span className="text-xs text-primary-strong">{errors.name}</span> : null}
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("admin.domain")}</span>
-              <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.domain} onChange={(event) => setValues((current) => ({ ...current, domain: event.target.value }))} />
-              {errors.domain ? <span className="text-xs text-terracotta">{errors.domain}</span> : null}
+              <input className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.domain} onChange={(event) => setValues((current) => ({ ...current, domain: event.target.value }))} />
+              {errors.domain ? <span className="text-xs text-primary-strong">{errors.domain}</span> : null}
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">{t("admin.status")}</span>
-                <select className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.status} onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as typeof values.status }))}>
+                <select className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.status} onChange={(event) => setValues((current) => ({ ...current, status: event.target.value as typeof values.status }))}>
                   <option value="active">{t("adminStatus.active")}</option>
                   <option value="inactive">{t("adminStatus.inactive")}</option>
                   <option value="manual">{t("adminStatus.manual")}</option>
@@ -199,36 +199,36 @@ export function AdminAffiliatesPage() {
               </label>
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">{t("admin.strategy")}</span>
-                <select className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.strategy} onChange={(event) => setValues((current) => ({ ...current, strategy: event.target.value as typeof values.strategy }))}>
+                <select className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.strategy} onChange={(event) => setValues((current) => ({ ...current, strategy: event.target.value as typeof values.strategy }))}>
                   <option value="query_param">query_param</option>
                   <option value="deeplink_template">deeplink_template</option>
                   <option value="manual">manual</option>
                   <option value="passthrough">passthrough</option>
                   <option value="api">api</option>
                 </select>
-                {errors.strategy ? <span className="text-xs text-terracotta">{errors.strategy}</span> : null}
+                {errors.strategy ? <span className="text-xs text-primary-strong">{errors.strategy}</span> : null}
               </label>
             </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">Template</span>
-              <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.deeplink_template} onChange={(event) => setValues((current) => ({ ...current, deeplink_template: event.target.value }))} />
+              <input className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.deeplink_template} onChange={(event) => setValues((current) => ({ ...current, deeplink_template: event.target.value }))} />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">Tracking param</span>
-                <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_name} onChange={(event) => setValues((current) => ({ ...current, tracking_param_name: event.target.value }))} />
+                <input className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.tracking_param_name} onChange={(event) => setValues((current) => ({ ...current, tracking_param_name: event.target.value }))} />
               </label>
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">Vault env key</span>
-                <input className="rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.tracking_param_value_env_key} onChange={(event) => setValues((current) => ({ ...current, tracking_param_value_env_key: event.target.value }))} />
+                <input className="rounded-ctrl border border-border bg-surface px-4 py-3" value={values.tracking_param_value_env_key} onChange={(event) => setValues((current) => ({ ...current, tracking_param_value_env_key: event.target.value }))} />
               </label>
             </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">Notes</span>
-              <textarea className="min-h-24 rounded-2xl border border-warm-100 bg-porcelain px-4 py-3" value={values.notes} onChange={(event) => setValues((current) => ({ ...current, notes: event.target.value }))} />
+              <textarea className="min-h-24 rounded-ctrl border border-border bg-surface px-4 py-3" value={values.notes} onChange={(event) => setValues((current) => ({ ...current, notes: event.target.value }))} />
             </label>
             {Object.values(errors).filter(Boolean).length ? (
-              <p className="text-sm text-terracotta">{t("admin.validationError")}</p>
+              <p className="text-sm text-primary-strong">{t("admin.validationError")}</p>
             ) : null}
             <div className="flex flex-wrap gap-3">
               <PrimaryButton onClick={() => void handleSave()} disabled={saving}>{t("admin.saveMerchant")}</PrimaryButton>

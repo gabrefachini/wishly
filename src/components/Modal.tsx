@@ -88,7 +88,7 @@ export function Modal({ title, open, onClose, children, size = "lg" }: ModalProp
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-[#2b2521]/20 p-4 sm:items-center sm:p-6"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-ink/25 p-4 sm:items-center sm:p-6"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -101,7 +101,7 @@ export function Modal({ title, open, onClose, children, size = "lg" }: ModalProp
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`flex w-full max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-[32px] bg-surface shadow-soft ring-1 ring-border focus:outline-none ${sizeClasses[size]}`}
+        className={`flex w-full max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-modal bg-surface shadow-soft ring-1 ring-border focus:outline-none ${sizeClasses[size]}`}
       >
         <div className="sticky top-0 z-10 flex-shrink-0 border-b border-border bg-surface px-5 pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">

@@ -14,17 +14,17 @@ export function AdminShell() {
   const { t } = useTranslation();
 
   return (
-    <div className="min-h-screen bg-cream text-warm-900">
+    <div className="min-h-screen bg-page text-warm-900">
       <main className="mx-auto min-h-screen w-full max-w-5xl px-4 pb-16 pt-5 sm:px-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-3 rounded-full bg-porcelain px-4 py-2 shadow-card ring-1 ring-warm-100">
+          <div className="inline-flex items-center gap-3 rounded-full bg-surface px-4 py-2 shadow-card ring-1 ring-border">
             <WishlyLogo size="sm" />
             <span className="text-sm font-semibold text-warm-500">{t("admin.admin")}</span>
           </div>
           <div className="flex items-center gap-3">
             <NavLink
               to="/app"
-              className="inline-flex items-center gap-2 rounded-full bg-porcelain px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-warm-100"
+              className="inline-flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-semibold text-warm-700 shadow-card ring-1 ring-border"
             >
               <Undo2 size={16} aria-hidden="true" />
               {t("admin.backToApp")}
@@ -33,7 +33,7 @@ export function AdminShell() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-          <aside className="h-fit rounded-[32px] bg-porcelain p-3 shadow-card ring-1 ring-warm-100">
+          <aside className="h-fit rounded-modal bg-surface p-3 shadow-card ring-1 ring-border">
             <nav className="grid gap-2">
               {navItems.map((item) => (
                 <NavLink
@@ -41,9 +41,9 @@ export function AdminShell() {
                   to={item.to}
                   end={item.end}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    `flex items-center gap-3 rounded-ctrl px-4 py-3 text-sm font-semibold transition ${
                       isActive
-                        ? "bg-blush text-terracotta"
+                        ? "bg-sunken text-primary-strong"
                         : "text-warm-600 hover:bg-warm-50"
                     }`
                   }

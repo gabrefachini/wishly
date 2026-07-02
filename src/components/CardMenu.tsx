@@ -49,14 +49,14 @@ export function CardMenu({ ariaLabel, items, align = "right" }: CardMenuProps) {
         aria-label={ariaLabel}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-warm-500 transition hover:border-coral hover:text-terracotta focus:outline-none focus:ring-4 focus:ring-coral/15"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-warm-500 transition hover:border-primary hover:text-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/15"
       >
         <MoreHorizontal size={16} aria-hidden="true" />
       </button>
 
       {open ? (
         <div
-          className={`absolute top-12 z-20 min-w-[210px] rounded-[20px] border border-border bg-surface p-2 shadow-soft ${
+          className={`absolute top-12 z-20 min-w-[210px] rounded-card border border-border bg-surface p-2 shadow-soft ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -68,10 +68,10 @@ export function CardMenu({ ariaLabel, items, align = "right" }: CardMenuProps) {
                 setOpen(false);
                 item.onSelect();
               }}
-              className={`flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-sm font-medium transition ${
+              className={`flex w-full items-center gap-2 rounded-ctrl px-3 py-2.5 text-left text-sm font-medium transition ${
                 item.tone === "danger"
-                  ? "text-terracotta hover:bg-danger-soft"
-                  : "text-warm-700 hover:bg-surface-alt"
+                  ? "text-primary-strong hover:bg-danger-soft"
+                  : "text-warm-700 hover:bg-sunken"
               }`}
             >
               {item.icon}

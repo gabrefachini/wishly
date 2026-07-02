@@ -132,7 +132,7 @@ export function DiscoverPage() {
   return (
     <PremiumPageShell>
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">{t("nav.discover")}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">{t("nav.discover")}</p>
         <h1 className="mt-2 text-[clamp(2rem,4vw,3.3rem)] font-bold tracking-[-0.05em] text-warm-900">{t("discover.title")}</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-warm-500">{t("discover.body")}</p>
       </header>
@@ -183,7 +183,7 @@ export function DiscoverPage() {
           onRetry={() => window.location.reload()}
         />
       ) : null}
-      {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+      {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
 
       {!loading && !error && filteredItems.length === 0 ? (
         <EmptyState
@@ -221,7 +221,7 @@ export function DiscoverPage() {
               key={wishlist.id}
               type="button"
               onClick={() => goToGiftCreation(wishlist.id)}
-              className="rounded-[24px] border border-border bg-surface-alt px-4 py-4 text-left transition hover:border-coral/35 hover:bg-blush"
+              className="rounded-card border border-border bg-sunken px-4 py-4 text-left transition hover:border-primary/35 hover:bg-sunken"
             >
               <p className="font-semibold text-warm-900">{wishlist.title}</p>
               <p className="mt-1 text-sm text-warm-500">{t(`occasions.${wishlist.occasion}`)}</p>
@@ -251,8 +251,8 @@ function FilterChip({
       onClick={onClick}
       className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
         active
-          ? "bg-surface text-terracotta shadow-card ring-1 ring-border"
-          : "bg-surface-alt text-warm-600 ring-1 ring-border hover:bg-surface"
+          ? "bg-surface text-primary-strong shadow-card ring-1 ring-border"
+          : "bg-sunken text-warm-600 ring-1 ring-border hover:bg-surface"
       }`}
     >
       {label}

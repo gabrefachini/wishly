@@ -34,7 +34,7 @@ export function SponsoredItemCard({
   onAdd,
 }: SponsoredItemCardProps) {
   return (
-    <article className="overflow-hidden rounded-[30px] bg-surface shadow-card ring-1 ring-border transition hover:shadow-soft">
+    <article className="overflow-hidden rounded-modal bg-surface shadow-card ring-1 ring-border transition hover:shadow-soft">
       <img
         src={item.image_url || fallbackImage}
         alt=""
@@ -42,12 +42,12 @@ export function SponsoredItemCard({
       />
       <div className="grid gap-4 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-blush px-3 py-1 text-xs font-semibold text-terracotta">
+          <span className="inline-flex items-center rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-primary-strong">
             {sponsoredLabel}
           </span>
           {item.occasion ? <StatusBadge label="groupGift" /> : null}
           {occasionLabel ? (
-            <span className="inline-flex items-center rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-600">
+            <span className="inline-flex items-center rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-600">
               {occasionLabel}
             </span>
           ) : null}

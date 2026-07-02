@@ -36,7 +36,7 @@ export function MockCheckoutPage() {
 
   if (mockCheckoutDisabled) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-8">
+      <main className="min-h-screen bg-page px-4 py-8">
         <div className="mx-auto max-w-md">
           <EmptyState
             title={t("common.notFound")}
@@ -61,7 +61,7 @@ export function MockCheckoutPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-8">
+      <main className="min-h-screen bg-page px-4 py-8">
         <div className="mx-auto grid max-w-md gap-4 text-center">
           <WishlyLogo size="md" />
           <LoadingState
@@ -82,7 +82,7 @@ export function MockCheckoutPage() {
 
   if (!checkout) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-8">
+      <main className="min-h-screen bg-page px-4 py-8">
         <div className="mx-auto max-w-md">
           <EmptyState title={t("common.notFound")} body={t("giftFunding.checkoutNotFound")} branded />
         </div>
@@ -91,7 +91,7 @@ export function MockCheckoutPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-8">
+    <main className="min-h-screen bg-page px-4 py-8">
       <div className="mx-auto grid max-w-md gap-6">
         <div className="flex justify-center">
           <WishlyLogo size="md" />
@@ -104,8 +104,8 @@ export function MockCheckoutPage() {
             </Link>
           </>
         ) : (
-          <section className="rounded-[32px] bg-porcelain p-6 shadow-card ring-1 ring-warm-100">
-            <p className="text-sm font-semibold text-coral">{t("giftFunding.groupGift")}</p>
+          <section className="rounded-modal bg-surface p-6 shadow-card ring-1 ring-border">
+            <p className="text-sm font-semibold text-primary">{t("giftFunding.groupGift")}</p>
             <h1 className="mt-2 text-2xl font-bold text-warm-900">{checkout.gift_name}</h1>
             <p className="mt-3 text-sm text-warm-500">
               {t("giftFunding.paymentSandbox")}

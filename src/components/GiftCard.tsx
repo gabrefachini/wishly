@@ -55,14 +55,14 @@ export function GiftCard({
   const isCollective = gift.purchaseType === "collective" || gift.groupGift;
 
   return (
-    <article className="rounded-[30px] bg-surface p-4 shadow-card ring-1 ring-border sm:p-5">
+    <article className="rounded-modal bg-surface p-4 shadow-card ring-1 ring-border sm:p-5">
       <div className="grid gap-4 sm:grid-cols-[112px_1fr]">
         <button
           type="button"
           onClick={() => onOpenDetails?.(gift.id)}
-          className="overflow-hidden rounded-[24px] text-left focus:outline-none"
+          className="overflow-hidden rounded-card text-left focus:outline-none"
         >
-          <img src={gift.image} alt={gift.name} className="h-48 w-full rounded-[24px] object-cover sm:h-32" />
+          <img src={gift.image} alt={gift.name} className="h-48 w-full rounded-card object-cover sm:h-32" />
         </button>
         <div className="min-w-0">
           <div className="flex items-start justify-between gap-3">
@@ -99,7 +99,7 @@ export function GiftCard({
 
       {gift.funding ? (
         <div
-          className={`mt-4 grid gap-2 rounded-[24px] p-4 ${themed ? "" : "bg-surface-alt"}`}
+          className={`mt-4 grid gap-2 rounded-card p-4 ${themed ? "" : "bg-sunken"}`}
           style={themed ? { backgroundColor: "var(--wishlist-secondary-soft)" } : undefined}
         >
           <div className="flex items-center justify-between gap-3 text-xs font-semibold text-warm-500">
@@ -108,7 +108,7 @@ export function GiftCard({
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-warm-100">
             <div
-              className={`h-full rounded-full transition-[width] ${themed ? "" : "bg-coral"}`}
+              className={`h-full rounded-full transition-[width] ${themed ? "" : "bg-primary"}`}
               style={{
                 width: `${gift.funding.progress}%`,
                 backgroundColor: themed ? "var(--wishlist-progress)" : undefined,
@@ -127,7 +127,7 @@ export function GiftCard({
             href={gift.storeUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition hover:border-primary/35 hover:text-primary-strong"
           >
             <ExternalLink size={16} aria-hidden="true" />
             {gift.store}
@@ -136,7 +136,7 @@ export function GiftCard({
         {mode === "visitor" && gift.buyHref ? (
           <a
             href={gift.buyHref}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition ${themed ? "" : "hover:border-coral/35 hover:text-terracotta"}`}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 shadow-card transition ${themed ? "" : "hover:border-primary/35 hover:text-primary-strong"}`}
             style={themed ? { borderColor: "var(--wishlist-primary-soft)" } : undefined}
           >
             <ExternalLink size={16} aria-hidden="true" />

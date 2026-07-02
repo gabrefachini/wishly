@@ -30,7 +30,7 @@ export function SignupPage() {
 
   if (!hasSupabaseEnv && !isDemoMode) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
           <SetupNotice />
         </div>
@@ -68,9 +68,9 @@ export function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+    <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
       <div className="mx-auto grid max-w-md gap-6">
-        <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">
+        <section className="rounded-modal bg-surface p-6 shadow-soft ring-1 ring-border">
           <div className="mb-5 flex justify-center">
             <WishlyLogo size="md" />
           </div>
@@ -88,7 +88,7 @@ export function SignupPage() {
             </div>
           ) : (
             <>
-          <p className="text-sm font-semibold text-coral">{t("auth.createYourAccount")}</p>
+          <p className="text-sm font-semibold text-primary">{t("auth.createYourAccount")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("actions.signUp")}</h1>
           <form
             className="mt-6 grid gap-4"
@@ -100,7 +100,7 @@ export function SignupPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.name")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 autoComplete="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -109,7 +109,7 @@ export function SignupPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.email")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 type="email"
                 autoComplete="email"
                 value={email}
@@ -119,14 +119,14 @@ export function SignupPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.password")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 type="password"
                 autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
-            {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+            {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
             <PrimaryButton type="submit" disabled={loading}>
               {t("actions.createAccount")}
             </PrimaryButton>

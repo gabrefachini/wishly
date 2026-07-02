@@ -17,7 +17,7 @@ export function ForgotPasswordPage() {
 
   if (!hasSupabaseEnv && !isDemoMode) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+      <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
         <div className="mx-auto grid max-w-3xl gap-6">
           <SetupNotice />
         </div>
@@ -49,22 +49,22 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-5 sm:px-6">
+    <main className="min-h-screen bg-page px-4 py-5 sm:px-6">
       <div className="mx-auto grid max-w-md gap-6">
-        <section className="rounded-[36px] bg-porcelain p-6 shadow-soft ring-1 ring-warm-100">
-          <p className="text-sm font-semibold text-coral">{t("auth.checkEmail")}</p>
+        <section className="rounded-modal bg-surface p-6 shadow-soft ring-1 ring-border">
+          <p className="text-sm font-semibold text-primary">{t("auth.checkEmail")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("auth.resetPasswordTitle")}</h1>
           <p className="mt-3 text-sm leading-6 text-warm-500">{t("auth.resetPasswordBody")}</p>
           <div className="mt-6 grid gap-4">
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("auth.email")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
             </label>
-            {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+            {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
             {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
             <PrimaryButton onClick={handleSubmit} disabled={loading}>
               {t("actions.continue")}

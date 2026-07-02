@@ -160,12 +160,12 @@ export function CreateWishlistPage() {
   return (
     <div className="grid gap-6">
       <header>
-        <p className="text-sm font-semibold text-coral">{t("create.eyebrow")}</p>
+        <p className="text-sm font-semibold text-primary">{t("create.eyebrow")}</p>
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("create.title")}</h1>
         <p className="mt-3 text-sm leading-6 text-warm-500">{t("create.body")}</p>
       </header>
-      <section className="rounded-[36px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-        {submitError ? <p className="mb-4 text-sm text-terracotta">{submitError}</p> : null}
+      <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
+        {submitError ? <p className="mb-4 text-sm text-primary-strong">{submitError}</p> : null}
         <CreateWishlistForm
           values={values}
           errors={errors}

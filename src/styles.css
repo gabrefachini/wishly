@@ -3,19 +3,51 @@
 @tailwind utilities;
 
 :root {
-  color: #29231f;
-  background: #fbf7f1;
+  color: #211e1b;
+  background: #f6f4f0;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color-scheme: light;
-  --page-bg: #fbf7f1;
-  --surface: #fffdf9;
-  --surface-alt: #f5efe7;
-  --border: #e5ddd2;
-  --text-primary: #29231f;
-  --text-secondary: #7f746c;
+
+  /* Semantic tokens — Stone & Spruce. Re-skin the app here.
+     RGB triplets feed Tailwind's alpha modifiers (bg-primary/15 etc);
+     the plain vars are for direct CSS use. */
+  --page-bg-rgb: 246 244 240;
+  --surface-rgb: 255 255 255;
+  --surface-alt-rgb: 239 236 230;
+  --border-rgb: 227 223 215;
+  --border-strong-rgb: 211 206 196;
+  --text-primary-rgb: 33 30 27;
+  --text-secondary-rgb: 110 104 97;
+  --primary-rgb: 49 97 79;
+  --primary-strong-rgb: 39 80 63;
+  --primary-soft-rgb: 226 235 227;
+  --highlight-rgb: 192 138 62;
+  --highlight-soft-rgb: 243 233 214;
+  --danger-rgb: 168 75 62;
+  --danger-soft-rgb: 241 224 219;
+  --info-rgb: 94 113 136;
+  --info-soft-rgb: 228 233 239;
+
+  --page-bg: rgb(var(--page-bg-rgb));
+  --surface: rgb(var(--surface-rgb));
+  --surface-alt: rgb(var(--surface-alt-rgb));
+  --border: rgb(var(--border-rgb));
+  --border-strong: rgb(var(--border-strong-rgb));
+  --text-primary: rgb(var(--text-primary-rgb));
+  --text-secondary: rgb(var(--text-secondary-rgb));
+  --primary: rgb(var(--primary-rgb));
+  --primary-strong: rgb(var(--primary-strong-rgb));
+  --primary-soft: rgb(var(--primary-soft-rgb));
+  --highlight: rgb(var(--highlight-rgb));
+  --highlight-soft: rgb(var(--highlight-soft-rgb));
+  --danger: rgb(var(--danger-rgb));
+  --danger-soft: rgb(var(--danger-soft-rgb));
+  --info: rgb(var(--info-rgb));
+  --info-soft: rgb(var(--info-soft-rgb));
+  --ring: rgba(49, 97, 79, 0.28);
 }
 
 * {
@@ -23,7 +55,7 @@
 }
 
 *::selection {
-  background: rgba(217, 120, 99, 0.16);
+  background: rgba(49, 97, 79, 0.16);
 }
 
 body {

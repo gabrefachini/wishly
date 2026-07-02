@@ -42,7 +42,7 @@ export function GoGiftPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-cream px-4 py-8">
+      <main className="min-h-screen bg-page px-4 py-8">
         <div className="mx-auto grid max-w-md gap-6">
           <div className="flex justify-center">
             <WishlyLogo size="md" />
@@ -50,7 +50,7 @@ export function GoGiftPage() {
           <EmptyState title={t("affiliate.redirectErrorTitle")} body={t("affiliate.redirectErrorBody")} />
           <Link
             to={searchParams.get("shareId") ? `/w/${searchParams.get("shareId")}` : "/"}
-            className="text-center text-sm font-semibold text-coral"
+            className="text-center text-sm font-semibold text-primary"
           >
             {t("actions.backToWishlist")}
           </Link>
@@ -60,10 +60,10 @@ export function GoGiftPage() {
   }
 
   return (
-    <main className="min-h-screen bg-cream px-4 py-8">
+    <main className="min-h-screen bg-page px-4 py-8">
       <div className="mx-auto grid max-w-md justify-items-center gap-4 text-center">
         <WishlyLogo size="md" />
-        <p className="text-sm font-semibold text-coral">{t("affiliate.redirecting")}</p>
+        <p className="text-sm font-semibold text-primary">{t("affiliate.redirecting")}</p>
         <LoadingState
           title={t("common.loadingTitle")}
           body={t("common.loadingBody")}

@@ -11,7 +11,7 @@ export function PremiumRadarPage() {
       <BentoCard tone="dark" className="overflow-hidden">
         <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_0.8fr] sm:items-center">
           <div className="grid gap-4">
-            <p className="text-sm font-semibold text-blush">{t("priceRadar.upgradeEyebrow")}</p>
+            <p className="text-sm font-semibold text-warm-100">{t("priceRadar.upgradeEyebrow")}</p>
             <h1 className="text-3xl font-bold leading-tight">{t("priceRadar.upgradeTitle")}</h1>
             <p className="text-sm leading-6 text-warm-100">{t("priceRadar.upgradeBody")}</p>
             <div className="flex flex-wrap gap-2">
@@ -24,7 +24,7 @@ export function PremiumRadarPage() {
             </div>
             <p className="text-xs leading-6 text-warm-200">{t("priceRadar.freeLimit")}</p>
           </div>
-          <div className="grid gap-3 rounded-[30px] bg-warm-700 p-4">
+          <div className="grid gap-3 rounded-modal bg-warm-700 p-4">
             <BenefitRow icon={BarChart3} title={t("priceRadar.benefitTracking")} />
             <BenefitRow icon={BellRing} title={t("priceRadar.benefitAlerts")} />
             <BenefitRow icon={Target} title={t("priceRadar.benefitTarget")} />
@@ -44,8 +44,8 @@ function BenefitRow({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-[22px] bg-warm-900 px-4 py-3">
-      <Icon size={18} aria-hidden="true" className="text-blush" />
+    <div className="flex items-center gap-3 rounded-card bg-warm-900 px-4 py-3">
+      <Icon size={18} aria-hidden="true" className="text-warm-100" />
       <p className="text-sm font-medium text-white">{title}</p>
     </div>
   );

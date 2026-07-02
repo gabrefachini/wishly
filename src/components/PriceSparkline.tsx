@@ -17,8 +17,8 @@ export function PriceSparkline({
   currentLabel = "Current",
   startLabel = "Start",
   endLabel = "Today",
-  accent = "#de7762",
-  softAccent = "#f6dad2",
+  accent = "var(--primary)",
+  softAccent = "var(--primary-soft)",
   emptyLabel = "",
 }: PriceSparklineProps) {
   const validPoints = points.filter((point) => Number.isFinite(point));
@@ -30,7 +30,7 @@ export function PriceSparkline({
   if (validPoints.length < 2) {
     return (
       <div
-        className="flex min-h-[132px] items-center justify-center rounded-[22px] border border-dashed border-warm-200 bg-warm-50 px-4 text-center text-xs leading-5 text-warm-500"
+        className="flex min-h-[132px] items-center justify-center rounded-card border border-dashed border-warm-200 bg-warm-50 px-4 text-center text-xs leading-5 text-warm-500"
         style={{ color: accent, backgroundColor: softAccent }}
       >
         {emptyLabel}
@@ -69,7 +69,7 @@ export function PriceSparkline({
         <span>{startLabel}</span>
         <span>{endLabel}</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[140px] w-full rounded-[24px] bg-surface-alt p-1" role="img" aria-label={referenceLabel ?? "Price history"}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[140px] w-full rounded-card bg-sunken p-1" role="img" aria-label={referenceLabel ?? "Price history"}>
         {[0.25, 0.5, 0.75].map((ratio) => {
           const y = paddingTop + innerHeight * ratio;
           return <line key={ratio} x1={paddingX} x2={width - paddingX} y1={y} y2={y} stroke="rgba(126, 106, 100, 0.07)" strokeWidth="1" />;
@@ -89,7 +89,7 @@ export function PriceSparkline({
           />
         ) : null}
 
-        <path d={areaPath} fill={softAccent} opacity="1" />
+        <path d={areaPath} fill={softAccent} opacity="0.45" />
         <path d={path} fill="none" stroke={accent} strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round" />
 
         {validPoints.map((point, index) => {

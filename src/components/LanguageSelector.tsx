@@ -8,7 +8,7 @@ export function LanguageSelector() {
 
   return (
     <div
-      className="inline-flex rounded-full border border-warm-100 bg-porcelain p-1 shadow-card"
+      className="inline-flex rounded-full border border-border bg-surface p-1 shadow-card"
       aria-label={t("language.label")}
     >
       {locales.map((item) => (
@@ -16,9 +16,9 @@ export function LanguageSelector() {
           key={item}
           type="button"
           onClick={() => setLocale(item)}
-          className={`min-h-8 rounded-full px-3 text-xs font-bold transition focus:outline-none focus:ring-4 focus:ring-coral/15 ${
+          className={`min-h-8 rounded-full px-3 text-xs font-bold transition focus:outline-none focus:ring-4 focus:ring-primary/15 ${
             locale === item
-              ? "bg-blush text-terracotta"
+              ? "bg-sunken text-primary-strong"
               : "text-warm-500 hover:bg-warm-50"
           }`}
           aria-pressed={locale === item}

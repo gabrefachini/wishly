@@ -401,9 +401,9 @@ export function WishlistDetailPage() {
     return total + Math.max(current - target, 0);
   }, 0);
   const dashboardMetrics = [
-    { label: summary.giftCountLabel, value: String(wishlist.gifts.length) },
-    { label: summary.reservedCountLabel, value: String(wishlist.gifts.filter((gift) => gift.status === "reserved").length) },
-    { label: t("wishlist.visibility"), value: summary.visibilityLabel },
+    { label: t("summary.gifts"), value: String(wishlist.gifts.length) },
+    { label: t("summary.reserved"), value: String(wishlist.gifts.filter((gift) => gift.status === "reserved").length) },
+    { label: t("summary.visibility"), value: summary.visibilityLabel },
   ];
 
   async function handleGiftStatusChange(giftId: string, status: "available" | "purchased") {
@@ -447,7 +447,7 @@ export function WishlistDetailPage() {
   return (
     <PremiumPageShell className="grid gap-6 xl:grid-cols-[minmax(0,1.38fr)_minmax(340px,0.62fr)] xl:items-start">
       <div className="grid gap-6">
-      <section className="overflow-hidden rounded-[38px] bg-surface shadow-soft ring-1 ring-border">
+      <section className="overflow-hidden rounded-modal bg-surface shadow-soft ring-1 ring-border">
         <img
           src={wishlist.cover_image_url || fallbackCover}
           alt=""
@@ -456,24 +456,24 @@ export function WishlistDetailPage() {
         <div className="grid gap-5 p-5 sm:p-6">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
             <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
               {summary.occasionLabel} · {summary.dateLabel}
             </p>
             <h1 className="mt-2 text-[clamp(2rem,4vw,3.3rem)] font-bold tracking-[-0.05em] text-warm-900">{wishlist.title}</h1>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
+              <span className="rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-700">
                 {summary.visibilityLabel}
               </span>
-              <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-warm-700">
+              <span className="rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-warm-700">
                 {summary.giftCountLabel}
               </span>
               {!isPrivateWishlist ? (
-                <span className="rounded-full bg-blush px-3 py-1 text-xs font-semibold text-terracotta">
+                <span className="rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-primary-strong">
                   {summary.reservedCountLabel}
                 </span>
               ) : null}
             </div>
-            <p className="mt-4 rounded-[28px] bg-surface-alt p-4 text-sm leading-7 text-warm-700">
+            <p className="mt-4 rounded-modal bg-sunken p-4 text-sm leading-7 text-warm-700">
               {wishlist.message || t("wishlist.message")}
             </p>
             {isPrivateWishlist ? (
@@ -497,17 +497,17 @@ export function WishlistDetailPage() {
                 {editMessage}
               </p>
             ) : null}
-            {error ? <p className="mt-3 text-sm text-terracotta">{error}</p> : null}
+            {error ? <p className="mt-3 text-sm text-primary-strong">{error}</p> : null}
             </div>
-            <div className="grid gap-3 rounded-[28px] bg-surface-alt p-4 ring-1 ring-border">
+            <div className="grid gap-3 rounded-modal bg-sunken p-4 ring-1 ring-border">
               {dashboardMetrics.map((metric) => (
-                <div key={metric.label} className="rounded-[22px] bg-surface p-4 ring-1 ring-border">
+                <div key={metric.label} className="rounded-card bg-surface p-4 ring-1 ring-border">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{metric.label}</p>
                   <p className="mt-2 text-sm font-semibold text-warm-900">{metric.value}</p>
                 </div>
               ))}
-              <div className="rounded-[22px] bg-surface p-4 ring-1 ring-border">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-coral">
+              <div className="rounded-card bg-surface p-4 ring-1 ring-border">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
                   {canUseRadar ? t("priceRadar.enabled") : t("priceRadar.disabled")}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-warm-900">
@@ -672,16 +672,16 @@ export function WishlistDetailPage() {
 
       <aside className="grid gap-4 xl:sticky xl:top-6">
         <BentoCard tone="default" className="p-5">
-          <p className="text-sm font-semibold text-coral">{t("wishlist.summaryTitle")}</p>
+          <p className="text-sm font-semibold text-primary">{t("wishlist.summaryTitle")}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {dashboardMetrics.map((metric) => (
-              <div key={metric.label} className="rounded-[22px] bg-surface-alt p-4">
+              <div key={metric.label} className="rounded-card bg-sunken p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{metric.label}</p>
                 <p className="mt-2 text-sm font-semibold text-warm-900">{metric.value}</p>
               </div>
             ))}
-            <div className="rounded-[22px] bg-blush p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-coral">
+            <div className="rounded-card bg-sunken p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
                 {canUseRadar ? t("priceRadar.enabled") : t("priceRadar.disabled")}
               </p>
               <p className="mt-2 text-sm font-semibold text-warm-900">
@@ -709,16 +709,16 @@ export function WishlistDetailPage() {
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("create.wishlistName")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={wishlistValues.title}
               onChange={(event) => setWishlistValues((current) => ({ ...current, title: event.target.value }))}
             />
-            {wishlistEditErrors.title ? <span className="text-xs text-terracotta">{wishlistEditErrors.title}</span> : null}
+            {wishlistEditErrors.title ? <span className="text-xs text-primary-strong">{wishlistEditErrors.title}</span> : null}
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("create.listType")}</span>
             <select
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={wishlistValues.type}
               onChange={(event) =>
                 setWishlistValues((current) => {
@@ -743,7 +743,7 @@ export function WishlistDetailPage() {
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">{t("create.occasion")}</span>
                 <select
-                  className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                  className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   value={wishlistValues.occasion}
                   onChange={(event) => setWishlistValues((current) => ({ ...current, occasion: event.target.value }))}
                 >
@@ -758,7 +758,7 @@ export function WishlistDetailPage() {
             ) : (
               <label className="grid gap-2">
                 <span className="text-sm font-semibold text-warm-700">{t("create.occasion")}</span>
-                <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+                <div className="inline-flex min-h-12 items-center rounded-ctrl border border-border bg-warm-50 px-4 text-base font-semibold text-warm-700">
                   {t("wishlistType.wishlist")}
                 </div>
               </label>
@@ -767,16 +767,16 @@ export function WishlistDetailPage() {
               <span className="text-sm font-semibold text-warm-700">{t("create.eventDate")}</span>
               <input
                 type="date"
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 value={wishlistValues.event_date}
                 onChange={(event) => setWishlistValues((current) => ({ ...current, event_date: event.target.value }))}
               />
             </label>
           </div>
           {wishlistValues.type === "wishlist" ? (
-            <label className="grid gap-3 rounded-[28px] border border-warm-100 bg-warm-50/60 p-4">
+            <label className="grid gap-3 rounded-modal border border-border bg-warm-50/60 p-4">
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+                <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-sunken text-primary-strong">
                   <Radar size={18} aria-hidden="true" />
                 </span>
                 <div className="grid gap-1">
@@ -797,13 +797,13 @@ export function WishlistDetailPage() {
                   }
                   className={`relative inline-flex h-10 w-[72px] items-center rounded-full border transition ${
                     wishlistValues.is_price_radar_enabled
-                      ? "border-coral bg-coral/15"
+                      ? "border-primary bg-primary/15"
                       : "border-warm-200 bg-white"
                   }`}
                 >
                   <span
                     className={`inline-block h-8 w-8 rounded-full bg-white shadow-sm transition ${
-                      wishlistValues.is_price_radar_enabled ? "translate-x-8 bg-coral" : "translate-x-1"
+                      wishlistValues.is_price_radar_enabled ? "translate-x-8 bg-primary" : "translate-x-1"
                     }`}
                   />
                 </button>
@@ -814,7 +814,7 @@ export function WishlistDetailPage() {
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("create.message")}</span>
             <textarea
-              className="min-h-28 rounded-2xl border border-warm-100 bg-porcelain px-4 py-3 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-28 rounded-ctrl border border-border bg-surface px-4 py-3 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={wishlistValues.message}
               onChange={(event) => setWishlistValues((current) => ({ ...current, message: event.target.value }))}
             />
@@ -822,7 +822,7 @@ export function WishlistDetailPage() {
           <div className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("actions.chooseCover")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={wishlistValues.cover_image_url}
               onChange={(event) => setWishlistValues((current) => ({ ...current, cover_image_url: event.target.value }))}
             />
@@ -830,7 +830,7 @@ export function WishlistDetailPage() {
               <button
                 type="button"
                 onClick={() => wishlistCoverFileInputRef.current?.click()}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-primary/35 hover:text-primary-strong"
               >
                 <Upload size={17} aria-hidden="true" />
                 {wishlistCoverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
@@ -848,14 +848,14 @@ export function WishlistDetailPage() {
               <span className="text-xs leading-6 text-warm-500">{t("create.coverUploadHint")}</span>
             </div>
             {wishlistEditErrors.cover_image_url ? (
-              <span className="text-xs text-terracotta">{wishlistEditErrors.cover_image_url}</span>
+              <span className="text-xs text-primary-strong">{wishlistEditErrors.cover_image_url}</span>
             ) : null}
           </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("create.visibility")}</span>
               {wishlistValues.type === "wishlist" ? (
                 <>
-                  <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+                  <div className="inline-flex min-h-12 items-center rounded-ctrl border border-border bg-warm-50 px-4 text-base font-semibold text-warm-700">
                     {t("common.private")}
                   </div>
                   <span className="text-xs leading-6 text-warm-500">{t("create.visibilityPrivateHint")}</span>
@@ -863,7 +863,7 @@ export function WishlistDetailPage() {
               ) : (
                 <>
                   <select
-                    className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                    className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     value={wishlistValues.visibility}
                     onChange={(event) =>
                       setWishlistValues((current) => ({ ...current, visibility: event.target.value as "private" | "public_link" }))
@@ -928,25 +928,25 @@ export function WishlistDetailPage() {
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.giftName")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={giftValues.name}
               onChange={(event) => setGiftValues((current) => ({ ...current, name: event.target.value }))}
             />
-            {giftEditErrors.name ? <span className="text-xs text-terracotta">{giftEditErrors.name}</span> : null}
+            {giftEditErrors.name ? <span className="text-xs text-primary-strong">{giftEditErrors.name}</span> : null}
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.storeLink")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={giftValues.store_url}
               onChange={(event) => setGiftValues((current) => ({ ...current, store_url: event.target.value }))}
             />
-            {giftEditErrors.store_url ? <span className="text-xs text-terracotta">{giftEditErrors.store_url}</span> : null}
+            {giftEditErrors.store_url ? <span className="text-xs text-primary-strong">{giftEditErrors.store_url}</span> : null}
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.estimatedPrice")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={giftValues.estimated_price}
               onChange={(event) => setGiftValues((current) => ({ ...current, estimated_price: event.target.value }))}
             />
@@ -955,7 +955,7 @@ export function WishlistDetailPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("giftForm.priority")}</span>
               <select
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 value={giftValues.priority}
                 onChange={(event) => setGiftValues((current) => ({ ...current, priority: event.target.value as typeof current.priority }))}
               >
@@ -967,7 +967,7 @@ export function WishlistDetailPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("giftForm.purchaseType")}</span>
               <select
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 value={giftValues.purchase_type}
                 onChange={(event) => setGiftValues((current) => ({ ...current, purchase_type: event.target.value as typeof current.purchase_type }))}
               >
@@ -980,11 +980,11 @@ export function WishlistDetailPage() {
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-warm-700">{t("giftFunding.goal")}</span>
               <input
-                className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+                className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 value={giftValues.funding_goal_amount}
                 onChange={(event) => setGiftValues((current) => ({ ...current, funding_goal_amount: event.target.value }))}
               />
-              {giftEditErrors.funding_goal_amount ? <span className="text-xs text-terracotta">{giftEditErrors.funding_goal_amount}</span> : null}
+              {giftEditErrors.funding_goal_amount ? <span className="text-xs text-primary-strong">{giftEditErrors.funding_goal_amount}</span> : null}
             </label>
           ) : null}
           {wishlistValues.type === "wishlist" ? (
@@ -1019,16 +1019,16 @@ export function WishlistDetailPage() {
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.productImage")}</span>
             <input
-              className="min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={giftValues.image_url}
               onChange={(event) => setGiftValues((current) => ({ ...current, image_url: event.target.value }))}
             />
-            {giftEditErrors.image_url ? <span className="text-xs text-terracotta">{giftEditErrors.image_url}</span> : null}
+            {giftEditErrors.image_url ? <span className="text-xs text-primary-strong">{giftEditErrors.image_url}</span> : null}
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold text-warm-700">{t("giftForm.optionalNote")}</span>
             <textarea
-              className="min-h-28 rounded-2xl border border-warm-100 bg-porcelain px-4 py-3 text-base text-warm-900 outline-none transition focus:border-coral focus:ring-4 focus:ring-coral/15"
+              className="min-h-28 rounded-ctrl border border-border bg-surface px-4 py-3 text-base text-warm-900 outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
               value={giftValues.description}
               onChange={(event) => setGiftValues((current) => ({ ...current, description: event.target.value }))}
             />
@@ -1057,7 +1057,7 @@ export function WishlistDetailPage() {
         <div className="grid gap-5">
           <p className="text-sm leading-6 text-warm-500">{t("giftDelete.body")}</p>
           {giftToDelete ? (
-            <div className="rounded-[24px] bg-warm-50/70 p-4 text-sm text-warm-700">
+            <div className="rounded-card bg-warm-50/70 p-4 text-sm text-warm-700">
               <p className="font-semibold text-warm-900">{giftToDelete.name}</p>
               <p className="mt-1">{storeLabel(giftToDelete.store_url)}</p>
             </div>
@@ -1069,7 +1069,7 @@ export function WishlistDetailPage() {
             <SecondaryButton
               onClick={() => void handleDeleteGift()}
               disabled={deleteLoading}
-              className="border-terracotta/20 text-terracotta hover:border-terracotta hover:text-terracotta"
+              className="border-primary-strong/20 text-primary-strong hover:border-primary-strong hover:text-primary-strong"
             >
               <Trash2 size={16} aria-hidden="true" />
               {deleteLoading ? t("common.loading") : t("actions.deleteGift")}

@@ -20,14 +20,14 @@ function Field({
     <label className="grid gap-2">
       <span className="text-sm font-semibold text-warm-700">{label}</span>
       {children}
-      {error ? <span className="text-xs text-terracotta">{error}</span> : null}
+      {error ? <span className="text-xs text-primary-strong">{error}</span> : null}
       {!error && hint ? <span className="text-xs text-warm-500">{hint}</span> : null}
     </label>
   );
 }
 
 const inputClass =
-  "min-h-12 rounded-2xl border border-warm-100 bg-porcelain px-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-coral focus:ring-4 focus:ring-coral/15";
+  "min-h-12 rounded-ctrl border border-border bg-surface px-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-primary focus:ring-4 focus:ring-primary/15";
 
 type CreateWishlistFormProps = {
   values: {
@@ -108,7 +108,7 @@ export function CreateWishlistForm({
           </Field>
         ) : (
           <Field label={t("create.occasion")} hint={t("create.wishlistOccasionHint")}>
-            <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+            <div className="inline-flex min-h-12 items-center rounded-ctrl border border-border bg-warm-50 px-4 text-base font-semibold text-warm-700">
               {t("wishlistType.wishlist")}
             </div>
           </Field>
@@ -149,7 +149,7 @@ export function CreateWishlistForm({
             <button
               type="button"
               onClick={() => coverFileInputRef.current?.click()}
-              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-warm-100 bg-porcelain px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta"
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-border bg-surface px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-primary/35 hover:text-primary-strong"
             >
               <Upload size={17} aria-hidden="true" />
               {coverUploading ? t("create.coverUploading") : t("create.coverUploadAction")}
@@ -170,17 +170,17 @@ export function CreateWishlistForm({
             <img
               src={values.cover_image_url}
               alt=""
-              className="h-40 w-full rounded-[24px] object-cover ring-1 ring-warm-100"
+              className="h-40 w-full rounded-card object-cover ring-1 ring-border"
             />
           ) : null}
         </div>
-        {errors.cover_image_url ? <span className="text-xs text-terracotta">{errors.cover_image_url}</span> : null}
+        {errors.cover_image_url ? <span className="text-xs text-primary-strong">{errors.cover_image_url}</span> : null}
       </div>
       <Field label={t("create.visibility")}>
         <div className="grid gap-2">
           {values.type === "wishlist" ? (
             <div className="grid gap-2">
-              <div className="inline-flex min-h-12 items-center rounded-2xl border border-warm-100 bg-warm-50 px-4 text-base font-semibold text-warm-700">
+              <div className="inline-flex min-h-12 items-center rounded-ctrl border border-border bg-warm-50 px-4 text-base font-semibold text-warm-700">
                 {t("common.private")}
               </div>
               <p className="text-xs leading-6 text-warm-500">{t("create.visibilityPrivateHint")}</p>
@@ -205,9 +205,9 @@ export function CreateWishlistForm({
         </div>
       </Field>
       {values.type === "wishlist" ? (
-        <label className="grid gap-3 rounded-[28px] border border-warm-100 bg-warm-50/60 p-4">
+        <label className="grid gap-3 rounded-modal border border-border bg-warm-50/60 p-4">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+            <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full bg-sunken text-primary-strong">
               <Radar size={18} aria-hidden="true" />
             </span>
             <div className="grid gap-1">
@@ -223,13 +223,13 @@ export function CreateWishlistForm({
               onClick={() => onChange("is_price_radar_enabled", !values.is_price_radar_enabled)}
               className={`relative inline-flex h-10 w-[72px] items-center rounded-full border transition ${
                 values.is_price_radar_enabled
-                  ? "border-coral bg-coral/15"
+                  ? "border-primary bg-primary/15"
                   : "border-warm-200 bg-white"
               }`}
             >
               <span
                 className={`inline-block h-8 w-8 rounded-full bg-white shadow-sm transition ${
-                  values.is_price_radar_enabled ? "translate-x-8 bg-coral" : "translate-x-1"
+                  values.is_price_radar_enabled ? "translate-x-8 bg-primary" : "translate-x-1"
                 }`}
               />
             </button>
@@ -327,9 +327,9 @@ export function PriceRadarFields({
 
   if (!enabled) {
     return (
-      <label className="grid gap-3 rounded-[28px] border border-dashed border-warm-200 bg-warm-50/60 p-4">
+      <label className="grid gap-3 rounded-modal border border-dashed border-warm-200 bg-warm-50/60 p-4">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-coral">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-primary">
             <Target size={18} aria-hidden="true" />
           </span>
           <div>
@@ -340,7 +340,7 @@ export function PriceRadarFields({
         {priceTrackingAllowed ? (
           <button
             type="button"
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white"
             onClick={() => onChange("price_tracking_enabled", true)}
           >
             {t("priceRadar.activate")}
@@ -348,7 +348,7 @@ export function PriceRadarFields({
         ) : (
           <Link
             to={upgradeHref}
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-white"
           >
             {t("priceRadar.upgrade")}
           </Link>
@@ -359,9 +359,9 @@ export function PriceRadarFields({
   }
 
   return (
-    <section className="grid gap-4 rounded-[28px] border border-warm-100 bg-white p-4 shadow-card">
+    <section className="grid gap-4 rounded-modal border border-border bg-white p-4 shadow-card">
       <div className="flex items-start gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blush text-terracotta">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-sunken text-primary-strong">
           <Radar size={18} aria-hidden="true" />
         </span>
         <div>
@@ -379,7 +379,7 @@ export function PriceRadarFields({
             onChange={(event) => onChange("current_price", event.target.value)}
             placeholder="1899"
           />
-          {errors.current_price ? <span className="text-xs text-terracotta">{errors.current_price}</span> : null}
+          {errors.current_price ? <span className="text-xs text-primary-strong">{errors.current_price}</span> : null}
         </label>
         <label className="grid gap-2">
           <span className="text-sm font-semibold text-warm-700">{t("priceRadar.targetPrice")}</span>
@@ -389,7 +389,7 @@ export function PriceRadarFields({
             onChange={(event) => onChange("target_price", event.target.value)}
             placeholder="1749"
           />
-          {errors.target_price ? <span className="text-xs text-terracotta">{errors.target_price}</span> : null}
+          {errors.target_price ? <span className="text-xs text-primary-strong">{errors.target_price}</span> : null}
         </label>
       </div>
 
@@ -420,10 +420,10 @@ export function PriceRadarFields({
                 key={option.value}
                 type="button"
                 onClick={() => toggleAlert(option.value)}
-                className={`rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                className={`rounded-ctrl border px-3 py-3 text-left text-sm transition ${
                   active
-                    ? "border-coral bg-blush text-terracotta"
-                    : "border-warm-100 bg-porcelain text-warm-700"
+                    ? "border-primary bg-sunken text-primary-strong"
+                    : "border-border bg-surface text-warm-700"
                 }`}
               >
                 {option.label}
@@ -493,11 +493,11 @@ export function AddGiftForm({
           />
         </div>
         {productLookupState === "loading" ? (
-          <p className="text-xs font-medium text-coral">{t("giftPreview.loading")}</p>
+          <p className="text-xs font-medium text-primary">{t("giftPreview.loading")}</p>
         ) : productLookupMessage ? (
           <p
             className={`text-xs leading-6 ${
-              productLookupState === "fallback" ? "text-terracotta" : "text-warm-500"
+              productLookupState === "fallback" ? "text-primary-strong" : "text-warm-500"
             }`}
           >
             {productLookupMessage}
@@ -645,7 +645,7 @@ export function ContributionForm({
             <SecondaryButton
               key={amount}
               type="button"
-              className={values.amount === amount ? "border-coral text-terracotta" : ""}
+              className={values.amount === amount ? "border-primary text-primary-strong" : ""}
               onClick={() => onPickAmount(amount)}
             >
               {amount}

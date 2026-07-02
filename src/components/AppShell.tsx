@@ -9,7 +9,7 @@ export function AppShell() {
         <div className="mb-7 flex items-center justify-between gap-4">
           <Link
             to="/app"
-            className="inline-flex rounded-full bg-surface px-3 py-2 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-coral/15"
+            className="inline-flex rounded-full bg-surface px-3 py-2 shadow-card ring-1 ring-border focus:outline-none focus:ring-4 focus:ring-primary/15"
             aria-label="Wishly"
           >
             <WishlyLogo size="sm" />

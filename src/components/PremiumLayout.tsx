@@ -31,9 +31,9 @@ type BentoCardProps = {
 
 const toneClasses: Record<NonNullable<BentoCardProps["tone"]>, string> = {
   default: "bg-surface text-warm-900 ring-border shadow-card",
-  soft: "bg-surface-alt text-warm-900 ring-border shadow-card",
+  soft: "bg-sunken text-warm-900 ring-border shadow-card",
   dark: "bg-warm-900 text-white ring-warm-900 shadow-soft",
-  accent: "bg-blush text-warm-900 ring-border shadow-card",
+  accent: "bg-sunken text-warm-900 ring-border shadow-card",
 };
 
 export function BentoCard({
@@ -44,7 +44,7 @@ export function BentoCard({
   return (
     <section
       className={joinClasses(
-        "relative overflow-hidden rounded-[32px] p-5 ring-1 sm:p-6",
+        "relative overflow-hidden rounded-modal p-5 ring-1 sm:p-6",
         toneClasses[tone],
         className,
       )}
@@ -73,7 +73,7 @@ export function SectionHeader({
     <div className={joinClasses("gap-4", align === "between" ? "grid sm:grid-cols-[1fr_auto] sm:items-end" : "grid")}>
       <div className="max-w-2xl">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-coral">{eyebrow}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">{eyebrow}</p>
         ) : null}
         <h2 className="mt-2 text-[clamp(1.5rem,3vw,2.35rem)] font-bold tracking-[-0.03em] text-inherit">{title}</h2>
         {body ? <p className="mt-3 text-sm leading-7 text-warm-500 sm:text-[15px]">{body}</p> : null}
@@ -93,10 +93,10 @@ type MetricBentoCardProps = {
 };
 
 const metricAccentClasses = {
-  coral: "bg-blush text-terracotta",
-  lavender: "bg-lavender text-warm-900",
+  coral: "bg-sunken text-primary-strong",
+  lavender: "bg-info-soft text-warm-900",
   emerald: "bg-emerald-50 text-emerald-700",
-  sky: "bg-surface-alt text-warm-700",
+  sky: "bg-sunken text-warm-700",
 };
 
 export function MetricBentoCard({
@@ -109,7 +109,7 @@ export function MetricBentoCard({
 }: MetricBentoCardProps) {
   return (
     <BentoCard className={joinClasses("grid gap-4 p-4 sm:p-5", className)} tone="soft">
-      <div className={joinClasses("inline-flex h-11 w-11 items-center justify-center rounded-2xl", metricAccentClasses[accent])}>
+      <div className={joinClasses("inline-flex h-11 w-11 items-center justify-center rounded-ctrl", metricAccentClasses[accent])}>
         <Icon size={18} aria-hidden="true" />
       </div>
       <div>
@@ -138,7 +138,7 @@ export function ActionBentoCard({
 }: ActionBentoCardProps) {
   return (
     <BentoCard className={joinClasses("grid gap-4", className)} tone="soft">
-      <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-warm-900 text-white shadow-card">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-ctrl bg-warm-900 text-white shadow-card">
         <Icon size={18} aria-hidden="true" />
       </div>
       <div>

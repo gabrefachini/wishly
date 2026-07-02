@@ -7,7 +7,7 @@ import { EmptyState } from "../components/States";
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <section className="rounded-[28px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+    <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
       <p className="text-sm font-semibold text-warm-500">{label}</p>
       <p className="mt-2 text-3xl font-bold text-warm-900">{value}</p>
     </section>
@@ -64,13 +64,13 @@ export function AdminDashboardPage() {
   }
 
   if (error) {
-    return <p className="text-sm text-terracotta">{error}</p>;
+    return <p className="text-sm text-primary-strong">{error}</p>;
   }
 
   return (
     <div className="grid gap-6">
       <header>
-        <p className="text-sm font-semibold text-coral">{t("admin.admin")}</p>
+        <p className="text-sm font-semibold text-primary">{t("admin.admin")}</p>
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("admin.dashboard")}</h1>
       </header>
 
@@ -87,7 +87,7 @@ export function AdminDashboardPage() {
         />
       </div>
 
-      <section className="rounded-[32px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold text-warm-900">{t("admin.recentActivity")}</h2>
         </div>
@@ -98,7 +98,7 @@ export function AdminDashboardPage() {
         ) : (
           <div className="mt-4 grid gap-3">
             {auditLogs.map((log) => (
-              <div key={log.id} className="rounded-[24px] bg-warm-50/60 p-4">
+              <div key={log.id} className="rounded-card bg-warm-50/60 p-4">
                 <p className="text-sm font-semibold text-warm-900">{log.action}</p>
                 <p className="mt-1 text-xs text-warm-500">
                   {log.entity_type} · {log.admin_email}

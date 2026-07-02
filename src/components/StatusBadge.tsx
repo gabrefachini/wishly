@@ -16,12 +16,12 @@ type StatusBadgeProps = {
 
 const statusClasses: Record<string, string> = {
   available: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-  reserved: "bg-lavender text-warm-900 ring-border",
-  purchased: "bg-warm-100 text-warm-500 ring-warm-100",
-  mustHave: "bg-blush text-terracotta ring-coral/10",
-  niceToHave: "bg-surface-alt text-warm-700 ring-border",
-  surpriseMe: "bg-porcelain text-warm-500 ring-warm-100",
-  groupGift: "bg-lavender text-warm-900 ring-border",
+  reserved: "bg-info-soft text-warm-900 ring-border",
+  purchased: "bg-warm-100 text-warm-500 ring-border",
+  mustHave: "bg-sunken text-primary-strong ring-primary/10",
+  niceToHave: "bg-sunken text-warm-700 ring-border",
+  surpriseMe: "bg-surface text-warm-500 ring-border",
+  groupGift: "bg-info-soft text-warm-900 ring-border",
   funded: "bg-emerald-50 text-emerald-700 ring-emerald-100",
 };
 
@@ -48,7 +48,7 @@ export function StatusBadge({ label, themed = false }: StatusBadgeProps) {
           ? "bg-[var(--wishlist-secondary-soft)] text-[var(--wishlist-badge)] ring-[var(--wishlist-secondary-soft)]"
           : themed && isPrimaryAccent
             ? "bg-[var(--wishlist-primary-soft)] text-[var(--wishlist-primary)] ring-[var(--wishlist-primary-soft)]"
-            : statusClasses[label] ?? "bg-warm-50 text-warm-500 ring-warm-100"
+            : statusClasses[label] ?? "bg-warm-50 text-warm-500 ring-border"
       }`}
     >
       {t(labelKeys[label])}

@@ -260,12 +260,12 @@ export function AddGiftPage() {
   return (
     <div className="grid gap-6">
       <header>
-        <p className="text-sm font-semibold text-coral">{t("giftForm.eyebrow")}</p>
+        <p className="text-sm font-semibold text-primary">{t("giftForm.eyebrow")}</p>
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("giftForm.title")}</h1>
         <p className="mt-3 text-sm leading-6 text-warm-500">{t("giftForm.body")}</p>
       </header>
-      <section className="rounded-[36px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
-        {submitError ? <p className="mb-4 text-sm text-terracotta">{submitError}</p> : null}
+      <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
+        {submitError ? <p className="mb-4 text-sm text-primary-strong">{submitError}</p> : null}
         <AddGiftForm
           values={values}
           wishlistOptions={wishlists.map((wishlist) => ({

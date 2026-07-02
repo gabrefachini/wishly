@@ -12,13 +12,13 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, body, action, onAction, branded = false }: EmptyStateProps) {
   return (
-    <section className="rounded-[34px] bg-surface p-8 text-center shadow-card ring-1 ring-border">
+    <section className="rounded-modal bg-surface p-8 text-center shadow-card ring-1 ring-border">
       {branded ? (
         <div className="mb-5 flex justify-center">
           <WishlyLogo size="md" />
         </div>
       ) : null}
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-blush text-terracotta">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-sunken text-primary-strong">
         <Gift aria-hidden="true" />
       </div>
       <h2 className="mt-5 text-xl font-bold text-warm-900">{title}</h2>
@@ -34,7 +34,7 @@ export function EmptyState({ title, body, action, onAction, branded = false }: E
 
 export function SuccessState({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-[34px] bg-surface p-8 text-center shadow-card ring-1 ring-border">
+    <section className="rounded-modal bg-surface p-8 text-center shadow-card ring-1 ring-border">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-600">
         <CheckCircle2 aria-hidden="true" />
       </div>

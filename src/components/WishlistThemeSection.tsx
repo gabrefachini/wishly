@@ -46,7 +46,7 @@ export function WishlistThemeSection({ values, t, onChange, layout = "stacked" }
 
   if (layout === "split") {
     return (
-      <section className="grid gap-3 rounded-[28px] border border-warm-100 bg-porcelain/90 p-4">
+      <section className="grid gap-3 rounded-modal border border-border bg-surface/90 p-4">
         <AppearanceCustomizerPanel
           values={values}
           t={t}
@@ -63,7 +63,7 @@ export function WishlistThemeSection({ values, t, onChange, layout = "stacked" }
   }
 
   return (
-    <section className="grid gap-3 rounded-[28px] border border-warm-100 bg-porcelain/90 p-4">
+    <section className="grid gap-3 rounded-modal border border-border bg-surface/90 p-4">
       <AppearanceSummaryCard
         t={t}
         themeName={themeName}
@@ -119,7 +119,7 @@ function AppearanceSummaryCard({
   onToggle: () => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-[24px] bg-white px-4 py-4 ring-1 ring-warm-100">
+    <div className="grid gap-3 rounded-card bg-white px-4 py-4 ring-1 ring-border">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-warm-900">{t("theme.appearanceLabel")}</p>
@@ -128,7 +128,7 @@ function AppearanceSummaryCard({
         <button
           type="button"
           onClick={onToggle}
-          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-warm-100 bg-porcelain px-4 text-sm font-semibold text-warm-700 transition hover:border-coral/35 hover:text-terracotta"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-warm-700 transition hover:border-primary/35 hover:text-primary-strong"
         >
           <PencilLine size={16} aria-hidden="true" />
           {t("theme.personalize")}
@@ -171,7 +171,7 @@ function AppearanceCustomizerPanel({
   if (layout === "split") {
     return (
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.16fr)_minmax(300px,0.84fr)] lg:items-start">
-        <div className="grid gap-4 rounded-[28px] bg-warm-50/60 p-4 ring-1 ring-warm-100">
+        <div className="grid gap-4 rounded-modal bg-warm-50/60 p-4 ring-1 ring-border">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-warm-900">{t("theme.title")}</h3>
@@ -181,7 +181,7 @@ function AppearanceCustomizerPanel({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-warm-100 bg-white text-warm-600 transition hover:border-coral/35 hover:text-terracotta"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-warm-600 transition hover:border-primary/35 hover:text-primary-strong"
                 aria-label={t("theme.close")}
               >
                 <X size={16} aria-hidden="true" />
@@ -207,7 +207,7 @@ function AppearanceCustomizerPanel({
 
           <div className="grid gap-3">
             <span className="text-sm font-semibold text-warm-700">{t("theme.customMode")}</span>
-            <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-warm-100">
+            <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-border">
               <ModeToggle active={!values.use_custom_theme} onClick={() => onChange("use_custom_theme", false)}>
                 {t("theme.usePreset")}
               </ModeToggle>
@@ -233,7 +233,7 @@ function AppearanceCustomizerPanel({
           </div>
 
           {contrastWarning ? (
-            <p className="text-xs leading-6 text-terracotta">{t("theme.contrastWarning")}</p>
+            <p className="text-xs leading-6 text-primary-strong">{t("theme.contrastWarning")}</p>
           ) : (
             <p className="text-xs leading-6 text-warm-500">{t("theme.contrastSafe")}</p>
           )}
@@ -247,7 +247,7 @@ function AppearanceCustomizerPanel({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-terracotta"
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-primary-strong"
               >
                 {t("theme.apply")}
               </button>
@@ -263,7 +263,7 @@ function AppearanceCustomizerPanel({
   }
 
   return (
-    <div className="grid gap-4 rounded-[28px] bg-warm-50/60 p-4 ring-1 ring-warm-100">
+    <div className="grid gap-4 rounded-modal bg-warm-50/60 p-4 ring-1 ring-border">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold text-warm-900">{t("theme.title")}</h3>
@@ -273,7 +273,7 @@ function AppearanceCustomizerPanel({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-warm-100 bg-white text-warm-600 transition hover:border-coral/35 hover:text-terracotta"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white text-warm-600 transition hover:border-primary/35 hover:text-primary-strong"
             aria-label={t("theme.close")}
           >
             <X size={16} aria-hidden="true" />
@@ -299,7 +299,7 @@ function AppearanceCustomizerPanel({
 
       <div className="grid gap-3">
         <span className="text-sm font-semibold text-warm-700">{t("theme.customMode")}</span>
-        <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-warm-100">
+        <div className="inline-flex w-fit rounded-full bg-white p-1 ring-1 ring-border">
           <ModeToggle active={!values.use_custom_theme} onClick={() => onChange("use_custom_theme", false)}>
             {t("theme.usePreset")}
           </ModeToggle>
@@ -325,7 +325,7 @@ function AppearanceCustomizerPanel({
       </div>
 
       {contrastWarning ? (
-        <p className="text-xs leading-6 text-terracotta">{t("theme.contrastWarning")}</p>
+        <p className="text-xs leading-6 text-primary-strong">{t("theme.contrastWarning")}</p>
       ) : (
         <p className="text-xs leading-6 text-warm-500">{t("theme.contrastSafe")}</p>
       )}
@@ -339,7 +339,7 @@ function AppearanceCustomizerPanel({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-terracotta"
+            className="inline-flex min-h-12 items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-primary-strong"
           >
             {t("theme.apply")}
           </button>
@@ -378,7 +378,7 @@ function AppearanceBottomSheet({
         onClick={onClose}
         className="fixed inset-0 z-40 bg-black/35"
       />
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[32px] bg-porcelain shadow-[0_-18px_50px_rgba(36,24,21,0.18)] ring-1 ring-warm-100">
+      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-modal bg-surface shadow-[0_-18px_50px_rgba(36,24,21,0.18)] ring-1 ring-border">
         <div className="max-h-[86vh] overflow-y-auto px-4 pb-4 pt-3">
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-warm-200" />
           <AppearanceCustomizerPanel
@@ -416,13 +416,13 @@ function ThemePresetCard({
     <button
       type="button"
       onClick={onClick}
-      className={`grid gap-3 rounded-[24px] border px-4 py-4 text-left transition ${
-        active ? "border-coral bg-white shadow-card" : "border-warm-100 bg-white/85 hover:border-coral/35"
+      className={`grid gap-3 rounded-card border px-4 py-4 text-left transition ${
+        active ? "border-primary bg-white shadow-card" : "border-border bg-white/85 hover:border-primary/35"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-warm-900">{name}</span>
-        {active ? <Sparkles size={16} className="text-coral" aria-hidden="true" /> : null}
+        {active ? <Sparkles size={16} className="text-primary" aria-hidden="true" /> : null}
       </div>
       <div className="flex gap-2">
         <ColorSwatch color={primary} />
@@ -468,7 +468,7 @@ function CustomColorPicker({
   return (
     <label className="grid gap-2">
       <span className="text-sm font-semibold text-warm-700">{label}</span>
-      <div className="flex items-center gap-3 rounded-[22px] bg-white px-4 py-3 ring-1 ring-warm-100">
+      <div className="flex items-center gap-3 rounded-card bg-white px-4 py-3 ring-1 ring-border">
         <input
           type="color"
           value={value}
@@ -502,7 +502,7 @@ function WishlistThemePreview({
         <span className="text-xs text-warm-500">{t("theme.previewCompact")}</span>
       </div>
       <div
-        className={`overflow-hidden rounded-[24px] bg-cream ring-1 ring-warm-100 ${compact ? "lg:max-w-[380px]" : ""}`}
+        className={`overflow-hidden rounded-card bg-page ring-1 ring-border ${compact ? "lg:max-w-[380px]" : ""}`}
         style={getWishlistThemeCssVars(values)}
       >
         <div className="grid gap-3 p-4" style={{ backgroundColor: "var(--wishlist-header-surface)" }}>
@@ -526,7 +526,7 @@ function WishlistThemePreview({
           </div>
         </div>
         <div className="grid gap-3 p-4">
-          <div className="rounded-[20px] bg-white p-3 shadow-card ring-1 ring-warm-100/80">
+          <div className="rounded-card bg-white p-3 shadow-card ring-1 ring-border/80">
             <div className="flex items-center gap-2">
               <span
                 className="rounded-full px-2.5 py-1 text-[11px] font-semibold"

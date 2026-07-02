@@ -141,7 +141,7 @@ export function PriceRadarPreviewPage() {
   return (
     <div className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid gap-2">
-        <p className="text-sm font-semibold text-coral">{t("priceRadar.eyebrow")}</p>
+        <p className="text-sm font-semibold text-primary">{t("priceRadar.eyebrow")}</p>
         <h1 className="text-3xl font-bold text-warm-900">Preview do Radar de Preços</h1>
         <p className="max-w-3xl text-sm leading-6 text-warm-600">
           Página de desenvolvimento para validar a densidade do radar, o estado sem histórico e a leitura do preço

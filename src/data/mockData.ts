@@ -49,7 +49,7 @@ export const wishlists: Wishlist[] = [
     date: "2026-08-24",
     cover:
       "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=900&q=80",
-    accent: "bg-blush",
+    accent: "bg-sunken",
     summary: {
       kind: "gifts",
       count: 12,
@@ -132,7 +132,7 @@ export const wishlists: Wishlist[] = [
     date: "2026-09-12",
     cover:
       "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=900&q=80",
-    accent: "bg-surface-alt",
+    accent: "bg-sunken",
     summary: {
       kind: "reserved",
       count: 5,
@@ -168,7 +168,7 @@ export const wishlists: Wishlist[] = [
     date: "2026-12-25",
     cover:
       "https://images.unsplash.com/photo-1512389142860-9c449e58a543?auto=format&fit=crop&w=900&q=80",
-    accent: "bg-lavender",
+    accent: "bg-info-soft",
     summary: {
       kind: "shared",
     },

@@ -54,14 +54,14 @@ export function ProfilePage() {
   return (
     <div className="grid gap-5">
       <header>
-        <p className="text-sm font-semibold text-coral">{t("lists.profileEyebrow")}</p>
+        <p className="text-sm font-semibold text-primary">{t("lists.profileEyebrow")}</p>
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("lists.profileTitle")}</h1>
         <p className="mt-3 text-sm leading-6 text-warm-500">{t("lists.profileBody")}</p>
       </header>
-      <section className="rounded-[36px] bg-porcelain p-5 shadow-card ring-1 ring-warm-100">
+      <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
         <dl className="grid gap-5">
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+            <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               {t("profile.account")}
             </dt>
             <dd className="mt-1 text-base font-semibold text-warm-900">
@@ -70,7 +70,7 @@ export function ProfilePage() {
             <p className="mt-1 text-sm text-warm-500">{profile.email}</p>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+            <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               {t("profile.preferences")}
             </dt>
             <dd className="mt-1 text-base font-semibold text-warm-900">
@@ -82,16 +82,16 @@ export function ProfilePage() {
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[24px] bg-warm-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+            <div className="rounded-card bg-warm-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                 {t("profile.createdLists")}
               </p>
               <p className="mt-2 text-2xl font-bold text-warm-900">
                 {wishlistCount ?? "—"}
               </p>
             </div>
-            <div className="rounded-[24px] bg-warm-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+            <div className="rounded-card bg-warm-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                 {t("profile.currentLanguage")}
               </p>
               <p className="mt-2 text-2xl font-bold text-warm-900">{locale}</p>

@@ -9,7 +9,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function PrimaryButton({ children, className = "", ...props }: ButtonProps) {
   return (
     <button
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-coral px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-terracotta focus:outline-none focus:ring-4 focus:ring-coral/25 ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/25 ${className}`}
       {...props}
     >
       {children}
@@ -24,7 +24,7 @@ export function SecondaryButton({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-border bg-surface px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-coral/35 hover:text-terracotta focus:outline-none focus:ring-4 focus:ring-coral/15 ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface px-5 py-3 text-sm font-semibold text-warm-700 shadow-card transition hover:border-primary/35 hover:text-primary-strong focus:outline-none focus:ring-4 focus:ring-primary/15 ${className}`}
       {...props}
     >
       {children}

@@ -42,16 +42,16 @@ export function BottomNavigation() {
       aria-label={t("nav.primary")}
       className="fixed inset-x-0 bottom-0 z-20 mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8"
     >
-      <div className="grid grid-cols-4 rounded-[30px] border border-border bg-surface p-2 shadow-soft">
+      <div className="grid grid-cols-4 rounded-modal border border-border bg-surface p-2 shadow-soft">
         {items.map((item) => (
           <NavLink
             key={item.labelKey}
             to={item.to}
             className={() =>
-              `flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-coral/15 ${
+              `flex min-h-14 flex-col items-center justify-center gap-1 rounded-ctrl text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-primary/15 ${
                 isActiveTab(item.to)
-                  ? "bg-blush text-terracotta shadow-card"
-                  : "text-warm-500 hover:bg-surface-alt"
+                  ? "bg-sunken text-primary-strong shadow-card"
+                  : "text-warm-500 hover:bg-sunken"
               }`
             }
           >

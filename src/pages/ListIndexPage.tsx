@@ -106,8 +106,7 @@ export function ListIndexPage() {
     <div className="grid gap-5">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-coral">{t("lists.eyebrow")}</p>
-          <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("lists.title")}</h1>
+          <h1 className="text-3xl font-bold text-warm-900">{t("lists.title")}</h1>
           <p className="mt-3 text-sm leading-6 text-warm-500">{t("lists.body")}</p>
         </div>
         <Link to="/create">
@@ -115,7 +114,7 @@ export function ListIndexPage() {
         </Link>
       </header>
 
-      <section className="grid gap-3 rounded-[32px] bg-surface p-5 shadow-card ring-1 ring-border">
+      <section className="grid gap-3 rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
         <div className="flex flex-wrap gap-2">
           {(["active", "archived", "all"] as FilterMode[]).map((item) => (
             <button
@@ -123,7 +122,7 @@ export function ListIndexPage() {
               type="button"
               onClick={() => setFilter(item)}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                filter === item ? "bg-blush text-terracotta" : "bg-surface-alt text-warm-600"
+                filter === item ? "bg-primary-soft text-primary-strong" : "bg-sunken text-warm-600"
               }`}
             >
               {t(`lists.filters.${item}`)}
@@ -137,7 +136,7 @@ export function ListIndexPage() {
             aria-hidden="true"
           />
           <input
-            className="min-h-12 w-full rounded-2xl border border-border bg-surface pl-11 pr-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-coral focus:ring-4 focus:ring-coral/15"
+            className="min-h-12 w-full rounded-ctrl border border-border bg-surface pl-11 pr-4 text-base text-warm-900 outline-none transition placeholder:text-warm-300 focus:border-primary focus:ring-4 focus:ring-primary/15"
             placeholder={t("lists.searchPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -157,7 +156,7 @@ export function ListIndexPage() {
           onRetry={() => window.location.reload()}
         />
       ) : null}
-      {error ? <p className="text-sm text-terracotta">{error}</p> : null}
+      {error ? <p className="text-sm text-primary-strong">{error}</p> : null}
       {actionMessage ? <p className="text-sm text-emerald-700">{actionMessage}</p> : null}
 
       {!loading && !error && filteredWishlists.length === 0 ? (
@@ -176,11 +175,11 @@ export function ListIndexPage() {
           return (
             <section
               key={wishlist.id}
-              className="rounded-[30px] bg-surface p-5 shadow-card ring-1 ring-border"
+              className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-coral">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                     {summary.occasionLabel}
                   </p>
                   <h2 className="mt-1 text-xl font-bold text-warm-900">{wishlist.title}</h2>
@@ -205,9 +204,9 @@ export function ListIndexPage() {
                 />
               </div>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-warm-600">
-                <span className="rounded-full bg-surface-alt px-3 py-1">{summary.giftCountLabel}</span>
-                <span className="rounded-full bg-blush px-3 py-1 text-terracotta">{summary.reservedCountLabel}</span>
-                <span className="rounded-full bg-surface-alt px-3 py-1">{summary.visibilityLabel}</span>
+                <span className="rounded-full bg-sunken px-3 py-1">{summary.giftCountLabel}</span>
+                <span className="rounded-full bg-sunken px-3 py-1 text-primary-strong">{summary.reservedCountLabel}</span>
+                <span className="rounded-full bg-sunken px-3 py-1">{summary.visibilityLabel}</span>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Link to={`/lists/${wishlist.id}`}>

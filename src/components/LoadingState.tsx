@@ -42,10 +42,10 @@ export function LoadingState({
   }
 
   return (
-    <section className={`rounded-[34px] bg-surface p-8 text-center shadow-card ring-1 ring-border ${className}`}>
+    <section className={`rounded-modal bg-surface p-8 text-center shadow-card ring-1 ring-border ${className}`}>
       <div
         className={`mx-auto flex h-14 w-14 items-center justify-center rounded-3xl ${
-          timedOut ? "bg-blush text-terracotta" : "bg-blush text-coral"
+          timedOut ? "bg-sunken text-primary-strong" : "bg-sunken text-primary"
         }`}
       >
         {timedOut ? <AlertCircle aria-hidden="true" /> : <Loader2 className="animate-spin" aria-hidden="true" />}
