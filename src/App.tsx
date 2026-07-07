@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminRoute } from "./components/AdminRoute";
 import { AdminShell } from "./components/AdminShell";
 import { AppShell } from "./components/AppShell";
@@ -43,11 +43,12 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/app" element={<HomePage />} />
           <Route path="/lists" element={<ListIndexPage />} />
+          <Route path="/radar" element={<PremiumRadarPage />} />
           <Route path="/discover" element={<DiscoverPage />} />
           <Route path="/lists/:id" element={<WishlistDetailPage />} />
           <Route path="/create" element={<CreateWishlistPage />} />
           <Route path="/gift/new" element={<AddGiftPage />} />
-          <Route path="/premium/radar-de-precos" element={<PremiumRadarPage />} />
+          <Route path="/premium/radar-de-precos" element={<Navigate to="/radar" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>

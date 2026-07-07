@@ -312,6 +312,13 @@ export function VisitorPage() {
             <p className="mt-3 text-base leading-7 text-warm-500">
               {wishlist.message || t("visitor.body")}
             </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {[t("visitor.stepOne"), t("visitor.stepTwo"), t("visitor.stepThree")].map((step) => (
+                <div key={step} className="rounded-card bg-sunken px-3 py-3 text-sm font-medium text-warm-700">
+                  {step}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

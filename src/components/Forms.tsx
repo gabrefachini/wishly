@@ -78,6 +78,7 @@ export function CreateWishlistForm({
           className={inputClass}
           value={values.title}
           onChange={(event) => onChange("title", event.target.value)}
+          placeholder={t("create.defaultTitleWishlist")}
         />
       </Field>
       <Field label={t("create.listType")}>
@@ -127,6 +128,7 @@ export function CreateWishlistForm({
           className={`${inputClass} min-h-28 py-3`}
           value={values.message}
           onChange={(event) => onChange("message", event.target.value)}
+          placeholder={t("create.messageSuggestionWarm")}
         />
       </Field>
       <div className="grid gap-2">
@@ -138,11 +140,11 @@ export function CreateWishlistForm({
               className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-warm-300"
               aria-hidden="true"
             />
-            <input
-              className={`${inputClass} w-full pl-11`}
-              value={values.cover_image_url}
-              onChange={(event) => onChange("cover_image_url", event.target.value)}
-              placeholder="https://images.unsplash.com/..."
+          <input
+            className={`${inputClass} w-full pl-11`}
+            value={values.cover_image_url}
+            onChange={(event) => onChange("cover_image_url", event.target.value)}
+            placeholder="https://images.unsplash.com/..."
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
@@ -306,7 +308,7 @@ export function PriceRadarFields({
   errors,
   t,
   onChange,
-  upgradeHref = "/premium/radar-de-precos",
+  upgradeHref = "/radar",
 }: PriceRadarFieldsProps) {
   const alertOptions: Array<{ value: PriceAlertPreference; label: string }> = [
     { value: "any_drop", label: t("priceRadar.alerts.anyDrop") },
@@ -476,6 +478,7 @@ export function AddGiftForm({
           className={inputClass}
           value={values.name}
           onChange={(event) => onChange("name", event.target.value)}
+          placeholder="Air Fryer Philips Essential XL"
         />
       </Field>
       <Field label={t("giftForm.storeLink")} error={errors.store_url}>
@@ -506,12 +509,14 @@ export function AddGiftForm({
           <p className="text-xs leading-6 text-warm-500">{t("giftPreview.manualFallbackHint")}</p>
         )}
       </Field>
+      <p className="-mt-2 text-xs leading-6 text-warm-500">{t("giftForm.bodySmart")}</p>
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label={t("giftForm.estimatedPrice")} error={errors.estimated_price}>
           <input
             className={inputClass}
             value={values.estimated_price}
             onChange={(event) => onChange("estimated_price", event.target.value)}
+            placeholder="129,90"
           />
         </Field>
       </div>

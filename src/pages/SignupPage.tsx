@@ -90,6 +90,12 @@ export function SignupPage() {
             <>
           <p className="text-sm font-semibold text-primary">{t("auth.createYourAccount")}</p>
           <h1 className="mt-2 text-3xl font-bold text-warm-900">{t("actions.signUp")}</h1>
+          <p className="mt-3 text-sm leading-6 text-warm-500">{t("auth.signupBody")}</p>
+          <div className="mt-4 grid gap-2 rounded-card bg-sunken p-4 text-sm text-warm-700">
+            <p>{t("auth.valueOne")}</p>
+            <p>{t("auth.valueTwo")}</p>
+            <p>{t("auth.valueThree")}</p>
+          </div>
           <form
             className="mt-6 grid gap-4"
             onSubmit={(event) => {
@@ -104,6 +110,7 @@ export function SignupPage() {
                 autoComplete="name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                placeholder="Gabriel"
               />
             </label>
             <label className="grid gap-2">
@@ -114,6 +121,7 @@ export function SignupPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                placeholder="voce@exemplo.com"
               />
             </label>
             <label className="grid gap-2">
@@ -124,6 +132,7 @@ export function SignupPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                placeholder="Crie uma senha segura"
               />
             </label>
             {error ? <p className="text-sm text-primary-strong">{error}</p> : null}

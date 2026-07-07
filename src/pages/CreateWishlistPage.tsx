@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { CreateWishlistForm } from "../components/Forms";
@@ -31,13 +32,13 @@ export function CreateWishlistPage() {
     use_custom_theme: boolean;
     is_price_radar_enabled: boolean;
   }>({
-    title: "",
-    type: "event",
-    occasion: "birthday",
+    title: t("create.defaultTitleWishlist"),
+    type: "wishlist",
+    occasion: "wishlist",
     event_date: "",
     message: t("wishlist.message"),
     cover_image_url: "",
-    visibility: "public_link" as const,
+    visibility: "private" as const,
     theme_preset: "default" as const,
     theme_primary_color: WISHLIST_THEME_PRESETS.default.primary,
     theme_secondary_color: WISHLIST_THEME_PRESETS.default.secondary,
@@ -48,6 +49,24 @@ export function CreateWishlistPage() {
   const [loading, setLoading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const titleSuggestions = useMemo(
+    () => [
+      t("create.titleSuggestionPersonal"),
+      t("create.titleSuggestionBirthday"),
+      t("create.titleSuggestionHome"),
+      t("create.titleSuggestionSetup"),
+    ],
+    [t],
+  );
+
+  const completionSteps = [
+    values.title.trim().length > 0,
+    values.message.trim().length > 0,
+    values.visibility === "private" || values.visibility === "public_link",
+    values.cover_image_url.trim().length > 0 || values.event_date.length > 0,
+  ];
+  const readyCount = completionSteps.filter(Boolean).length;
 
   if (!hasSupabaseEnv && !isDemoMode) {
     return <SetupNotice />;
@@ -164,6 +183,47 @@ export function CreateWishlistPage() {
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("create.title")}</h1>
         <p className="mt-3 text-sm leading-6 text-warm-500">{t("create.body")}</p>
       </header>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+        <div className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sunken text-primary-strong">
+              <Sparkles size={18} aria-hidden="true" />
+            </span>
+            <div className="grid gap-1">
+              <p className="text-sm font-semibold text-warm-900">{t("create.progressTitle")}</p>
+              <p className="text-sm leading-6 text-warm-500">{t("create.progressBody")}</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <div className="flex items-center justify-between gap-3 text-sm font-semibold text-warm-700">
+              <span>{t("create.progressReady", { count: readyCount, total: completionSteps.length })}</span>
+              <span>{Math.round((readyCount / completionSteps.length) * 100)}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-sunken">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{ width: `${(readyCount / completionSteps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
+          <p className="text-sm font-semibold text-warm-900">{t("create.nextStepTitle")}</p>
+          <p className="mt-2 text-sm leading-6 text-warm-500">{t("create.nextStepName")}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {titleSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setValues((current) => ({ ...current, title: suggestion }))}
+                className="rounded-full border border-border bg-sunken px-3 py-2 text-sm font-semibold text-warm-700 transition hover:border-primary/35 hover:text-primary-strong"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
       <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
         {submitError ? <p className="mb-4 text-sm text-primary-strong">{submitError}</p> : null}
         <CreateWishlistForm
@@ -179,8 +239,14 @@ export function CreateWishlistPage() {
                 return {
                   ...current,
                   type,
+                  title:
+                    current.title === t("create.defaultTitleWishlist") || current.title === t("create.defaultTitleEvent")
+                      ? type === "wishlist"
+                        ? t("create.defaultTitleWishlist")
+                        : t("create.defaultTitleEvent")
+                      : current.title,
                   occasion: type === "wishlist" ? "wishlist" : current.occasion === "wishlist" ? "birthday" : current.occasion,
-                  visibility: type === "wishlist" ? "private" : current.visibility,
+                  visibility: type === "wishlist" ? "private" : current.visibility === "private" ? "public_link" : current.visibility,
                   is_price_radar_enabled: type === "wishlist" ? current.is_price_radar_enabled : false,
                 };
               }

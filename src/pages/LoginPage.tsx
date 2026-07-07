@@ -120,6 +120,12 @@ export function LoginPage() {
             <WishlyLogo size="md" />
           </div>
           <h1 className="text-3xl font-bold text-warm-900">{t("actions.logIn")}</h1>
+          <p className="mt-3 text-sm leading-6 text-warm-500">{t("auth.loginBody")}</p>
+          <div className="mt-4 grid gap-2 rounded-card bg-sunken p-4 text-sm text-warm-700">
+            <p>{t("auth.valueOne")}</p>
+            <p>{t("auth.valueTwo")}</p>
+            <p>{t("auth.valueThree")}</p>
+          </div>
           <form
             className="mt-6 grid gap-4"
             onSubmit={(event) => {
@@ -135,6 +141,7 @@ export function LoginPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                placeholder="voce@exemplo.com"
               />
             </label>
             <label className="grid gap-2">
@@ -145,6 +152,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
               />
             </label>
             {notice ? <p className="text-sm text-warm-600">{notice}</p> : null}

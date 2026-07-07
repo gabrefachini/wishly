@@ -262,7 +262,7 @@ export function AddGiftPage() {
       <header>
         <p className="text-sm font-semibold text-primary">{t("giftForm.eyebrow")}</p>
         <h1 className="mt-1 text-3xl font-bold text-warm-900">{t("giftForm.title")}</h1>
-        <p className="mt-3 text-sm leading-6 text-warm-500">{t("giftForm.body")}</p>
+        <p className="mt-3 text-sm leading-6 text-warm-500">{t("giftForm.bodySmart")}</p>
       </header>
       <section className="rounded-modal bg-surface p-5 shadow-card ring-1 ring-border">
         {submitError ? <p className="mb-4 text-sm text-primary-strong">{submitError}</p> : null}

@@ -378,6 +378,9 @@ export function WishlistDetailPage() {
   const isPersonalWishlist = wishlist.type === "wishlist";
   const canUseRadar = isPersonalWishlist && wishlist.is_price_radar_enabled;
   const trackedGifts = wishlist.gifts.filter((gift) => gift.price_tracking_enabled);
+  const totalListValue = wishlist.gifts.reduce((total, gift) => {
+    return total + (gift.current_price ?? gift.estimated_price ?? 0);
+  }, 0);
   const radarOpportunities = trackedGifts.filter((gift) => {
     const recommendation = getPriceRecommendation(
       {
@@ -403,8 +406,22 @@ export function WishlistDetailPage() {
   const dashboardMetrics = [
     { label: t("summary.gifts"), value: String(wishlist.gifts.length) },
     { label: t("summary.reserved"), value: String(wishlist.gifts.filter((gift) => gift.status === "reserved").length) },
+    { label: t("wishlist.totalValue"), value: formatGiftPrice(totalListValue, locale, "BRL", "")?.trim() || "-" },
     { label: t("summary.visibility"), value: summary.visibilityLabel },
   ];
+  const progressItems = [
+    { label: t("wishlist.progressAddItems"), done: wishlist.gifts.length > 0 },
+    { label: t("wishlist.progressShare"), done: wishlist.visibility === "public_link" },
+    { label: t("wishlist.progressMonitor"), done: trackedGifts.length > 0 },
+  ];
+  const completedProgressCount = progressItems.filter((item) => item.done).length;
+  const nextStep = wishlist.gifts.length === 0
+    ? { title: t("wishlist.nextStepAddFirstTitle"), body: t("wishlist.nextStepAddFirstBody"), href: `/gift/new?wishlistId=${wishlist.id}`, cta: t("actions.addGift") }
+    : wishlist.visibility === "public_link"
+      ? { title: t("wishlist.nextStepShareTitle"), body: t("wishlist.nextStepShareBody"), href: null, cta: t("actions.shareWishlist") }
+      : isPersonalWishlist && canUseRadar && trackedGifts.length === 0
+        ? { title: t("wishlist.nextStepMonitorTitle"), body: t("wishlist.nextStepMonitorBody"), href: `/lists/${wishlist.id}`, cta: t("actions.viewRadar") }
+        : { title: t("wishlist.nextStepReviewTitle"), body: t("wishlist.nextStepReviewBody"), href: `/lists/${wishlist.id}`, cta: t("actions.viewList") };
 
   async function handleGiftStatusChange(giftId: string, status: "available" | "purchased") {
     if (!wishlist) return;
@@ -513,6 +530,10 @@ export function WishlistDetailPage() {
                 <p className="mt-2 text-sm font-semibold text-warm-900">
                   {canUseRadar ? t("priceRadar.dashboardTitle") : t("priceRadar.paywallBody")}
                 </p>
+              </div>
+              <div className="rounded-card bg-surface p-4 ring-1 ring-border">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-warm-500">{t("wishlist.progressTitle")}</p>
+                <p className="mt-2 text-sm font-semibold text-warm-900">{completedProgressCount}/{progressItems.length}</p>
               </div>
             </div>
           </div>
@@ -692,6 +713,35 @@ export function WishlistDetailPage() {
           {isPrivateWishlist ? (
             <p className="mt-4 text-sm leading-6 text-warm-600">{t("wishlist.privateOwnerHint")}</p>
           ) : null}
+        </BentoCard>
+        <BentoCard tone="soft" className="p-5">
+          <p className="text-sm font-semibold text-primary">{t("wishlist.progressTitle")}</p>
+          <div className="mt-4 grid gap-3">
+            {progressItems.map((item) => (
+              <div key={item.label} className="flex items-center gap-3 rounded-card bg-surface p-3 ring-1 ring-border">
+                <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${item.done ? "bg-emerald-50 text-emerald-700" : "bg-sunken text-warm-500"}`}>
+                  {item.done ? <CheckCircle2 size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
+                </span>
+                <p className="text-sm font-medium text-warm-800">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        </BentoCard>
+        <BentoCard tone="soft" className="p-5">
+          <p className="text-sm font-semibold text-primary">{t("wishlist.nextStepCardTitle")}</p>
+          <h3 className="mt-3 text-lg font-bold text-warm-900">{nextStep.title}</h3>
+          <p className="mt-2 text-sm leading-6 text-warm-600">{nextStep.body}</p>
+          <div className="mt-4">
+            {nextStep.href ? (
+              <Link to={nextStep.href} className="contents">
+                <SecondaryButton className="w-full">{nextStep.cta}</SecondaryButton>
+              </Link>
+            ) : (
+              <SecondaryButton className="w-full" onClick={() => void handleShare()}>
+                {nextStep.cta}
+              </SecondaryButton>
+            )}
+          </div>
         </BentoCard>
       </aside>
 
