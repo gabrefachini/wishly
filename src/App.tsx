@@ -1,36 +1,118 @@
 import {
+  ArrowLeft,
   ArrowDown,
+  ArrowRight,
   Bell,
+  Clock3,
   Check,
   ChevronLeft,
   CreditCard,
+  ExternalLink,
   Gift,
   Heart,
   Home,
+  Link2,
   LineChart,
   Lock,
+  LogOut,
+  Menu,
   Moon,
   Plus,
+  QrCode,
   Search,
   Share2,
+  ShieldCheck,
   Sparkles,
   Sun,
   Tag,
+  TrendingDown,
   User,
+  XCircle,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import {
+  createWishlist,
+  createGift,
+  getInitialSession,
+  listenToAuthChanges,
+  loadAdminAffiliateQueue,
+  resolvePublicGiftRedirect,
+  loadViewerContext,
+  loadWishlistGifts,
+  signInWithEmailOtp,
+  signOut,
+  supabaseEnabled,
+  updateAdminAffiliateLink,
+  type AdminAffiliateQueueItem,
+  type DbWish,
+  type DbWishlist,
+  type PublicWishlist,
+  loadPublicWishlist,
+} from "./lib/wishly-api";
 
-type View = "home" | "list" | "add" | "radar" | "activity" | "pro" | "checkout" | "success";
+type View = "home" | "create_list" | "list" | "add" | "radar" | "activity" | "pro" | "checkout" | "success" | "admin";
+type Priority = "Alta" | "Media" | "Baixa";
+type AuthPanelMode = "create" | "login";
+type LocalSource = "mercado_livre" | "amazon" | "shopee" | "magalu" | "unknown";
+type LocalAffiliateStatus = "not_generated" | "generated" | "invalid" | "unavailable";
+type LocalAffiliateTaskStatus = "pending" | "completed" | "invalid" | "unavailable";
 
-type Wish = {
+type LocalWish = {
   id: number;
   title: string;
   store: string;
   price: string;
   image: string;
   status?: string;
-  priority?: "Alta" | "Media" | "Baixa";
+  priority?: Priority;
   drop?: string;
+  originalUrl: string;
+  resolvedUrl: string | null;
+  affiliateUrl: string | null;
+  source: LocalSource;
+  affiliateStatus: LocalAffiliateStatus;
+};
+
+type LocalAffiliateTask = {
+  id: number;
+  giftId: number;
+  wishlistId: string;
+  wishlistName: string;
+  itemTitle: string;
+  originalUrl: string;
+  resolvedUrl: string | null;
+  source: LocalSource;
+  status: LocalAffiliateTaskStatus;
+  createdByUserName: string;
+  createdAt: string;
+  completedAt: string | null;
+  completedByAdminName: string | null;
+};
+
+type AddWishFormState = {
+  productUrl: string;
+  title: string;
+  note: string;
+};
+
+type CreateListFormState = {
+  title: string;
+};
+
+type ViewerState = {
+  wishlists: DbWishlist[];
+  selectedWishlistId: string | null;
+  gifts: DbWish[];
+  isAdmin: boolean;
+};
+
+type PublicState = {
+  shareId: string | null;
+  wishlist: PublicWishlist | null;
+  loading: boolean;
+  notFound: boolean;
 };
 
 const images = {
@@ -52,7 +134,7 @@ const images = {
     "https://lh3.googleusercontent.com/aida-public/AB6AXuBQyeaafjqr6CtJaSTHF0KE2OAcyEeqZQBsgiDY-iWknpn0jHz0q14Z5-Xn2bzsCiFFiaQA_AEIrpeh-KLEcR35UeqC9T2tpswaXIquSGawQ1E4gz0cDANhUzHvy9LXqQqFKJGbVWXFcPL727gBsvOFgegT1yQLi2D65j34J03lDKFJqUrHNgGpQgOSfik7UO7wOOsXlDB4IVDug1W5P5o4StYlvDjc3iXwnF8GAL3-oSs6M3rkMcGN1g",
 };
 
-const wishes: Wish[] = [
+const localWishesSeed: LocalWish[] = [
   {
     id: 1,
     title: "Poltrona Boucle",
@@ -62,6 +144,11 @@ const wishes: Wish[] = [
     status: "Reservado",
     priority: "Alta",
     drop: "-18%",
+    originalUrl: "https://www.westwing.com.br/poltrona-boucle",
+    resolvedUrl: "https://www.westwing.com.br/poltrona-boucle",
+    affiliateUrl: null,
+    source: "unknown",
+    affiliateStatus: "unavailable",
   },
   {
     id: 2,
@@ -70,6 +157,11 @@ const wishes: Wish[] = [
     price: "R$ 2.340",
     image: images.ideaHome,
     priority: "Media",
+    originalUrl: "https://www.tokstok.com.br/mesa-centro-travertino",
+    resolvedUrl: "https://www.tokstok.com.br/mesa-centro-travertino",
+    affiliateUrl: null,
+    source: "unknown",
+    affiliateStatus: "unavailable",
   },
   {
     id: 3,
@@ -79,6 +171,11 @@ const wishes: Wish[] = [
     image: images.setup,
     priority: "Alta",
     drop: "-9%",
+    originalUrl: "https://www.lumini.com.br/luminaria-leitura",
+    resolvedUrl: "https://www.lumini.com.br/luminaria-leitura",
+    affiliateUrl: null,
+    source: "unknown",
+    affiliateStatus: "unavailable",
   },
   {
     id: 4,
@@ -87,6 +184,11 @@ const wishes: Wish[] = [
     price: "R$ 449",
     image: images.baby,
     priority: "Baixa",
+    originalUrl: "https://www.trousseau.com.br/jogo-lencois",
+    resolvedUrl: "https://www.trousseau.com.br/jogo-lencois",
+    affiliateUrl: null,
+    source: "unknown",
+    affiliateStatus: "unavailable",
   },
 ];
 
@@ -97,37 +199,607 @@ const activity = [
   "Voce recebeu 3 visitas na Lista de Gabriel e Ana.",
 ];
 
+const localListId = "casa-nova";
+const localListName = "Casa nova";
+const localCreatorName = "Gabriel Fachini";
+const localAdminName = "Time Wishly";
+const POST_AUTH_VIEW_KEY = "wishly-post-auth-view";
+
 function App() {
   const [view, setView] = useState<View>("home");
-  const [selectedPriority, setSelectedPriority] = useState("Alta");
-  const [tracked, setTracked] = useState([1, 3]);
+  const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
+  const [tracked, setTracked] = useState<number[]>(() => readLocalState("wishly-tracked", [1, 3]));
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "light";
     return window.localStorage.getItem("wishly-theme") === "dark" ? "dark" : "light";
   });
+  const [localWishes, setLocalWishes] = useState<LocalWish[]>(() => readLocalState("wishly-wishes", localWishesSeed));
+  const [localAffiliateTasks, setLocalAffiliateTasks] = useState<LocalAffiliateTask[]>(() =>
+    readLocalState("wishly-affiliate-tasks", []),
+  );
+  const [formState, setFormState] = useState<AddWishFormState>({ productUrl: "", title: "", note: "" });
+  const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
+  const [draftAffiliateUrls, setDraftAffiliateUrls] = useState<Record<string, string>>({});
+  const [marketingMenuOpen, setMarketingMenuOpen] = useState(false);
+
+  const [session, setSession] = useState<Session | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [authPanelMode, setAuthPanelMode] = useState<AuthPanelMode>("login");
+  const [syncError, setSyncError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [remoteReady, setRemoteReady] = useState(!supabaseEnabled);
+  const [remote, setRemote] = useState<ViewerState>({
+    wishlists: [],
+    selectedWishlistId: null,
+    gifts: [],
+    isAdmin: false,
+  });
+  const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
+  const [publicState, setPublicState] = useState<PublicState>({
+    shareId: readPublicShareId(),
+    wishlist: null,
+    loading: false,
+    notFound: false,
+  });
+
+  const isRemoteMode = supabaseEnabled && Boolean(session);
+  const isPublicMode = !session && Boolean(publicState.shareId);
+  const isMarketingMode = view === "home" && !session && !isPublicMode;
+  const isDesktopFlowMode = Boolean(session) && (view === "create_list" || view === "add");
 
   const title = useMemo(() => {
     if (view === "home") return "";
-    if (view === "list") return "Casa nova";
+    if (view === "create_list") return "Criar lista";
+    if (view === "list") return currentListTitle(remote, isRemoteMode);
     if (view === "add") return "Adicionar desejo";
     if (view === "radar") return "Radar de precos";
     if (view === "activity") return "Atividade";
     if (view === "pro") return "Upgrade para o Pro";
     if (view === "checkout") return "Finalizar assinatura";
+    if (view === "admin") return "Fila de afiliados";
     return "Assinatura confirmada";
-  }, [view]);
+  }, [view, remote, isRemoteMode]);
+
+  const localPendingTasks = useMemo(
+    () => localAffiliateTasks.filter((task) => task.status === "pending"),
+    [localAffiliateTasks],
+  );
+  const currentWishes = useMemo(() => (isRemoteMode ? remote.gifts : localWishes), [isRemoteMode, remote.gifts, localWishes]);
+  const pendingCount = isRemoteMode
+    ? adminQueue.filter((item) => item.affiliate_status !== "generated").length
+    : localPendingTasks.length;
 
   function go(viewName: View) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setView(viewName);
+    setMarketingMenuOpen(false);
+  }
+
+  function beginCreateListFlow() {
+    setAuthPanelMode("create");
+    setAuthMessage("");
+    setSyncError("");
+    window.localStorage.setItem(POST_AUTH_VIEW_KEY, "create_list");
+  }
+
+  function beginLoginFlow() {
+    setAuthPanelMode("login");
+    setAuthMessage("");
+    setSyncError("");
+    window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+  }
+
+  function resetAuthFlow() {
+    setAuthMessage("");
+    setSyncError("");
+    setAuthEmail("");
+  }
+
+  function scrollToSection(sectionId: string) {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setMarketingMenuOpen(false);
+  }
+
+  function exitPublicMode() {
+    window.history.replaceState({}, "", window.location.pathname);
+    setPublicState({ shareId: null, wishlist: null, loading: false, notFound: false });
+  }
+
+  async function handleShareCurrentList() {
+    const activeShareId = isRemoteMode
+      ? remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.share_id ?? null
+      : localListId;
+
+    if (!activeShareId) {
+      setSyncError("Nao foi possivel gerar o link da lista agora.");
+      return;
+    }
+
+    const shareUrl = buildPublicShareUrl(activeShareId);
+    const shareTitle = isRemoteMode
+      ? currentListTitle(remote, isRemoteMode)
+      : localListName;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Wishly · ${shareTitle}`,
+          text: `Veja a lista ${shareTitle} no Wishly.`,
+          url: shareUrl,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        window.prompt("Copie o link da lista:", shareUrl);
+      }
+
+      setAuthMessage("Link da lista pronto para compartilhar.");
+      setSyncError("");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      setSyncError("Nao foi possivel compartilhar a lista agora.");
+    }
+  }
+
+  async function handleBuyPublicWish(wish: DbWish) {
+    if (!publicState.shareId) {
+      openLink(getWishPurchaseUrl(wish));
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      const redirect = await resolvePublicGiftRedirect({
+        shareId: publicState.shareId,
+        giftId: wish.id,
+        locale: publicState.wishlist?.locale ?? "pt-BR",
+      });
+      openLink(redirect.url);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+      openLink(getWishPurchaseUrl(wish));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function refreshRemoteState(nextSession: Session | null) {
+    if (!supabaseEnabled || !nextSession?.user) {
+      setRemote({ wishlists: [], selectedWishlistId: null, gifts: [], isAdmin: false });
+      setAdminQueue([]);
+      setRemoteReady(true);
+      return;
+    }
+
+    setSyncing(true);
+    setSyncError("");
+    setRemoteReady(false);
+
+    try {
+      const context = await loadViewerContext(nextSession.user);
+      const selectedWishlistId =
+        remote.selectedWishlistId && context.wishlists.some((wishlist) => wishlist.id === remote.selectedWishlistId)
+          ? remote.selectedWishlistId
+          : context.wishlists[0]?.id ?? null;
+      const gifts = selectedWishlistId ? await loadWishlistGifts(selectedWishlistId) : [];
+      const queue = context.isAdmin ? await loadAdminAffiliateQueue() : [];
+
+      setRemote({
+        wishlists: context.wishlists,
+        selectedWishlistId,
+        gifts,
+        isAdmin: context.isAdmin,
+      });
+      setAdminQueue(queue);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+      setRemoteReady(true);
+    }
+  }
+
+  async function handleSelectRemoteWishlist(wishlistId: string) {
+    if (!isRemoteMode) return;
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      const gifts = await loadWishlistGifts(wishlistId);
+      setRemote((current) => ({
+        ...current,
+        selectedWishlistId: wishlistId,
+        gifts,
+      }));
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleBuyWish(wish: LocalWish | DbWish) {
+    if (isRemoteMode && !isLocalWish(wish)) {
+      const selectedWishlist = remote.wishlists.find((wishlist) => wishlist.id === wish.wishlist_id);
+      if (!selectedWishlist) {
+        openLink(getWishPurchaseUrl(wish));
+        return;
+      }
+
+      try {
+        setSyncing(true);
+        setSyncError("");
+        const redirect = await resolvePublicGiftRedirect({
+          shareId: selectedWishlist.share_id,
+          giftId: wish.id,
+          locale: "pt-BR",
+        });
+        openLink(redirect.url);
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+        openLink(getWishPurchaseUrl(wish));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    openLink(getWishPurchaseUrl(wish));
+  }
+
+  async function handleAddWish() {
+    const fallbackTitle = formState.title.trim() || "Novo desejo";
+
+    if (isRemoteMode && remote.selectedWishlistId) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+
+        await createGift({
+          wishlistId: remote.selectedWishlistId,
+          name: fallbackTitle,
+          description: formState.note.trim(),
+          storeUrl: formState.productUrl.trim(),
+          priority: mapPriorityToDb(selectedPriority),
+        });
+
+        await refreshRemoteState(session);
+        setFormState({ productUrl: "", title: "", note: "" });
+        setSelectedPriority("Alta");
+        go("list");
+        return;
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+    }
+
+    const linkData = analyzeProductUrl(formState.productUrl);
+    const nextWishId = getNextId(localWishes);
+    const createdWish: LocalWish = {
+      id: nextWishId,
+      title: fallbackTitle,
+      store: getStoreLabel(linkData.source),
+      price: "Adicionar preco",
+      image: images.setup,
+      priority: selectedPriority,
+      originalUrl: linkData.originalUrl,
+      resolvedUrl: linkData.resolvedUrl,
+      affiliateUrl: null,
+      source: linkData.source,
+      affiliateStatus: linkData.affiliateStatus,
+      status: formState.note.trim() ? "Com nota" : undefined,
+    };
+
+    setLocalWishes([createdWish, ...localWishes]);
+
+    if (createdWish.source === "mercado_livre") {
+      const nextTaskId = String(getNextId(localAffiliateTasks));
+      const task: LocalAffiliateTask = {
+        id: Number(nextTaskId),
+        giftId: createdWish.id,
+        wishlistId: localListId,
+        wishlistName: localListName,
+        itemTitle: createdWish.title,
+        originalUrl: createdWish.originalUrl,
+        resolvedUrl: createdWish.resolvedUrl,
+        source: createdWish.source,
+        status: "pending",
+        createdByUserName: localCreatorName,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        completedByAdminName: null,
+      };
+      setLocalAffiliateTasks([task, ...localAffiliateTasks]);
+      setDraftAffiliateUrls((current) => ({ ...current, [nextTaskId]: "" }));
+    }
+
+    setFormState({ productUrl: "", title: "", note: "" });
+    setSelectedPriority("Alta");
+    go("list");
+  }
+
+  async function handleCreateWishlist() {
+    const fallbackTitle = createListForm.title.trim() || "Minha lista";
+
+    if (isRemoteMode) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+        const wishlist = await createWishlist({ title: fallbackTitle });
+        const gifts = await loadWishlistGifts(wishlist.id);
+        setRemote((current) => ({
+          ...current,
+          wishlists: [wishlist, ...current.wishlists],
+          selectedWishlistId: wishlist.id,
+          gifts,
+        }));
+        setCreateListForm({ title: "" });
+        go("add");
+        return;
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+    }
+  }
+
+  async function handleRemoteAdminUpdate(giftId: string, status: "generated" | "failed" | "fallback") {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      await updateAdminAffiliateLink({
+        giftId,
+        affiliateUrl: draftAffiliateUrls[giftId] ?? "",
+        status,
+      });
+      await refreshRemoteState(session);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  function handleLocalAdminUpdate(taskId: string, status: LocalAffiliateTaskStatus) {
+    const numericId = Number(taskId);
+    const task = localAffiliateTasks.find((item) => item.id === numericId);
+    if (!task) return;
+
+    if (status === "completed") {
+      const affiliateUrl = draftAffiliateUrls[taskId]?.trim();
+      if (!affiliateUrl) return;
+
+      setLocalAffiliateTasks((current) =>
+        current.map((item) =>
+          item.id === numericId
+            ? { ...item, status: "completed", completedAt: new Date().toISOString(), completedByAdminName: localAdminName }
+            : item,
+        ),
+      );
+
+      setLocalWishes((current) =>
+        current.map((wish) =>
+          wish.id === task.giftId ? { ...wish, affiliateUrl, affiliateStatus: "generated" } : wish,
+        ),
+      );
+      return;
+    }
+
+    const nextStatus = status === "invalid" ? "invalid" : "unavailable";
+    setLocalAffiliateTasks((current) =>
+      current.map((item) =>
+        item.id === numericId
+          ? { ...item, status, completedAt: new Date().toISOString(), completedByAdminName: localAdminName }
+          : item,
+      ),
+    );
+    setLocalWishes((current) =>
+      current.map((wish) => (wish.id === task.giftId ? { ...wish, affiliateStatus: nextStatus } : wish)),
+    );
+  }
+
+  async function handleSendMagicLink() {
+    try {
+      setAuthMessage("");
+      setSyncError("");
+      await signInWithEmailOtp(authEmail.trim());
+      setAuthMessage(
+        authPanelMode === "create"
+          ? `Enviamos um link para ${authEmail.trim()}. Abra seu e-mail para criar sua conta e começar a lista.`
+          : `Enviamos um link para ${authEmail.trim()}. Abra seu e-mail para entrar no Wishly.`,
+      );
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
   }
 
   useEffect(() => {
     window.localStorage.setItem("wishly-theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    window.localStorage.setItem("wishly-tracked", JSON.stringify(tracked));
+  }, [tracked]);
+
+  useEffect(() => {
+    window.localStorage.setItem("wishly-wishes", JSON.stringify(localWishes));
+  }, [localWishes]);
+
+  useEffect(() => {
+    window.localStorage.setItem("wishly-affiliate-tasks", JSON.stringify(localAffiliateTasks));
+  }, [localAffiliateTasks]);
+
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+
+    let active = true;
+    getInitialSession().then((nextSession) => {
+      if (!active) return;
+      setSession(nextSession);
+      void refreshRemoteState(nextSession);
+    });
+
+    const unsubscribe = listenToAuthChanges((nextSession) => {
+      setSession(nextSession);
+      void refreshRemoteState(nextSession);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncShareId = () => {
+      setPublicState((current) => {
+        const nextShareId = readPublicShareId();
+        if (current.shareId === nextShareId) return current;
+        return {
+          shareId: nextShareId,
+          wishlist: nextShareId === current.shareId ? current.wishlist : null,
+          loading: Boolean(nextShareId),
+          notFound: false,
+        };
+      });
+    };
+
+    syncShareId();
+    window.addEventListener("popstate", syncShareId);
+
+    return () => {
+      window.removeEventListener("popstate", syncShareId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!publicState.shareId || session) {
+      if (publicState.wishlist || publicState.loading || publicState.notFound) {
+        setPublicState((current) => ({
+          shareId: current.shareId,
+          wishlist: null,
+          loading: false,
+          notFound: false,
+        }));
+      }
+      return;
+    }
+
+    let active = true;
+
+    setPublicState((current) => ({
+      ...current,
+      loading: true,
+      notFound: false,
+    }));
+
+    const load = async () => {
+      try {
+        const wishlist = supabaseEnabled
+          ? await loadPublicWishlist(publicState.shareId!)
+          : buildLocalPublicWishlist(publicState.shareId!, localWishes);
+
+        if (!active) return;
+
+        setPublicState((current) => ({
+          ...current,
+          wishlist,
+          loading: false,
+          notFound: !wishlist,
+        }));
+      } catch (error) {
+        if (!active) return;
+
+        setPublicState((current) => ({
+          ...current,
+          wishlist: buildLocalPublicWishlist(publicState.shareId!, localWishes),
+          loading: false,
+          notFound: !buildLocalPublicWishlist(publicState.shareId!, localWishes),
+        }));
+        setSyncError(getErrorMessage(error));
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, [publicState.shareId, session, localWishes]);
+
+  useEffect(() => {
+    if (!session || !remoteReady) return;
+
+    const pendingView = window.localStorage.getItem(POST_AUTH_VIEW_KEY) as View | null;
+    if (pendingView === "create_list") {
+      window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+      setView("create_list");
+      setAuthMessage("");
+      return;
+    }
+
+    if (view === "home" && remote.wishlists.length === 0) {
+      setView("create_list");
+    }
+  }, [session, remoteReady, remote.wishlists.length, view]);
+
+  useEffect(() => {
+    document.body.classList.toggle("marketing-body", isMarketingMode);
+    return () => {
+      document.body.classList.remove("marketing-body");
+    };
+  }, [isMarketingMode]);
+
+  if (isPublicMode) {
+    return (
+      <div className="app-shell public-shell" data-theme={theme}>
+        {syncError && (
+          <section className="inset-section compact">
+            <div className="sync-banner error">{syncError}</div>
+          </section>
+        )}
+        <PublicWishlistPage
+          loading={publicState.loading}
+          wishlist={publicState.wishlist}
+          notFound={publicState.notFound}
+          onBackHome={exitPublicMode}
+          onBuyWish={(wish) => void handleBuyPublicWish(wish)}
+          onCreateList={() => {
+            exitPublicMode();
+            beginCreateListFlow();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div className={`app-shell ${isMarketingMode ? "marketing-shell" : ""} ${isDesktopFlowMode ? "desktop-flow-shell" : ""}`} data-theme={theme}>
+      {isMarketingMode ? (
+        <MarketingHomePage
+          authEmail={authEmail}
+          authMessage={authMessage}
+          authPanelMode={authPanelMode}
+          marketingMenuOpen={marketingMenuOpen}
+          onCreateList={beginCreateListFlow}
+          onLogin={beginLoginFlow}
+          onOpenListDemo={() => go("list")}
+          onResetAuthFlow={resetAuthFlow}
+          onSendMagicLink={() => void handleSendMagicLink()}
+          onSetAuthEmail={setAuthEmail}
+          onToggleMenu={() => setMarketingMenuOpen((current) => !current)}
+          syncing={syncing}
+        />
+      ) : (
+        <>
       <header className="topbar">
         {view === "home" ? (
           <button className="brand-lockup" type="button" onClick={() => go("home")} aria-label="Wishly Home">
@@ -141,6 +813,11 @@ function App() {
         )}
         {title && <h1 className="top-title">{title}</h1>}
         <div className="top-actions">
+          {(!supabaseEnabled || remote.isAdmin || localPendingTasks.length > 0) && (
+            <button className="icon-button" type="button" onClick={() => go("admin")} aria-label="Abrir fila de afiliados" title="Fila de afiliados">
+              <ShieldCheck size={22} />
+            </button>
+          )}
           <button
             className="icon-button"
             type="button"
@@ -150,29 +827,104 @@ function App() {
           >
             {theme === "light" ? <Moon size={22} /> : <Sun size={22} />}
           </button>
-          <button className="icon-button primary" type="button" onClick={() => go("activity")} aria-label="Notificacoes">
-            <Bell size={23} />
-          </button>
+          {isRemoteMode ? (
+            <button className="icon-button primary" type="button" onClick={() => void signOut()} aria-label="Sair">
+              <LogOut size={20} />
+            </button>
+          ) : (
+            <button className="icon-button primary" type="button" onClick={() => go("activity")} aria-label="Notificacoes">
+              <Bell size={23} />
+            </button>
+          )}
         </div>
       </header>
 
       <main className="screen">
-        {view === "home" && <HomeScreen go={go} />}
-        {view === "list" && <ListScreen go={go} tracked={tracked} setTracked={setTracked} />}
-        {view === "add" && (
-          <AddWishScreen go={go} selectedPriority={selectedPriority} setSelectedPriority={setSelectedPriority} />
+        {syncError && (
+          <section className="inset-section compact">
+            <div className="sync-banner error">{syncError}</div>
+          </section>
         )}
-        {view === "radar" && <RadarScreen go={go} tracked={tracked} />}
+        {authMessage && !isMarketingMode && (
+          <section className="inset-section compact">
+            <div className="sync-banner success">{authMessage}</div>
+          </section>
+        )}
+        {view === "home" && (
+          <HomeScreen
+            go={go}
+            pendingCount={pendingCount}
+            session={session}
+            authEmail={authEmail}
+            setAuthEmail={setAuthEmail}
+            onSendMagicLink={handleSendMagicLink}
+            syncing={syncing}
+          />
+        )}
+        {view === "create_list" && (
+          <CreateListScreen
+            formState={createListForm}
+            onBack={() => go("home")}
+            onChange={(title) => setCreateListForm({ title })}
+            onSubmit={() => void handleCreateWishlist()}
+            syncing={syncing}
+          />
+        )}
+        {view === "list" && (
+          <ListScreen
+            go={go}
+            tracked={tracked}
+            setTracked={setTracked}
+            wishes={currentWishes}
+            wishlistTitle={currentListTitle(remote, isRemoteMode)}
+            wishlists={remote.wishlists}
+            selectedWishlistId={remote.selectedWishlistId}
+            isRemoteMode={isRemoteMode}
+            onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
+            onBuyWish={(wish) => void handleBuyWish(wish)}
+            onShare={() => void handleShareCurrentList()}
+          />
+        )}
+        {view === "add" && (
+          <AddWishScreen
+            formState={formState}
+            go={go}
+            selectedPriority={selectedPriority}
+            setFormState={setFormState}
+            setSelectedPriority={setSelectedPriority}
+            onSubmit={() => void handleAddWish()}
+            syncing={syncing}
+            isRemoteMode={isRemoteMode}
+          />
+        )}
+        {view === "radar" && <RadarScreen go={go} tracked={tracked} wishes={currentWishes} />}
         {view === "activity" && <ActivityScreen />}
+        {view === "admin" && (
+          <AdminScreen
+            isRemoteMode={isRemoteMode}
+            isAdmin={remote.isAdmin}
+            remoteQueue={adminQueue}
+            localTasks={localAffiliateTasks}
+            draftAffiliateUrls={draftAffiliateUrls}
+            onAffiliateChange={(taskId, value) => setDraftAffiliateUrls((current) => ({ ...current, [taskId]: value }))}
+            onRemoteApply={(giftId) => void handleRemoteAdminUpdate(giftId, "generated")}
+            onRemoteFail={(giftId) => void handleRemoteAdminUpdate(giftId, "failed")}
+            onLocalApply={(taskId) => handleLocalAdminUpdate(taskId, "completed")}
+            onLocalInvalid={(taskId) => handleLocalAdminUpdate(taskId, "invalid")}
+            onLocalUnavailable={(taskId) => handleLocalAdminUpdate(taskId, "unavailable")}
+          />
+        )}
         {view === "pro" && <ProScreen go={go} />}
         {view === "checkout" && <CheckoutScreen go={go} />}
         {view === "success" && <SuccessScreen go={go} />}
       </main>
 
-      <button className="fab" type="button" onClick={() => go(view === "home" ? "list" : "add")}>
-        <Plus size={19} />
-        <span>{view === "home" ? "CRIAR NOVA LISTA" : "ADICIONAR DESEJO"}</span>
-      </button>
+      {view !== "admin" && view !== "create_list" && (
+        <button className="fab" type="button" onClick={() => go(view === "home" ? "list" : "add")}>
+          <Plus size={19} />
+          <span>{view === "home" ? "CRIAR NOVA LISTA" : "ADICIONAR DESEJO"}</span>
+        </button>
+      )}
 
       <nav className="bottom-nav" aria-label="Navegacao principal">
         <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
@@ -180,36 +932,583 @@ function App() {
         <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
         <NavItem active={view === "pro"} icon={<User size={22} />} label="Profile" onClick={() => go("pro")} />
       </nav>
+        </>
+      )}
     </div>
   );
 }
 
-function HomeScreen({ go }: { go: (view: View) => void }) {
+function MarketingHomePage({
+  authEmail,
+  authMessage,
+  authPanelMode,
+  marketingMenuOpen,
+  onCreateList,
+  onLogin,
+  onOpenListDemo,
+  onResetAuthFlow,
+  onSendMagicLink,
+  onSetAuthEmail,
+  onToggleMenu,
+  syncing,
+}: {
+  authEmail: string;
+  authMessage: string;
+  authPanelMode: AuthPanelMode;
+  marketingMenuOpen: boolean;
+  onCreateList: () => void;
+  onLogin: () => void;
+  onOpenListDemo: () => void;
+  onResetAuthFlow: () => void;
+  onSendMagicLink: () => void;
+  onSetAuthEmail: (value: string) => void;
+  onToggleMenu: () => void;
+  syncing: boolean;
+}) {
+  const [authPanelOpen, setAuthPanelOpen] = useState(false);
+  const marketingImages = {
+    heroCover:
+      "https://media.architecturaldigest.com/photos/6879507ebb0032785eb73ee6/4%3A3/w_1600%2Cc_limit/41.%2520Hamptons%2520Modern%2520by%2520Chango%2520%26%2520Co.%2520-%2520Nursery%2520with%2520Glider%2520Detail.jpg",
+    nursery:
+      "https://media.architecturaldigest.com/photos/68795074980df8afc82091b5/4%3A3/w_1600%2Cc_limit/42.%2520Hamptons%2520Modern%2520by%2520Chango%2520%26%2520Co.%2520-%2520Nursery%2520with%2520Crib%2520Detail.jpg",
+    wedding:
+      "https://www.irishexaminer.com/cms_media/module_img/9925/4962821_9_org_AdobeStock_931604614.jpeg.jpg",
+    birthday:
+      "https://imgix.bustle.com/uploads/getty/2022/4/8/76ca8d7f-ee05-48b2-8357-7c5373f55654-getty-1156021435.jpg?crop=faces&dpr=2&fit=crop&h=900&w=1200",
+    personal:
+      "https://www.punkt.ch/cdn/shop/files/punkt-essay-cover1.webp?v=1752138119&width=1920",
+    cribMobile:
+      "https://www.mumzworld.com/media/catalog/product/g/f/gf-6981b-goodway-baby-bed-bell-hanging-toy-w-rattles-beige-1654780543.jpg",
+    playGym:
+      "https://tinystepskids.co.uk/cdn/shop/products/Jabadabadoo_wooden-Baby-Gym-grey_1800x1800.jpg?v=1620641436",
+    lamp:
+      "https://www.modishstore.com/cdn/shop/products/468693_1.jpg?v=1755510615&width=990",
+  };
+
+  const templateLists = [
+    { title: "Chá de bebê", detail: "Comece pelo enxoval e ajuste do seu jeito.", image: marketingImages.nursery },
+    { title: "Casamento", detail: "Reúna desejos para a casa e para a celebração.", image: marketingImages.wedding },
+    { title: "Aniversário", detail: "Uma lista simples para compartilhar com amigos e família.", image: marketingImages.birthday },
+    { title: "Minha lista de desejos", detail: "Guarde ideias, produtos e compras futuras.", image: marketingImages.personal },
+  ];
+
+  const heroItems = [
+    { title: "Móbile para berço", meta: "Novo desejo adicionado", image: marketingImages.cribMobile, badge: "novo" },
+    { title: "Play gym de madeira", meta: "Reservado por Marina", image: marketingImages.playGym, badge: "reservado" },
+    { title: "Abajur para o quarto", meta: "Preço caiu para R$ 189", image: marketingImages.lamp, badge: "queda de preço" },
+  ];
+
+  useEffect(() => {
+    if (!marketingMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onToggleMenu();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [marketingMenuOpen, onToggleMenu]);
+
+  const openAuthPanel = () => {
+    if (marketingMenuOpen) {
+      onToggleMenu();
+    }
+    setAuthPanelOpen(true);
+    window.requestAnimationFrame(() => {
+      document.getElementById("login-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const openCreateAccountPanel = () => {
+    onCreateList();
+    openAuthPanel();
+  };
+
+  const openLoginPanel = () => {
+    onLogin();
+    openAuthPanel();
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    if (marketingMenuOpen) {
+      onToggleMenu();
+    }
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleCreateList = () => {
+    if (marketingMenuOpen) {
+      onToggleMenu();
+    }
+    openCreateAccountPanel();
+  };
+
+  const handleOpenListDemo = () => {
+    if (marketingMenuOpen) {
+      onToggleMenu();
+    }
+    onOpenListDemo();
+  };
+
+  return (
+    <div className="marketing-page">
+      <header className="marketing-header">
+        <div className="marketing-header-inner">
+          <button className="brand-lockup" type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Wishly">
+            <img className="wordmark" src={images.logo} alt="Wishly" />
+          </button>
+
+          <div className="marketing-nav">
+            <button type="button" onClick={() => scrollToSection("como-funciona")}>
+              Como funciona
+            </button>
+            <button type="button" onClick={() => scrollToSection("radar-precos")}>
+              Acompanhar preços
+            </button>
+            <div className="marketing-actions">
+              <button className="secondary-button" type="button" onClick={openLoginPanel}>
+                Entrar
+              </button>
+              <button className="primary-button" type="button" onClick={handleCreateList}>
+                Criar lista
+              </button>
+            </div>
+          </div>
+
+          <button className="icon-button marketing-menu" type="button" onClick={onToggleMenu} aria-label="Abrir menu">
+            {marketingMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+      </header>
+
+      <div
+        className={`marketing-menu-overlay ${marketingMenuOpen ? "open" : ""}`}
+        onClick={marketingMenuOpen ? onToggleMenu : undefined}
+        aria-hidden={marketingMenuOpen ? "false" : "true"}
+      />
+
+      <aside
+        className={`marketing-drawer ${marketingMenuOpen ? "open" : ""}`}
+        aria-hidden={!marketingMenuOpen}
+        aria-label="Menu do Wishly"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div className="marketing-drawer-header">
+          <img className="wordmark" src={images.logo} alt="Wishly" />
+          <button className="icon-button marketing-drawer-close" type="button" onClick={onToggleMenu} aria-label="Fechar menu">
+            <X size={22} />
+          </button>
+        </div>
+
+        <nav className="marketing-drawer-nav" aria-label="Navegação principal">
+          <button type="button" onClick={() => scrollToSection("como-funciona")}>
+            Como funciona
+          </button>
+          <button type="button" onClick={() => scrollToSection("radar-precos")}>
+            Acompanhar preços
+          </button>
+        </nav>
+
+        <div className="marketing-drawer-divider" aria-hidden="true" />
+
+        <button className="text-button marketing-drawer-login" type="button" onClick={openLoginPanel}>
+          Entrar
+        </button>
+
+        <div className="marketing-drawer-footer">
+          <button className="primary-button full" type="button" onClick={handleCreateList}>
+            Criar lista
+          </button>
+        </div>
+      </aside>
+
+      {authPanelOpen ? (
+        <div className="marketing-login-band" id="login-panel">
+          <div className="marketing-login-card">
+            {authMessage ? (
+              <>
+                <div className="marketing-login-copy">
+                  <p className="label">{authPanelMode === "create" ? "Criar conta" : "Entrar"}</p>
+                  <h2>Confira seu e-mail</h2>
+                  <p>{authMessage}</p>
+                </div>
+                <div className="marketing-login-actions">
+                  <button className="secondary-button" type="button" onClick={onResetAuthFlow}>
+                    Usar outro e-mail
+                  </button>
+                  <button className="primary-button" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
+                    {syncing ? "Enviando..." : "Reenviar link"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="marketing-login-copy">
+                  <p className="label">{authPanelMode === "create" ? "Criar conta" : "Entrar"}</p>
+                  <h2>{authPanelMode === "create" ? "Crie sua conta para começar a lista" : "Receba um link por e-mail"}</h2>
+                  <p>
+                    {authPanelMode === "create"
+                      ? "Salve sua lista, continue depois e compartilhe quando estiver pronta."
+                      : "Use seu e-mail para entrar e continuar de onde parou."}
+                  </p>
+                </div>
+                <div className="marketing-login-form">
+                  <Field label="E-mail" placeholder="voce@exemplo.com" value={authEmail} onChange={onSetAuthEmail} />
+                  <button className="primary-button full" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
+                    {syncing ? "Enviando..." : authPanelMode === "create" ? "Continuar com e-mail" : "Receber link de acesso"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <main className="marketing-main">
+        <section className="marketing-hero">
+          <div className="hero-copy-block">
+            <h1>Tudo o que você deseja, em um só lugar.</h1>
+            <p className="hero-support">
+              Crie listas, salve produtos de qualquer loja e compartilhe seus desejos com quem importa.
+            </p>
+            <div className="hero-cta-row">
+              <button className="primary-button" type="button" onClick={handleCreateList}>
+                Criar minha lista
+              </button>
+              <button className="secondary-button" type="button" onClick={handleOpenListDemo}>
+                Ver como funciona
+              </button>
+            </div>
+            <span className="hero-proof">Grátis para começar.</span>
+          </div>
+
+          <div className="hero-stage">
+            <article className="marketing-hero-card">
+              <div className="marketing-hero-cover">
+                <img src={marketingImages.heroCover} alt="Quarto de bebê com luz natural e objetos do enxoval" />
+                <div className="marketing-hero-cover-copy">
+                  <span>Lista compartilhada</span>
+                  <button className="icon-button small" type="button" aria-label="Compartilhar">
+                    <Share2 size={16} />
+                  </button>
+                  <h2>Chá de bebê da Cil e do Gabriel</h2>
+                  <p>4 desejos adicionados · 1 com queda de preço · 1 reservado</p>
+                </div>
+              </div>
+              <div className="marketing-hero-items">
+                {heroItems.map((item) => (
+                  <article className="marketing-item-card" key={item.title}>
+                    <img src={item.image} alt="" />
+                    <div className="marketing-item-copy">
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
+                    </div>
+                    <small>{item.badge}</small>
+                  </article>
+                ))}
+                <div className="marketing-hero-footer">
+                  <span>Tudo organizado para quem cria e para quem vai presentear.</span>
+                  <button className="secondary-button" type="button" onClick={handleOpenListDemo}>
+                    Ver lista
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="marketing-section" id="modelos">
+          <div className="section-intro">
+            <h2>Comece com uma lista para o seu momento</h2>
+            <p>Escolha um modelo e personalize no seu ritmo.</p>
+          </div>
+          <div className="marketing-list-grid">
+            {templateLists.map((item) => (
+              <article className="marketing-list-card" key={item.title}>
+                <img src={item.image} alt={item.title} />
+                <div className="marketing-list-overlay" />
+                <div className="marketing-list-copy">
+                  <h3>{item.title}</h3>
+                  <p>{item.detail}</p>
+                  <button className="text-button" type="button" onClick={openCreateAccountPanel}>
+                    Usar este modelo
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="marketing-section marketing-steps-section" id="como-funciona">
+          <div className="section-intro">
+            <h2>Como funciona</h2>
+            <p>Três passos para criar e compartilhar sua lista.</p>
+          </div>
+          <div className="marketing-steps-grid">
+            {[
+              { step: "1", title: "Crie uma lista", text: "Escolha um modelo ou comece do zero.", detail: "Modelo ou lista vazia" },
+              { step: "2", title: "Adicione seus desejos", text: "Cole o link de qualquer produto.", detail: "Nome, imagem e preço" },
+              { step: "3", title: "Compartilhe", text: "Envie por link ou WhatsApp.", detail: "Sem conta para convidados" },
+            ].map((item) => (
+              <article className="marketing-step-card" key={item.step}>
+                <span>{item.step}</span>
+                <strong>{item.title}</strong>
+                <p>{item.text}</p>
+                <small>{item.detail}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="marketing-section marketing-price-section" id="radar-precos">
+          <div className="marketing-price-copy">
+            <div>
+              <h2>O preço mudou? O Wishly avisa.</h2>
+              <p>Acompanhe os produtos das suas listas e descubra o melhor momento para comprar.</p>
+              <span className="price-inline-copy">Histórico de preços · Alertas personalizados · Produtos de várias lojas</span>
+            </div>
+          </div>
+          <div className="marketing-price-card">
+            <div className="marketing-price-head">
+              <img src={marketingImages.lamp} alt="Abajur branco em fundo neutro" />
+              <div>
+                <strong>Abajur para leitura</strong>
+                <span>Mercado Livre · alerta ativo</span>
+              </div>
+            </div>
+            <div className="marketing-price-values">
+              <article>
+                <span>Preço atual</span>
+                <strong>R$ 189</strong>
+              </article>
+              <article>
+                <span>Preço anterior</span>
+                <strong>R$ 229</strong>
+              </article>
+              <article className="drop">
+                <span>Queda</span>
+                <strong>-17%</strong>
+              </article>
+            </div>
+            <div className="marketing-price-graph" aria-hidden="true">
+              <div className="marketing-price-scale">
+                <span>R$ 229</span>
+                <span>R$ 209</span>
+                <span>R$ 189</span>
+              </div>
+              <div className="marketing-price-chart">
+                <div className="marketing-price-grid">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <svg className="marketing-price-svg" viewBox="0 0 260 88" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="priceArea" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(143, 77, 57, 0.22)" />
+                      <stop offset="100%" stopColor="rgba(143, 77, 57, 0.02)" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    className="marketing-price-area"
+                    d="M 0 12 C 20 18, 36 26, 52 34 S 92 46, 104 52 S 146 60, 156 66 S 198 70, 208 74 S 238 76, 260 78 L 260 88 L 0 88 Z"
+                  />
+                  <path
+                    className="marketing-price-path"
+                    d="M 0 12 C 20 18, 36 26, 52 34 S 92 46, 104 52 S 146 60, 156 66 S 198 70, 208 74 S 238 76, 260 78"
+                  />
+                  {[
+                    { cx: 0, cy: 12 },
+                    { cx: 52, cy: 34 },
+                    { cx: 104, cy: 52 },
+                    { cx: 156, cy: 66 },
+                    { cx: 208, cy: 74 },
+                    { cx: 260, cy: 78 },
+                  ].map((point, index) => (
+                    <circle className="marketing-price-point" cx={point.cx} cy={point.cy} r="4.5" key={index} />
+                  ))}
+                </svg>
+                <div className="marketing-price-labels">
+                  <span>Seg</span>
+                  <span>Ter</span>
+                  <span>Qua</span>
+                  <span>Qui</span>
+                  <span>Hoje</span>
+                </div>
+              </div>
+            </div>
+            <p className="price-note">
+              <TrendingDown size={16} />
+              Avisar quando baixar para R$ 179.
+            </p>
+          </div>
+        </section>
+
+        <section className="marketing-section marketing-share-section">
+          <div className="section-intro">
+            <h2>Compartilhar a lista deve ser tão simples quanto criar.</h2>
+            <p>Quem recebe sua lista pode visualizar os desejos e escolher um presente sem criar uma conta.</p>
+          </div>
+          <div className="marketing-share-layout">
+            <div className="marketing-phone-preview">
+              <div className="marketing-phone-header">
+                <strong>Lista da Sofia</strong>
+                <span>Visualização para quem vai presentear</span>
+              </div>
+              <article className="marketing-item-card compact">
+                <img src={marketingImages.playGym} alt="" />
+                <div className="marketing-item-copy">
+                  <strong>Play gym de madeira</strong>
+                  <span>Faixa ideal · R$ 249</span>
+                </div>
+                <small>disponível</small>
+              </article>
+              <article className="marketing-item-card compact">
+                <img src={marketingImages.lamp} alt="" />
+                <div className="marketing-item-copy">
+                  <strong>Abajur para leitura</strong>
+                  <span>Reservado por Mariana</span>
+                </div>
+                <small>reservado</small>
+              </article>
+            </div>
+            <div className="marketing-share-actions">
+              <div className="marketing-share-action">
+                <span>
+                  <Share2 size={18} />
+                </span>
+                <div>
+                  <strong>WhatsApp</strong>
+                  <p>Compartilhe a lista direto com amigos e família.</p>
+                </div>
+              </div>
+              <div className="marketing-share-action">
+                <span>
+                  <Link2 size={18} />
+                </span>
+                <div>
+                  <strong>Copiar link</strong>
+                  <p>Um único link com capa, título e desejos.</p>
+                </div>
+              </div>
+              <div className="marketing-share-action qr">
+                <div className="marketing-qr-box" aria-hidden="true">
+                  <QrCode size={34} />
+                </div>
+                <div>
+                  <strong>QR Code discreto</strong>
+                  <p>Menos dúvidas. Nenhum presente repetido.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="marketing-section marketing-final-section">
+          <div className="marketing-final-copy">
+            <h2>Sua próxima lista começa aqui.</h2>
+            <p>Organize seus desejos e compartilhe quando quiser.</p>
+            <div className="hero-cta-row centered">
+              <button className="primary-button" type="button" onClick={openCreateAccountPanel}>
+                Criar minha lista grátis
+              </button>
+              <button className="text-button" type="button" onClick={openLoginPanel}>
+                Já tenho uma conta
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="marketing-footer">
+        <img className="wordmark" src={images.logo} alt="Wishly" />
+        <div className="footer-links">
+          <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Produto</button>
+          <button type="button" onClick={() => scrollToSection("como-funciona")}>Como funciona</button>
+          <span>Privacidade</span>
+          <span>Termos</span>
+          <button type="button" onClick={openLoginPanel}>Ajuda</button>
+          <span>Instagram</span>
+        </div>
+        <p>Alguns links podem gerar comissão para o Wishly, sem mudar o valor pago por você.</p>
+      </footer>
+    </div>
+  );
+}
+
+function HomeScreen({
+  go,
+  pendingCount,
+  session,
+  authEmail,
+  setAuthEmail,
+  onSendMagicLink,
+  syncing,
+}: {
+  go: (view: View) => void;
+  pendingCount: number;
+  session: Session | null;
+  authEmail: string;
+  setAuthEmail: (value: string) => void;
+  onSendMagicLink: () => void;
+  syncing: boolean;
+}) {
   return (
     <>
-      <section className="inset-section">
-        <p className="label">Novidades nas suas listas</p>
-        <div className="notice-card">
-          <Notice icon={<ArrowDown size={18} />} text="2 itens baixaram de preco na sua lista Casa Nova." />
-          <Notice icon={<Gift size={18} />} text="1 item voltou ao estoque em Setup." />
-          <Notice icon={<Heart size={18} />} text="1 item foi reservado por um convidado." />
-        </div>
-      </section>
+      <div className="dashboard-overview">
+        {supabaseEnabled && !session && (
+          <section className="inset-section dashboard-auth">
+            <div className="auth-card">
+              <p className="label">Acesse sua conta</p>
+              <h2>Entrar no Wishly</h2>
+              <p>Use seu e-mail para acessar suas listas e continuar de onde parou.</p>
+              <div className="auth-inline">
+                <Field label="Email" placeholder="voce@exemplo.com" value={authEmail} onChange={setAuthEmail} />
+                <button className="primary-button full" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
+                  Entrar por email
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
-      <Shelf title="Suas listas" action="VER TUDO">
-        <ListCard
-          image={images.home}
-          title="Casa nova"
-          meta="18 desejos • 3 precos cairam"
-          badge="3 PROMOS"
-          onClick={() => go("list")}
-        />
+        <section className="inset-section dashboard-notices">
+          <p className="label">Novidades nas suas listas</p>
+          <div className="notice-card">
+            <Notice icon={<ArrowDown size={18} />} text="2 itens baixaram de preco na sua lista Casa Nova." />
+            <Notice icon={<Gift size={18} />} text="1 item voltou ao estoque em Setup." />
+            <Notice icon={<Heart size={18} />} text="1 item foi reservado por um convidado." />
+            <Notice
+              icon={<ShieldCheck size={18} />}
+              text={
+                pendingCount > 0
+                  ? `${pendingCount} link${pendingCount > 1 ? "s" : ""} aguardando tratamento de afiliado.`
+                  : "Novos links manuais entram automaticamente na fila interna de afiliados."
+              }
+            />
+          </div>
+        </section>
+      </div>
+
+      <Shelf title="Suas listas" action="VER TUDO" variant="lists">
+        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 precos cairam" badge="3 PROMOS" onClick={() => go("list")} />
         <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritarios" badge="9 ITENS" />
         <ListCard image={images.travel} title="Proxima viagem" meta="12 desejos • Compartilhada" badge="GRUPO" />
       </Shelf>
 
       <section className="idea-band">
-        <Shelf title="Ideias para comecar" tone="tertiary">
+        <Shelf title="Ideias para comecar" tone="tertiary" variant="ideas">
           <Idea image={images.ideaHome} label="Casa nova" />
           <Idea image={images.baby} label="Cha de bebe" />
           <Idea image={images.plane} label="Viagem" />
@@ -219,14 +1518,101 @@ function HomeScreen({ go }: { go: (view: View) => void }) {
   );
 }
 
+function CreateListScreen({
+  formState,
+  onBack,
+  onChange,
+  onSubmit,
+  syncing,
+}: {
+  formState: CreateListFormState;
+  onBack: () => void;
+  onChange: (title: string) => void;
+  onSubmit: () => void;
+  syncing: boolean;
+}) {
+  return (
+    <section className="desktop-flow-layout">
+      <form
+        className="form-stack desktop-flow-main"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div className="upload-card">
+          <Heart size={24} />
+          <h2>Crie sua primeira lista</h2>
+          <p>Escolha um nome para começar. Depois você adiciona os desejos e compartilha quando quiser.</p>
+        </div>
+
+        <Field
+          label="Nome da lista"
+          placeholder="Chá de bebê da Ana"
+          value={formState.title}
+          onChange={onChange}
+        />
+
+        <div className="field-row">
+          <button className="secondary-button" type="button" onClick={onBack}>
+            <ArrowLeft size={18} />
+            Voltar
+          </button>
+          <button className="primary-button full" type="submit" disabled={!formState.title.trim() || syncing}>
+            {syncing ? "Criando..." : "Continuar"}
+          </button>
+        </div>
+      </form>
+
+      <aside className="desktop-flow-aside">
+        <div className="desktop-flow-card">
+          <p className="label">Primeiro passo</p>
+          <h2>Sua lista nasce pronta para receber desejos</h2>
+          <p>Depois de criar a lista, você pode colar links, ajustar prioridades e compartilhar quando tudo estiver organizado.</p>
+        </div>
+        <div className="desktop-flow-points">
+          <article>
+            <strong>1. Crie a lista</strong>
+            <p>Dê um nome ao momento que você quer organizar.</p>
+          </article>
+          <article>
+            <strong>2. Adicione desejos</strong>
+            <p>Salve produtos de qualquer loja no mesmo lugar.</p>
+          </article>
+          <article>
+            <strong>3. Compartilhe</strong>
+            <p>Envie a lista quando estiver pronta para circular.</p>
+          </article>
+        </div>
+      </aside>
+    </section>
+  );
+}
+
 function ListScreen({
   go,
   tracked,
   setTracked,
+  wishes,
+  wishlistTitle,
+  wishlists,
+  selectedWishlistId,
+  isRemoteMode,
+  onSelectWishlist,
+  onBuyWish,
+  onShare,
 }: {
   go: (view: View) => void;
   tracked: number[];
   setTracked: (ids: number[]) => void;
+  wishes: Array<LocalWish | DbWish>;
+  wishlistTitle: string;
+  wishlists: DbWishlist[];
+  selectedWishlistId: string | null;
+  isRemoteMode: boolean;
+  onSelectWishlist: (wishlistId: string) => void;
+  onBuyWish: (wish: LocalWish | DbWish) => void;
+  onShare: () => void;
 }) {
   function toggle(id: number) {
     setTracked(tracked.includes(id) ? tracked.filter((item) => item !== id) : [...tracked, id]);
@@ -238,37 +1624,83 @@ function ListScreen({
         <img src={images.home} alt="Sala de estar moderna" />
         <div className="hero-gradient" />
         <div className="hero-copy">
-          <p className="label light">Lista de Gabriel e Ana</p>
-          <h2>Casa nova</h2>
+          <p className="label light">Lista compartilhada</p>
+          <h2>{wishlistTitle}</h2>
           <p>Uma colecao calma de pecas para transformar o primeiro apartamento em casa.</p>
           <div className="hero-actions">
             <button className="primary-button" type="button" onClick={() => go("add")}>
               <Plus size={18} />
               Adicionar
             </button>
-            <button className="secondary-button light" type="button">
+            <button className="secondary-button light" type="button" onClick={onShare}>
               <Share2 size={18} />
               Compartilhar
             </button>
           </div>
         </div>
       </section>
+      
+      <section className="inset-section compact list-overview">
+        <div className="list-summary-stack">
+          {isRemoteMode && wishlists.length > 1 && (
+            <div className="wishlist-switcher" aria-label="Selecionar lista">
+              {wishlists.map((wishlist) => (
+                <button
+                  key={wishlist.id}
+                  className={wishlist.id === selectedWishlistId ? "active" : ""}
+                  type="button"
+                  onClick={() => onSelectWishlist(wishlist.id)}
+                >
+                  {wishlist.title}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="list-summary-card">
+            <div className="list-summary-head">
+              <div>
+                <p className="label">Resumo da lista</p>
+                <h3>{wishlistTitle}</h3>
+              </div>
+              <span className="summary-badge">Atualizada agora</span>
+            </div>
+            <div className="stat-grid">
+              <Stat value={String(wishes.length)} label="desejos" />
+              <Stat value={String(wishes.filter((wish) => getWishDrop(wish)).length)} label="promocoes" />
+              <Stat value={String(wishes.filter((wish) => getWishStatus(wish) === "Reservado").length)} label="reservados" />
+            </div>
+          </div>
+        </div>
 
-      <section className="inset-section compact">
-        <div className="stat-grid">
-          <Stat value="18" label="desejos" />
-          <Stat value="3" label="promocoes" />
-          <Stat value="4" label="reservados" />
+        <div className="list-summary-card list-summary-card-accent">
+          <p className="label">Lista pronta para compartilhar</p>
+          <h3>Quem receber ve o que importa sem confusao.</h3>
+          <p>Os desejos ficam organizados por prioridade, reservas e sinais de preco. A lista continua simples para quem envia e para quem compra.</p>
+          <div className="list-summary-notes">
+            <div>
+              <strong>{tracked.length}</strong>
+              <span>itens com radar ativo</span>
+            </div>
+            <div>
+              <strong>{wishes.filter((wish) => getWishPriorityLabel(wish) === "Alta").length}</strong>
+              <span>prioridades altas</span>
+            </div>
+          </div>
+          <button className="secondary-button" type="button" onClick={onShare}>
+              <Share2 size={18} />
+              Compartilhar
+            </button>
         </div>
       </section>
 
-      <Shelf title="Destaques" action="FILTRAR">
-        {wishes.map((wish) => (
+      <Shelf title="Destaques" action="FILTRAR" variant="wishes">
+        {wishes.map((wish, index) => (
           <WishCard
-            key={wish.id}
+            key={getWishId(wish)}
             wish={wish}
-            tracked={tracked.includes(wish.id)}
-            onTrack={() => toggle(wish.id)}
+            tracked={tracked.includes(index + 1)}
+            onTrack={() => toggle(index + 1)}
+            onBuy={() => onBuyWish(wish)}
           />
         ))}
       </Shelf>
@@ -277,54 +1709,242 @@ function ListScreen({
 }
 
 function AddWishScreen({
+  formState,
   go,
   selectedPriority,
+  setFormState,
   setSelectedPriority,
+  onSubmit,
+  syncing,
+  isRemoteMode,
 }: {
+  formState: AddWishFormState;
   go: (view: View) => void;
-  selectedPriority: string;
-  setSelectedPriority: (priority: string) => void;
+  selectedPriority: Priority;
+  setFormState: (state: AddWishFormState) => void;
+  setSelectedPriority: (priority: Priority) => void;
+  onSubmit: () => void;
+  syncing: boolean;
+  isRemoteMode: boolean;
 }) {
   return (
-    <form
-      className="form-stack"
-      onSubmit={(event) => {
-        event.preventDefault();
-        go("list");
-      }}
-    >
-      <div className="upload-card">
-        <Search size={24} />
-        <h2>Cole um link ou descreva o desejo</h2>
-        <p>Wishly organiza imagem, loja, preco e prioridade em uma ficha editorial.</p>
-      </div>
-      <Field label="Link do produto" placeholder="https://loja.com/produto" />
-      <Field label="Nome do desejo" placeholder="Poltrona boucle creme" />
-      <div>
-        <p className="field-label">Prioridade</p>
-        <div className="segmented">
-          {["Alta", "Media", "Baixa"].map((priority) => (
-            <button
-              className={selectedPriority === priority ? "selected" : ""}
-              key={priority}
-              type="button"
-              onClick={() => setSelectedPriority(priority)}
-            >
-              {priority}
-            </button>
-          ))}
+    <section className="desktop-flow-layout">
+      <form
+        className="form-stack desktop-flow-main"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div className="upload-card">
+          <Search size={24} />
+          <h2>Cole um link ou descreva o desejo</h2>
+          <p>
+            {isRemoteMode
+              ? "Esse desejo será salvo na sua lista e pode ser compartilhado depois."
+              : "Adicione os detalhes do desejo para continuar montando sua lista."}
+          </p>
         </div>
-      </div>
-      <Field label="Observacao" placeholder="Tamanho, cor, motivo ou alternativa" textarea />
-      <button className="primary-button full" type="submit">
-        <Sparkles size={18} />
-        Salvar desejo
-      </button>
-    </form>
+        <Field
+          label="Link do produto"
+          placeholder="https://loja.com/produto"
+          value={formState.productUrl}
+          onChange={(value) => setFormState({ ...formState, productUrl: value })}
+        />
+        <Field
+          label="Nome do desejo"
+          placeholder="Poltrona boucle creme"
+          value={formState.title}
+          onChange={(value) => setFormState({ ...formState, title: value })}
+        />
+        <div>
+          <p className="field-label">Prioridade</p>
+          <div className="segmented">
+            {(["Alta", "Media", "Baixa"] as Priority[]).map((priority) => (
+              <button
+                className={selectedPriority === priority ? "selected" : ""}
+                key={priority}
+                type="button"
+                onClick={() => setSelectedPriority(priority)}
+              >
+                {priority}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field
+          label="Observacao"
+          placeholder="Tamanho, cor, motivo ou alternativa"
+          textarea
+          value={formState.note}
+          onChange={(value) => setFormState({ ...formState, note: value })}
+        />
+        <div className="field-row">
+          <button className="secondary-button" type="button" onClick={() => go("list")}>
+            Voltar
+          </button>
+          <button className="primary-button full" type="submit" disabled={syncing}>
+            <Sparkles size={18} />
+            {syncing ? "Salvando..." : "Salvar desejo"}
+          </button>
+        </div>
+      </form>
+
+      <aside className="desktop-flow-aside">
+        <div className="desktop-flow-card">
+          <p className="label">Dica rápida</p>
+          <h2>Comece pelo link. O restante você ajusta depois.</h2>
+          <p>Você não precisa preencher tudo de primeira. Salve o desejo, organize a prioridade e refine os detalhes quando quiser.</p>
+        </div>
+        <div className="desktop-flow-points">
+          <article>
+            <strong>Link do produto</strong>
+            <p>Facilita a compra para quem receber sua lista.</p>
+          </article>
+          <article>
+            <strong>Prioridade</strong>
+            <p>Ajuda a destacar o que faz mais sentido naquele momento.</p>
+          </article>
+          <article>
+            <strong>Observação</strong>
+            <p>Explique tamanho, cor ou alguma alternativa, se precisar.</p>
+          </article>
+        </div>
+      </aside>
+    </section>
   );
 }
 
-function RadarScreen({ go, tracked }: { go: (view: View) => void; tracked: number[] }) {
+function PublicWishlistPage({
+  loading,
+  wishlist,
+  notFound,
+  onBackHome,
+  onBuyWish,
+  onCreateList,
+}: {
+  loading: boolean;
+  wishlist: PublicWishlist | null;
+  notFound: boolean;
+  onBackHome: () => void;
+  onBuyWish: (wish: DbWish) => void;
+  onCreateList: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="public-page">
+        <header className="public-header">
+          <button className="brand-lockup" type="button" onClick={onBackHome} aria-label="Voltar para Wishly">
+            <img className="wordmark" src={images.logo} alt="Wishly" />
+          </button>
+        </header>
+        <main className="public-main">
+          <section className="public-empty-state">
+            <p className="label">Abrindo lista compartilhada</p>
+            <h2>Carregando os desejos...</h2>
+            <p>Estamos preparando a lista para voce visualizar tudo em um so lugar.</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (notFound || !wishlist) {
+    return (
+      <div className="public-page">
+        <header className="public-header">
+          <button className="brand-lockup" type="button" onClick={onBackHome} aria-label="Voltar para Wishly">
+            <img className="wordmark" src={images.logo} alt="Wishly" />
+          </button>
+          <button className="primary-button" type="button" onClick={onCreateList}>
+            Criar minha lista
+          </button>
+        </header>
+        <main className="public-main">
+          <section className="public-empty-state">
+            <p className="label">Link indisponivel</p>
+            <h2>Essa lista nao esta mais acessivel.</h2>
+            <p>Confira se o link foi copiado por completo ou volte para criar sua propria lista no Wishly.</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="public-page">
+      <header className="public-header">
+        <button className="brand-lockup" type="button" onClick={onBackHome} aria-label="Voltar para Wishly">
+          <img className="wordmark" src={images.logo} alt="Wishly" />
+        </button>
+        <div className="public-header-actions">
+          <button className="text-button" type="button" onClick={onBackHome}>
+            Conhecer Wishly
+          </button>
+          <button className="primary-button" type="button" onClick={onCreateList}>
+            Criar minha lista
+          </button>
+        </div>
+      </header>
+
+      <main className="public-main">
+        <section className="public-hero">
+          <div className="public-hero-media">
+            <img src={wishlist.cover_image_url || images.home} alt="" />
+          </div>
+          <div className="public-hero-copy">
+            <p className="label">Lista compartilhada</p>
+            <h1>{wishlist.title}</h1>
+            <p>{wishlist.message || "Escolha um presente com clareza, sem itens repetidos e sem perder contexto."}</p>
+            <div className="public-meta">
+              {wishlist.occasion && <span>{wishlist.occasion}</span>}
+              {wishlist.event_date && <span>{formatEventDate(wishlist.event_date)}</span>}
+              <span>{wishlist.gifts.length} desejos</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="public-summary">
+          <div className="stat-grid">
+            <Stat value={String(wishlist.gifts.length)} label="desejos" />
+            <Stat value={String(wishlist.gifts.filter((wish) => getWishStatus(wish) === "Reservado").length)} label="reservados" />
+            <Stat value={String(wishlist.gifts.filter((wish) => getWishPriorityLabel(wish) === "Alta").length)} label="prioridade alta" />
+          </div>
+        </section>
+
+        <section className="public-wishes-section">
+          <div className="section-heading">
+            <h2>Desejos da lista</h2>
+          </div>
+          <div className="public-wishes-grid">
+            {wishlist.gifts.map((wish) => (
+              <article className="public-wish-card" key={wish.id}>
+                <img src={getWishImage(wish)} alt="" />
+                <div className="public-wish-copy">
+                  <div>
+                    <div className="public-wish-head">
+                      <h3>{wish.name}</h3>
+                      {getWishStatus(wish) && <span className="status-pill">{getWishStatus(wish)}</span>}
+                    </div>
+                    <p>{getWishStore(wish)}</p>
+                    {wish.description && <small>{wish.description}</small>}
+                    <strong>{getWishPrice(wish)}</strong>
+                  </div>
+                  <button className="secondary-button buy-button" type="button" onClick={() => onBuyWish(wish)}>
+                    <ExternalLink size={16} />
+                    Ver presente
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracked: number[]; wishes: Array<LocalWish | DbWish> }) {
   return (
     <>
       <section className="radar-summary">
@@ -337,12 +1957,12 @@ function RadarScreen({ go, tracked }: { go: (view: View) => void; tracked: numbe
         </button>
       </section>
       <section className="vertical-list">
-        {wishes.map((wish) => (
-          <article className="radar-row" key={wish.id}>
-            <img src={wish.image} alt="" />
+        {wishes.map((wish, index) => (
+          <article className="radar-row" key={getWishId(wish)}>
+            <img src={getWishImage(wish)} alt="" />
             <div>
-              <p className="row-title">{wish.title}</p>
-              <p className="row-meta">{tracked.includes(wish.id) ? "Acompanhando preco" : "Radar pausado"}</p>
+              <p className="row-title">{getWishTitle(wish)}</p>
+              <p className="row-meta">{tracked.includes(index + 1) ? "Acompanhando preco" : "Radar pausado"}</p>
               <div className="sparkline" aria-hidden="true">
                 <span />
                 <span />
@@ -351,7 +1971,7 @@ function RadarScreen({ go, tracked }: { go: (view: View) => void; tracked: numbe
                 <span />
               </div>
             </div>
-            <strong>{wish.drop ?? "0%"}</strong>
+            <strong>{getWishDrop(wish) ?? "0%"}</strong>
           </article>
         ))}
       </section>
@@ -371,6 +1991,230 @@ function ActivityScreen() {
           </div>
         </article>
       ))}
+    </section>
+  );
+}
+
+function AdminScreen({
+  isRemoteMode,
+  isAdmin,
+  remoteQueue,
+  localTasks,
+  draftAffiliateUrls,
+  onAffiliateChange,
+  onRemoteApply,
+  onRemoteFail,
+  onLocalApply,
+  onLocalInvalid,
+  onLocalUnavailable,
+}: {
+  isRemoteMode: boolean;
+  isAdmin: boolean;
+  remoteQueue: AdminAffiliateQueueItem[];
+  localTasks: LocalAffiliateTask[];
+  draftAffiliateUrls: Record<string, string>;
+  onAffiliateChange: (taskId: string, value: string) => void;
+  onRemoteApply: (giftId: string) => void;
+  onRemoteFail: (giftId: string) => void;
+  onLocalApply: (taskId: string) => void;
+  onLocalInvalid: (taskId: string) => void;
+  onLocalUnavailable: (taskId: string) => void;
+}) {
+  if (isRemoteMode && !isAdmin) {
+    return (
+      <section className="admin-stack">
+        <div className="empty-admin">
+          <ShieldCheck size={24} />
+          <strong>Acesso restrito</strong>
+          <p>Essa fila real so aparece para usuarios presentes em `admin_users` no Supabase.</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (isRemoteMode) {
+    const pending = remoteQueue.filter((item) => item.affiliate_status !== "generated");
+    const history = remoteQueue.filter((item) => item.affiliate_status === "generated");
+
+    return (
+      <section className="admin-stack">
+        <div className="admin-summary">
+          <p className="label">Operacao real</p>
+          <h2>Fila unica para admins</h2>
+          <p>Essa tela usa RPCs do Supabase. Mercado Livre ja entra como merchant `manual` e aparece aqui para ajuste.</p>
+          <div className="stat-grid">
+            <Stat value={String(pending.length)} label="pendentes" />
+            <Stat value={String(history.length)} label="gerados" />
+            <Stat value={String(remoteQueue.length)} label="total" />
+          </div>
+        </div>
+
+        {pending.length === 0 ? (
+          <div className="empty-admin">
+            <ShieldCheck size={24} />
+            <strong>Nenhuma pendencia aberta</strong>
+            <p>Se um gift entrar com merchant manual e link fallback, ele aparece aqui automaticamente.</p>
+          </div>
+        ) : (
+          pending.map((task) => (
+            <article className="admin-card" key={task.gift_id}>
+              <div className="admin-card-head">
+                <div>
+                  <p className="label">Pendente</p>
+                  <h3>{task.item_title}</h3>
+                </div>
+                <span className="status-pill">{task.merchant_name}</span>
+              </div>
+              <div className="admin-meta">
+                <span>Lista: {task.wishlist_title}</span>
+                <span>Dono: {task.owner_name ?? task.owner_email}</span>
+              </div>
+              <label className="link-block">
+                <span className="field-label">Original URL</span>
+                <div className="link-line">
+                  <code>{task.original_url}</code>
+                  <button className="icon-button" type="button" onClick={() => openLink(task.original_url)} aria-label="Abrir link original">
+                    <ExternalLink size={18} />
+                  </button>
+                </div>
+              </label>
+              <Field
+                label="Affiliate URL"
+                placeholder="https://..."
+                value={draftAffiliateUrls[task.gift_id] ?? task.affiliate_url ?? ""}
+                onChange={(value) => onAffiliateChange(task.gift_id, value)}
+              />
+              <div className="admin-actions">
+                <button className="secondary-button" type="button" onClick={() => onRemoteFail(task.gift_id)}>
+                  <XCircle size={18} />
+                  Sem afiliado
+                </button>
+                <button className="primary-button" type="button" onClick={() => onRemoteApply(task.gift_id)}>
+                  <Check size={18} />
+                  Aplicar link
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+
+        {history.length > 0 && (
+          <div className="history-block">
+            <div className="section-heading compact-heading">
+              <h2>Historico</h2>
+            </div>
+            <div className="vertical-list admin-history">
+              {history.map((task) => (
+                <article className="activity-row" key={task.gift_id}>
+                  <div className="activity-icon">
+                    <Check size={18} />
+                  </div>
+                  <div>
+                    <p>
+                      {task.item_title} • afiliado aplicado
+                    </p>
+                    <span>{task.merchant_name}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  const pending = localTasks.filter((task) => task.status === "pending");
+  const history = localTasks.filter((task) => task.status !== "pending");
+
+  return (
+    <section className="admin-stack">
+      <div className="admin-summary">
+        <p className="label">Operacao local</p>
+        <h2>Fila demo para admins</h2>
+        <p>Essa fila continua disponivel como fallback enquanto voce nao estiver autenticado no banco real.</p>
+        <div className="stat-grid">
+          <Stat value={String(pending.length)} label="pendentes" />
+          <Stat value={String(history.filter((task) => task.status === "completed").length)} label="gerados" />
+          <Stat value={String(history.length)} label="encerrados" />
+        </div>
+      </div>
+
+      {pending.length === 0 ? (
+        <div className="empty-admin">
+          <ShieldCheck size={24} />
+          <strong>Nenhuma pendencia aberta</strong>
+          <p>Ao adicionar um item do Mercado Livre no modo local, a plataforma cria uma task simulada para todos os admins.</p>
+        </div>
+      ) : (
+        pending.map((task) => {
+          const key = String(task.id);
+          return (
+            <article className="admin-card" key={task.id}>
+              <div className="admin-card-head">
+                <div>
+                  <p className="label">Pendente</p>
+                  <h3>{task.itemTitle}</h3>
+                </div>
+                <span className="status-pill">Mercado Livre</span>
+              </div>
+              <div className="admin-meta">
+                <span>Lista: {task.wishlistName}</span>
+                <span>Criado por: {task.createdByUserName}</span>
+              </div>
+              <label className="link-block">
+                <span className="field-label">Original URL</span>
+                <div className="link-line">
+                  <code>{task.originalUrl}</code>
+                  <button className="icon-button" type="button" onClick={() => openLink(task.originalUrl)} aria-label="Abrir link original">
+                    <ExternalLink size={18} />
+                  </button>
+                </div>
+              </label>
+              <Field
+                label="Affiliate URL"
+                placeholder="https://..."
+                value={draftAffiliateUrls[key] ?? ""}
+                onChange={(value) => onAffiliateChange(key, value)}
+              />
+              <div className="admin-actions">
+                <button className="secondary-button" type="button" onClick={() => onLocalInvalid(key)}>
+                  <XCircle size={18} />
+                  Marcar invalido
+                </button>
+                <button className="secondary-button" type="button" onClick={() => onLocalUnavailable(key)}>
+                  Sem afiliado
+                </button>
+                <button className="primary-button" type="button" onClick={() => onLocalApply(key)}>
+                  <Check size={18} />
+                  Aplicar link
+                </button>
+              </div>
+            </article>
+          );
+        })
+      )}
+
+      {history.length > 0 && (
+        <div className="history-block">
+          <div className="section-heading compact-heading">
+            <h2>Historico</h2>
+          </div>
+          <div className="vertical-list admin-history">
+            {history.map((task) => (
+              <article className="activity-row" key={task.id}>
+                <div className="activity-icon">{task.status === "completed" ? <Check size={18} /> : <Bell size={18} />}</div>
+                <div>
+                  <p>
+                    {task.itemTitle} • {task.status}
+                  </p>
+                  <span>{task.completedByAdminName ?? localAdminName}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -413,11 +2257,11 @@ function CheckoutScreen({ go }: { go: (view: View) => void }) {
         <strong>R$ 14,90</strong>
         <small>Renovacao mensal. Cancele quando quiser.</small>
       </div>
-      <Field label="Nome no cartao" placeholder="Gabriel Fachini" />
-      <Field label="Numero do cartao" placeholder="0000 0000 0000 0000" icon={<CreditCard size={18} />} />
+      <Field label="Nome no cartao" placeholder="Gabriel Fachini" value="" onChange={() => undefined} />
+      <Field label="Numero do cartao" placeholder="0000 0000 0000 0000" icon={<CreditCard size={18} />} value="" onChange={() => undefined} />
       <div className="field-row">
-        <Field label="Validade" placeholder="MM/AA" />
-        <Field label="CVV" placeholder="123" />
+        <Field label="Validade" placeholder="MM/AA" value="" onChange={() => undefined} />
+        <Field label="CVV" placeholder="123" value="" onChange={() => undefined} />
       </div>
       <button className="primary-button full" type="submit">
         Confirmar assinatura
@@ -446,11 +2290,13 @@ function Shelf({
   action,
   children,
   tone,
+  variant,
 }: {
   title: string;
   action?: string;
   children: React.ReactNode;
   tone?: "tertiary";
+  variant?: "lists" | "ideas" | "wishes";
 }) {
   return (
     <section className={`shelf ${tone ?? ""}`}>
@@ -458,7 +2304,7 @@ function Shelf({
         <h2>{title}</h2>
         {action && <button type="button">{action}</button>}
       </div>
-      <div className="horizontal-shelf">{children}</div>
+      <div className={`horizontal-shelf ${variant ? `shelf-${variant}` : ""}`}>{children}</div>
     </section>
   );
 }
@@ -488,20 +2334,36 @@ function ListCard({
   );
 }
 
-function WishCard({ wish, tracked, onTrack }: { wish: Wish; tracked: boolean; onTrack: () => void }) {
+function WishCard({
+  wish,
+  tracked,
+  onTrack,
+  onBuy,
+}: {
+  wish: LocalWish | DbWish;
+  tracked: boolean;
+  onTrack: () => void;
+  onBuy: () => void;
+}) {
   return (
     <article className="wish-card">
-      <img src={wish.image} alt="" />
+      <img src={getWishImage(wish)} alt="" />
       <div className="wish-copy">
         <div>
-          <h3>{wish.title}</h3>
-          <p>{wish.store}</p>
-          <span>{wish.price}</span>
+          <h3>{getWishTitle(wish)}</h3>
+          <p>{getWishStore(wish)}</p>
+          <span>{getWishPrice(wish)}</span>
         </div>
-        <button className={tracked ? "tracked" : ""} type="button" onClick={onTrack}>
-          <Tag size={15} />
-          {tracked ? "Radar ativo" : "Ativar radar"}
-        </button>
+        <div className="wish-actions">
+          <button className={tracked ? "tracked" : ""} type="button" onClick={onTrack}>
+            <Tag size={15} />
+            {tracked ? "Radar ativo" : "Ativar radar"}
+          </button>
+          <button className="secondary-button buy-button" type="button" onClick={onBuy}>
+            <ExternalLink size={16} />
+            Comprar
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -541,40 +2403,252 @@ function Field({
   placeholder,
   textarea,
   icon,
+  value,
+  onChange,
+  disabled,
 }: {
   label: string;
   placeholder: string;
   textarea?: boolean;
   icon?: React.ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
       <span className="input-wrap">
         {icon}
-        {textarea ? <textarea placeholder={placeholder} rows={4} /> : <input placeholder={placeholder} />}
+        {textarea ? (
+          <textarea placeholder={placeholder} rows={4} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+        ) : (
+          <input placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+        )}
       </span>
     </label>
   );
 }
 
-function NavItem({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
+function NavItem({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
     <button className={`nav-item ${active ? "active" : ""}`} type="button" onClick={onClick}>
       {icon}
       <span>{label}</span>
     </button>
   );
+}
+
+function readLocalState<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  const raw = window.localStorage.getItem(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function readPublicShareId() {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("share");
+}
+
+function buildPublicShareUrl(shareId: string) {
+  if (typeof window === "undefined") return `/?share=${shareId}`;
+  const url = new URL(window.location.origin);
+  url.searchParams.set("share", shareId);
+  return url.toString();
+}
+
+function getNextId(items: Array<{ id: number }>) {
+  return items.length ? Math.max(...items.map((item) => item.id)) + 1 : 1;
+}
+
+function mapPriorityToDb(priority: Priority): DbWish["priority"] {
+  if (priority === "Alta") return "must_have";
+  if (priority === "Media") return "nice_to_have";
+  return "surprise_me";
+}
+
+function buildLocalPublicWishlist(shareId: string, wishes: LocalWish[]): PublicWishlist | null {
+  if (shareId !== localListId) return null;
+
+  return {
+    id: localListId,
+    share_id: localListId,
+    title: localListName,
+    occasion: "Casa nova",
+    event_date: null,
+    message: "Uma selecao de desejos para montar a casa nova com calma.",
+    cover_image_url: images.home,
+    locale: "pt-BR",
+    gifts: wishes.map((wish) => ({
+      id: String(wish.id),
+      wishlist_id: localListId,
+      name: wish.title,
+      description: wish.status ?? null,
+      store_url: wish.originalUrl,
+      image_url: wish.image,
+      estimated_price: parsePriceValue(wish.price),
+      currency: "BRL",
+      priority: mapPriorityToDb(wish.priority ?? "Baixa"),
+      status: wish.status === "Reservado" ? "reserved" : "available",
+      created_at: new Date().toISOString(),
+      affiliate_link:
+        wish.affiliateStatus === "generated" && wish.affiliateUrl
+          ? {
+              original_url: wish.originalUrl,
+              affiliate_url: wish.affiliateUrl,
+              status: "generated",
+            }
+          : null,
+    })),
+  };
+}
+
+function parsePriceValue(price: string) {
+  const normalized = price.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
+}
+
+function currentListTitle(remote: ViewerState, isRemoteMode: boolean) {
+  if (!isRemoteMode) return localListName;
+  return remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.title ?? "Sua lista";
+}
+
+function getWishId(wish: LocalWish | DbWish) {
+  return typeof wish.id === "number" ? String(wish.id) : wish.id;
+}
+
+function getWishTitle(wish: LocalWish | DbWish) {
+  return "title" in wish ? wish.title : wish.name;
+}
+
+function getWishStore(wish: LocalWish | DbWish) {
+  return "store" in wish ? wish.store : getHostnameLabel(wish.store_url);
+}
+
+function getWishPrice(wish: LocalWish | DbWish) {
+  if ("price" in wish) return wish.price;
+  if (wish.estimated_price == null) return "Sem preco";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: wish.currency || "BRL" }).format(wish.estimated_price);
+}
+
+function getWishImage(wish: LocalWish | DbWish) {
+  if ("image" in wish) return wish.image;
+  return wish.image_url || images.setup;
+}
+
+function getWishStatus(wish: LocalWish | DbWish) {
+  if ("status" in wish && typeof wish.id === "number") return wish.status;
+  return wish.status === "reserved" ? "Reservado" : undefined;
+}
+
+function getWishDrop(wish: LocalWish | DbWish) {
+  return "drop" in wish ? wish.drop : undefined;
+}
+
+function getWishPriorityLabel(wish: LocalWish | DbWish) {
+  if ("priority" in wish && typeof wish.id === "number") return wish.priority;
+  if (wish.priority === "must_have") return "Alta";
+  if (wish.priority === "nice_to_have") return "Media";
+  return "Baixa";
+}
+
+function getWishPurchaseUrl(wish: LocalWish | DbWish) {
+  if (!isLocalWish(wish)) {
+    if (wish.affiliate_link?.status === "generated") return wish.affiliate_link.affiliate_url;
+    return wish.store_url || "#";
+  } else {
+    if (wish.affiliateStatus === "generated" && wish.affiliateUrl) return wish.affiliateUrl;
+    return wish.originalUrl;
+  }
+}
+
+function formatEventDate(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function openLink(url: string) {
+  if (!url || url === "#") return;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function getHostnameLabel(url: string | null) {
+  if (!url) return "Loja externa";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "Loja externa";
+  }
+}
+
+function getStoreLabel(source: LocalSource) {
+  if (source === "mercado_livre") return "Mercado Livre";
+  if (source === "amazon") return "Amazon";
+  if (source === "shopee") return "Shopee";
+  if (source === "magalu") return "Magalu";
+  return "Loja externa";
+}
+
+function analyzeProductUrl(rawUrl: string) {
+  const originalUrl = rawUrl.trim() || "https://exemplo.com/item";
+
+  try {
+    const parsed = new URL(originalUrl);
+    const normalized = normalizeResolvedUrl(parsed);
+    const source = detectMarketplace(normalized.hostname, normalized.pathname);
+    return {
+      originalUrl,
+      resolvedUrl: normalized.toString(),
+      source,
+      affiliateStatus: source === "mercado_livre" ? ("not_generated" as LocalAffiliateStatus) : ("unavailable" as LocalAffiliateStatus),
+    };
+  } catch {
+    return {
+      originalUrl,
+      resolvedUrl: null,
+      source: "unknown" as LocalSource,
+      affiliateStatus: "unavailable" as LocalAffiliateStatus,
+    };
+  }
+}
+
+function normalizeResolvedUrl(url: URL) {
+  const normalized = new URL(url.toString());
+  ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid", "tracking_id"].forEach((param) =>
+    normalized.searchParams.delete(param),
+  );
+  normalized.hash = "";
+  return normalized;
+}
+
+function detectMarketplace(hostname: string, pathname: string): LocalSource {
+  const host = hostname.replace(/^www\./, "").toLowerCase();
+  const path = pathname.toLowerCase();
+
+  if (host.includes("mercadolivre") || host.includes("mercadolibre") || host === "mlbr.co" || path.includes("/sec/")) return "mercado_livre";
+  if (host.includes("amazon")) return "amazon";
+  if (host.includes("shopee")) return "shopee";
+  if (host.includes("magazineluiza") || host.includes("magalu")) return "magalu";
+  return "unknown";
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Nao foi possivel concluir a operacao.";
+}
+
+function isLocalWish(wish: LocalWish | DbWish): wish is LocalWish {
+  return typeof wish.id === "number";
 }
 
 export default App;
