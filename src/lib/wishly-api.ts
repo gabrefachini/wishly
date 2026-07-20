@@ -8,8 +8,26 @@ export type DbWish = {
   description: string | null;
   store_url: string | null;
   image_url: string | null;
+  canonical_url?: string | null;
+  provider?: ProductExtractionResult["provider"] | null;
+  store_name?: string | null;
+  seller_name?: string | null;
+  external_product_id?: string | null;
+  external_variant_id?: string | null;
+  current_price?: number | null;
+  original_price?: number | null;
   estimated_price: number | null;
   currency: string;
+  availability?: ProductExtractionResult["availability"] | null;
+  selected_variant?: Array<{
+    name: string;
+    value: string;
+  }> | null;
+  image_urls?: string[] | null;
+  extracted_at?: string | null;
+  extraction_confidence?: ProductExtractionResult["confidence"] | null;
+  extraction_warnings?: string[] | null;
+  autofill_status?: "not_requested" | "pending" | "success" | "partial" | "failed" | null;
   priority: "must_have" | "nice_to_have" | "surprise_me";
   status: "available" | "reserved" | "purchased";
   purchase_type?: "individual" | "collective";
@@ -58,6 +76,20 @@ export type AdminAffiliateQueueItem = {
   created_at: string;
   owner_name: string | null;
   owner_email: string;
+  canonical_url?: string | null;
+  provider?: ProductExtractionResult["provider"] | null;
+  store_name?: string | null;
+  seller_name?: string | null;
+  external_product_id?: string | null;
+  external_variant_id?: string | null;
+  current_price?: number | null;
+  original_price?: number | null;
+  availability?: ProductExtractionResult["availability"] | null;
+  image_url?: string | null;
+  image_urls?: string[] | null;
+  extracted_at?: string | null;
+  extraction_warnings?: string[] | null;
+  autofill_status?: "not_requested" | "pending" | "success" | "partial" | "failed" | null;
 };
 
 export type AdminAccountDeletionRequest = {
@@ -69,6 +101,44 @@ export type AdminAccountDeletionRequest = {
   requested_at: string;
   processed_at: string | null;
   notes: string | null;
+};
+
+export type ProductExtractionResult = {
+  originalUrl: string;
+  canonicalUrl: string | null;
+  provider:
+    | "mercado_livre"
+    | "amazon"
+    | "shopify"
+    | "structured_data"
+    | "open_graph"
+    | "generic"
+    | "manual";
+  storeName: string | null;
+  sellerName: string | null;
+  externalProductId: string | null;
+  externalVariantId: string | null;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  imageUrls: string[];
+  currentPriceInCents: number | null;
+  originalPriceInCents: number | null;
+  currency: string | null;
+  availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
+  selectedVariant: Array<{
+    name: string;
+    value: string;
+  }>;
+  extractedAt: string;
+  confidence: {
+    title: number;
+    description: number;
+    image: number;
+    price: number;
+    variant: number;
+  };
+  warnings: string[];
 };
 
 export async function getInitialSession(): Promise<Session | null> {
@@ -147,6 +217,19 @@ export async function signOut() {
 
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+export async function extractProductFromUrl(url: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.functions.invoke("extract-product", {
+    body: { url },
+  });
+
+  if (error) throw error;
+
+  return data as ProductExtractionResult;
 }
 
 export async function updateViewerProfile(input: { fullName: string; avatarFile?: File | null }) {
@@ -303,12 +386,29 @@ export async function loadWishlistGifts(wishlistId: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
-  const { data, error } = await supabase
+  const enhancedResponse = await supabase
     .from("gifts")
-    .select("id, wishlist_id, name, description, store_url, image_url, estimated_price, currency, priority, status, created_at")
+    .select(
+      "id, wishlist_id, name, description, store_url, image_url, canonical_url, provider, store_name, seller_name, external_product_id, external_variant_id, estimated_price, current_price, original_price, currency, availability, selected_variant, image_urls, extracted_at, extraction_confidence, extraction_warnings, autofill_status, priority, status, created_at",
+    )
     .eq("wishlist_id", wishlistId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
+
+  let data: Record<string, unknown>[] | null = enhancedResponse.data as Record<string, unknown>[] | null;
+  let error = enhancedResponse.error;
+
+  if (error && isSchemaCompatibilityInsertError(error)) {
+    const legacyResponse = await supabase
+      .from("gifts")
+      .select("id, wishlist_id, name, description, store_url, image_url, estimated_price, currency, priority, status, created_at")
+      .eq("wishlist_id", wishlistId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    data = legacyResponse.data as Record<string, unknown>[] | null;
+    error = legacyResponse.error;
+  }
 
   if (error) throw error;
 
@@ -337,7 +437,7 @@ export async function loadWishlistGifts(wishlistId: string) {
 
   return (data ?? []).map((gift) => ({
     ...gift,
-    affiliate_link: linkMap.get(gift.id) ?? null,
+    affiliate_link: linkMap.get(String(gift.id)) ?? null,
   })) as DbWish[];
 }
 
@@ -347,22 +447,126 @@ export async function createGift(input: {
   description: string;
   storeUrl: string;
   priority: DbWish["priority"];
+  imageUrl?: string | null;
+  estimatedPriceInCents?: number | null;
+  currency?: string | null;
+  autofill?: {
+    requestedUrl: string;
+    canonicalUrl?: string | null;
+    provider?: ProductExtractionResult["provider"] | null;
+    storeName?: string | null;
+    sellerName?: string | null;
+    externalProductId?: string | null;
+    externalVariantId?: string | null;
+    availability?: ProductExtractionResult["availability"] | null;
+    selectedVariant?: ProductExtractionResult["selectedVariant"];
+    imageUrls?: string[];
+    extractedAt?: string | null;
+    confidence?: ProductExtractionResult["confidence"] | null;
+    warnings?: string[];
+    status?: "not_requested" | "pending" | "success" | "partial" | "failed";
+    errorMessage?: string | null;
+  };
 }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
-  const payload = {
+  const legacyPayload = {
     wishlist_id: input.wishlistId,
     name: input.name,
     description: input.description || null,
     store_url: input.storeUrl || null,
+    image_url: input.imageUrl ?? null,
+    estimated_price: input.estimatedPriceInCents ?? null,
     priority: input.priority,
-    currency: "BRL",
-    funding_currency: "BRL",
+    currency: input.currency ?? "BRL",
+    funding_currency: input.currency ?? "BRL",
   };
 
-  const { data, error } = await supabase.from("gifts").insert(payload).select("id").single();
+  const autofillPayload = input.autofill
+    ? {
+        canonical_url: input.autofill.canonicalUrl ?? null,
+        provider: input.autofill.provider ?? null,
+        store_name: input.autofill.storeName ?? null,
+        seller_name: input.autofill.sellerName ?? null,
+        external_product_id: input.autofill.externalProductId ?? null,
+        external_variant_id: input.autofill.externalVariantId ?? null,
+        availability: input.autofill.availability ?? "unknown",
+        selected_variant: input.autofill.selectedVariant ?? [],
+        image_urls: input.autofill.imageUrls ?? [],
+        extracted_at: input.autofill.extractedAt ?? null,
+        extraction_confidence: input.autofill.confidence ?? {},
+        extraction_warnings: input.autofill.warnings ?? [],
+        autofill_status: input.autofill.status ?? "not_requested",
+        last_extraction_error: input.autofill.errorMessage ?? null,
+      }
+    : null;
+
+  let data: { id: string } | null = null;
+  let error: Error | null = null;
+
+  if (autofillPayload) {
+    const response = await supabase
+      .from("gifts")
+      .insert({
+        ...legacyPayload,
+        ...autofillPayload,
+      })
+      .select("id")
+      .single();
+
+    data = response.data;
+    error = response.error;
+
+    if (error && isSchemaCompatibilityInsertError(error)) {
+      const legacyResponse = await supabase.from("gifts").insert(legacyPayload).select("id").single();
+      data = legacyResponse.data;
+      error = legacyResponse.error;
+    }
+  } else {
+    const response = await supabase.from("gifts").insert(legacyPayload).select("id").single();
+    data = response.data;
+    error = response.error;
+  }
+
   if (error) throw error;
+  if (!data) throw new Error("Nao foi possivel criar o item.");
+
+  if (input.autofill) {
+    const extractionStatus = input.autofill.status ?? "not_requested";
+    const normalizedPayload = {
+      title: input.name,
+      description: input.description || null,
+      image_url: input.imageUrl ?? null,
+      image_urls: input.autofill.imageUrls ?? [],
+      currency: input.currency ?? "BRL",
+      estimated_price_in_cents: input.estimatedPriceInCents ?? null,
+      canonical_url: input.autofill.canonicalUrl ?? null,
+      provider: input.autofill.provider ?? null,
+      store_name: input.autofill.storeName ?? null,
+      seller_name: input.autofill.sellerName ?? null,
+      external_product_id: input.autofill.externalProductId ?? null,
+      external_variant_id: input.autofill.externalVariantId ?? null,
+      availability: input.autofill.availability ?? "unknown",
+      selected_variant: input.autofill.selectedVariant ?? [],
+    };
+
+    const { error: extractionError } = await supabase.from("product_extractions").insert({
+      gift_id: data.id,
+      requested_url: input.autofill.requestedUrl,
+      canonical_url: input.autofill.canonicalUrl ?? null,
+      provider: input.autofill.provider ?? null,
+      normalized_payload: normalizedPayload,
+      field_confidence: input.autofill.confidence ?? {},
+      extraction_status: extractionStatus,
+      error_message: input.autofill.errorMessage ?? null,
+      extracted_at: input.autofill.extractedAt ?? new Date().toISOString(),
+    });
+
+    if (extractionError && !isSchemaCompatibilityInsertError(extractionError)) {
+      throw extractionError;
+    }
+  }
 
   return data;
 }
@@ -374,7 +578,53 @@ export async function loadAdminAffiliateQueue() {
   const { data, error } = await supabase.rpc("list_admin_affiliate_queue");
   if (error) throw error;
 
-  return (data ?? []) as AdminAffiliateQueueItem[];
+  const queue = (data ?? []) as AdminAffiliateQueueItem[];
+  if (queue.length === 0) return queue;
+
+  const giftIds = queue.map((item) => item.gift_id);
+  const enhancedGiftResponse = await supabase
+    .from("gifts")
+    .select(
+      "id, canonical_url, provider, store_name, seller_name, external_product_id, external_variant_id, current_price, original_price, availability, image_url, image_urls, extracted_at, extraction_warnings, autofill_status",
+    )
+    .in("id", giftIds);
+
+  let giftMetadataRows = enhancedGiftResponse.data;
+  let giftMetadataError = enhancedGiftResponse.error;
+
+  if (giftMetadataError && isSchemaCompatibilityInsertError(giftMetadataError)) {
+    giftMetadataRows = null;
+    giftMetadataError = null;
+  }
+
+  if (giftMetadataError) throw giftMetadataError;
+
+  const metadataMap = new Map(
+    (giftMetadataRows ?? []).map((row) => [
+      row.id,
+      {
+        canonical_url: row.canonical_url,
+        provider: row.provider,
+        store_name: row.store_name,
+        seller_name: row.seller_name,
+        external_product_id: row.external_product_id,
+        external_variant_id: row.external_variant_id,
+        current_price: row.current_price,
+        original_price: row.original_price,
+        availability: row.availability,
+        image_url: row.image_url,
+        image_urls: row.image_urls,
+        extracted_at: row.extracted_at,
+        extraction_warnings: row.extraction_warnings,
+        autofill_status: row.autofill_status,
+      },
+    ]),
+  );
+
+  return queue.map((item) => ({
+    ...item,
+    ...metadataMap.get(item.gift_id),
+  })) as AdminAffiliateQueueItem[];
 }
 
 export async function loadAdminAccountDeletionRequests() {
@@ -458,6 +708,7 @@ export async function loadPublicWishlist(shareId: string) {
   const wishlist = data as PublicWishlist;
   const giftIds = (wishlist.gifts ?? []).map((gift) => gift.id);
   let linkMap = new Map<string, DbWish["affiliate_link"]>();
+  let giftMetadataMap = new Map<string, Partial<DbWish>>();
 
   if (giftIds.length > 0) {
     const { data: linkRows, error: linkError } = await supabase
@@ -477,12 +728,53 @@ export async function loadPublicWishlist(shareId: string) {
         ]),
       );
     }
+
+    const enhancedGiftResponse = await supabase
+      .from("gifts")
+      .select(
+        "id, canonical_url, provider, store_name, seller_name, external_product_id, external_variant_id, current_price, original_price, availability, selected_variant, image_urls, extracted_at, extraction_confidence, extraction_warnings, autofill_status",
+      )
+      .in("id", giftIds);
+
+    let giftMetadataRows = enhancedGiftResponse.data;
+    let giftMetadataError = enhancedGiftResponse.error;
+
+    if (giftMetadataError && isSchemaCompatibilityInsertError(giftMetadataError)) {
+      giftMetadataRows = null;
+      giftMetadataError = null;
+    }
+
+    if (!giftMetadataError) {
+      giftMetadataMap = new Map(
+        (giftMetadataRows ?? []).map((row) => [
+          row.id,
+          {
+            canonical_url: row.canonical_url,
+            provider: row.provider,
+            store_name: row.store_name,
+            seller_name: row.seller_name,
+            external_product_id: row.external_product_id,
+            external_variant_id: row.external_variant_id,
+            current_price: row.current_price,
+            original_price: row.original_price,
+            availability: row.availability,
+            selected_variant: row.selected_variant,
+            image_urls: row.image_urls,
+            extracted_at: row.extracted_at,
+            extraction_confidence: row.extraction_confidence,
+            extraction_warnings: row.extraction_warnings,
+            autofill_status: row.autofill_status,
+          },
+        ]),
+      );
+    }
   }
 
   return {
     ...wishlist,
     gifts: (wishlist.gifts ?? []).map((gift) => ({
       ...gift,
+      ...giftMetadataMap.get(gift.id),
       affiliate_link: linkMap.get(gift.id) ?? null,
     })),
   } as PublicWishlist;
@@ -498,4 +790,18 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
+}
+
+function isSchemaCompatibilityInsertError(error: { code?: string; message?: string; details?: string | null; hint?: string | null }) {
+  const context = [error.code, error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
+  return (
+    context.includes("could not find the") ||
+    context.includes("column") ||
+    context.includes("schema cache") ||
+    context.includes("product_extractions") ||
+    context.includes("does not exist") ||
+    error.code === "PGRST204" ||
+    error.code === "42703" ||
+    error.code === "42P01"
+  );
 }

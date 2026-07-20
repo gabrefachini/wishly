@@ -69,7 +69,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -1485,6 +1486,10 @@ button:disabled {
   gap: 10px;
 }
 
+.split-row {
+  flex-direction: column;
+}
+
 .primary-button,
 .secondary-button,
 .fab {
@@ -1950,7 +1955,8 @@ button:disabled {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 0;
   outline: 0;
@@ -1958,7 +1964,8 @@ textarea {
   background: transparent;
 }
 
-input {
+input,
+select {
   min-height: 52px;
   padding: 0 14px;
 }
@@ -1966,6 +1973,123 @@ input {
 textarea {
   resize: vertical;
   padding: 14px;
+}
+
+select {
+  appearance: none;
+  cursor: pointer;
+}
+
+.product-extraction-card {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: 20px;
+  background: var(--surface-low);
+  box-shadow: var(--shadow);
+}
+
+.product-extraction-card > img,
+.product-extraction-skeleton-media {
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: var(--surface-mid);
+}
+
+.product-extraction-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.product-extraction-copy strong,
+.product-extraction-copy p,
+.product-extraction-copy span,
+.product-extraction-price-row small {
+  margin: 0;
+}
+
+.product-extraction-copy strong {
+  color: var(--text);
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.product-extraction-copy span,
+.product-extraction-copy p,
+.product-extraction-price-row small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.product-extraction-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.product-extraction-price-row strong {
+  color: var(--text);
+  font-family: "Epilogue", sans-serif;
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.product-extraction-card.skeleton {
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+}
+
+.product-extraction-skeleton-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.product-extraction-skeleton-copy span,
+.product-extraction-card.skeleton p {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--surface-mid), var(--surface-high), var(--surface-mid));
+  background-size: 200% 100%;
+  animation: extraction-pulse 1.25s ease-in-out infinite;
+}
+
+.product-extraction-skeleton-copy span:nth-child(1) {
+  width: 82%;
+  height: 16px;
+}
+
+.product-extraction-skeleton-copy span:nth-child(2) {
+  width: 58%;
+  height: 12px;
+}
+
+.product-extraction-skeleton-copy span:nth-child(3) {
+  width: 36%;
+  height: 12px;
+}
+
+.product-extraction-card.skeleton p {
+  grid-column: 1 / -1;
+  width: 214px;
+  max-width: 100%;
+  height: 12px;
+  color: transparent;
+}
+
+@keyframes extraction-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .segmented {
@@ -2012,6 +2136,18 @@ textarea {
   gap: 12px;
 }
 
+.radar-row-critical {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #c84f3a 24%, transparent), var(--shadow);
+}
+
+.radar-row-opportunity {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1d8f5a 24%, transparent), var(--shadow);
+}
+
+.radar-row-review {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #c08a1b 24%, transparent), var(--shadow);
+}
+
 .radar-row img {
   width: 72px;
   height: 72px;
@@ -2025,6 +2161,58 @@ textarea {
 
 .radar-row strong {
   color: var(--primary);
+}
+
+.radar-row-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.radar-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.radar-pill-success {
+  color: #155e3b;
+  background: color-mix(in srgb, #d7f4e6 92%, white);
+}
+
+.radar-pill-danger {
+  color: #8a2f24;
+  background: color-mix(in srgb, #ffe2dc 92%, white);
+}
+
+.radar-pill-warning {
+  color: #7d5600;
+  background: color-mix(in srgb, #fff0c7 92%, white);
+}
+
+.radar-pill-neutral,
+.radar-pill-muted {
+  color: var(--muted);
+  background: var(--surface-low);
+}
+
+.radar-score {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.radar-score span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .sparkline {
@@ -2409,6 +2597,14 @@ textarea {
 
   .desktop-flow-main {
     padding: 24px 24px 28px;
+  }
+
+  .split-row {
+    flex-direction: row;
+  }
+
+  .split-row > .field {
+    flex: 1 1 0;
   }
 
   .inset-section {

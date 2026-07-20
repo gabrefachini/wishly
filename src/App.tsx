@@ -41,6 +41,7 @@ import {
   listenToAuthChanges,
   loadAdminAffiliateQueue,
   loadAdminAccountDeletionRequests,
+  extractProductFromUrl,
   processAdminAccountDeletionRequest,
   resolvePublicGiftRedirect,
   loadViewerContext,
@@ -60,6 +61,7 @@ import {
   type DbWish,
   type DbWishlist,
   type PublicWishlist,
+  type ProductExtractionResult,
   loadPublicWishlist,
 } from "./lib/wishly-api";
 
@@ -118,6 +120,26 @@ type AddWishFormState = {
   productUrl: string;
   title: string;
   note: string;
+  imageUrl: string;
+  imageUrlsText: string;
+  currentPrice: string;
+  originalPrice: string;
+  currency: string;
+  availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
+  storeName: string;
+  marketplace: string;
+  canonicalUrl: string;
+  externalProductId: string;
+  externalVariantId: string;
+  selectedVariantText: string;
+};
+
+type ProductExtractionState = {
+  status: "idle" | "loading" | "success" | "partial" | "error";
+  message: string;
+  provider: ProductExtractionResult["provider"] | null;
+  preview: ProductExtractionResult | null;
+  extractedUrl: string | null;
 };
 
 type CreateListFormState = {
@@ -275,6 +297,24 @@ const localProfileSeed: LocalProfile = {
   deletionRequestedAt: null,
 };
 
+const initialAddWishFormState: AddWishFormState = {
+  productUrl: "",
+  title: "",
+  note: "",
+  imageUrl: "",
+  imageUrlsText: "",
+  currentPrice: "",
+  originalPrice: "",
+  currency: "BRL",
+  availability: "unknown",
+  storeName: "",
+  marketplace: "",
+  canonicalUrl: "",
+  externalProductId: "",
+  externalVariantId: "",
+  selectedVariantText: "",
+};
+
 function App() {
   const [view, setView] = useState<View>("home");
   const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
@@ -288,7 +328,14 @@ function App() {
     readLocalState("wishly-affiliate-tasks", []),
   );
   const [localProfile, setLocalProfile] = useState<LocalProfile>(() => readLocalState("wishly-local-profile", localProfileSeed));
-  const [formState, setFormState] = useState<AddWishFormState>({ productUrl: "", title: "", note: "" });
+  const [formState, setFormState] = useState<AddWishFormState>(initialAddWishFormState);
+  const [extractionState, setExtractionState] = useState<ProductExtractionState>({
+    status: "idle",
+    message: "",
+    provider: null,
+    preview: null,
+    extractedUrl: null,
+  });
   const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
   const [profileForm, setProfileForm] = useState<ProfileFormState>(localProfileSeed);
   const [accessForm, setAccessForm] = useState<AccessFormState>({
@@ -621,6 +668,8 @@ function App() {
 
   async function handleAddWish() {
     const fallbackTitle = formState.title.trim() || "Novo desejo";
+    const priceInCents = parsePriceInputToCents(formState.currentPrice);
+    const canonicalOrOriginalUrl = formState.canonicalUrl.trim() || formState.productUrl.trim();
 
     if (isRemoteMode && remote.selectedWishlistId) {
       try {
@@ -631,12 +680,61 @@ function App() {
           wishlistId: remote.selectedWishlistId,
           name: fallbackTitle,
           description: formState.note.trim(),
-          storeUrl: formState.productUrl.trim(),
+          storeUrl: canonicalOrOriginalUrl,
           priority: mapPriorityToDb(selectedPriority),
+          imageUrl: formState.imageUrl.trim() || null,
+          estimatedPriceInCents: priceInCents,
+          currency: formState.currency.trim() || "BRL",
+          autofill: extractionState.preview
+            ? {
+                requestedUrl: formState.productUrl.trim() || canonicalOrOriginalUrl,
+                canonicalUrl: extractionState.preview.canonicalUrl,
+                provider: extractionState.preview.provider,
+                storeName: extractionState.preview.storeName,
+                sellerName: extractionState.preview.sellerName,
+                externalProductId: extractionState.preview.externalProductId,
+                externalVariantId: extractionState.preview.externalVariantId,
+                availability: extractionState.preview.availability,
+                selectedVariant: extractionState.preview.selectedVariant,
+                imageUrls: extractionState.preview.imageUrls,
+                extractedAt: extractionState.preview.extractedAt,
+                confidence: extractionState.preview.confidence,
+                warnings: extractionState.preview.warnings,
+                status: extractionState.status === "success"
+                  ? "success"
+                  : extractionState.status === "partial"
+                    ? "partial"
+                    : extractionState.status === "loading"
+                      ? "pending"
+                      : extractionState.status === "error"
+                        ? "failed"
+                        : "not_requested",
+                errorMessage: extractionState.status === "error" ? extractionState.message : null,
+              }
+            : formState.productUrl.trim()
+              ? {
+                  requestedUrl: formState.productUrl.trim(),
+                  canonicalUrl: formState.canonicalUrl.trim() || null,
+                  provider: null,
+                  storeName: formState.storeName.trim() || null,
+                  sellerName: null,
+                  externalProductId: formState.externalProductId.trim() || null,
+                  externalVariantId: formState.externalVariantId.trim() || null,
+                  availability: formState.availability,
+                  selectedVariant: parseSelectedVariantText(formState.selectedVariantText),
+                  imageUrls: parseImageUrlsText(formState.imageUrlsText),
+                  extractedAt: null,
+                  confidence: null,
+                  warnings: [],
+                  status: extractionState.status === "error" ? "failed" : "not_requested",
+                  errorMessage: extractionState.status === "error" ? extractionState.message : null,
+                }
+              : undefined,
         });
 
         await refreshRemoteState(session);
-        setFormState({ productUrl: "", title: "", note: "" });
+        setFormState(initialAddWishFormState);
+        setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
         setSelectedPriority("Alta");
         go("list");
         return;
@@ -652,12 +750,12 @@ function App() {
     const createdWish: LocalWish = {
       id: nextWishId,
       title: fallbackTitle,
-      store: getStoreLabel(linkData.source),
-      price: "Adicionar preco",
-      image: images.setup,
+      store: formState.storeName.trim() || getStoreLabel(linkData.source),
+      price: formState.currentPrice.trim() || "Adicionar preco",
+      image: formState.imageUrl.trim() || images.setup,
       priority: selectedPriority,
       originalUrl: linkData.originalUrl,
-      resolvedUrl: linkData.resolvedUrl,
+      resolvedUrl: formState.canonicalUrl.trim() || linkData.resolvedUrl,
       affiliateUrl: null,
       source: linkData.source,
       affiliateStatus: linkData.affiliateStatus,
@@ -687,7 +785,8 @@ function App() {
       setDraftAffiliateUrls((current) => ({ ...current, [nextTaskId]: "" }));
     }
 
-    setFormState({ productUrl: "", title: "", note: "" });
+    setFormState(initialAddWishFormState);
+    setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
     setSelectedPriority("Alta");
     go("list");
   }
@@ -1068,6 +1167,61 @@ function App() {
   }, [viewerProfile.privacy.defaultListVisibility, viewerProfile.privacy.profileVisibility]);
 
   useEffect(() => {
+    if (view !== "add") return;
+
+    const rawUrl = formState.productUrl.trim();
+    if (!isValidHttpUrl(rawUrl)) {
+      setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
+      return;
+    }
+
+    if (extractionState.extractedUrl === rawUrl && extractionState.status !== "error") {
+      return;
+    }
+
+    let active = true;
+    const timeout = window.setTimeout(async () => {
+      try {
+        setExtractionState({
+          status: "loading",
+          message: "Buscando informações do produto",
+          provider: null,
+          preview: null,
+          extractedUrl: rawUrl,
+        });
+
+        const result = await extractProductFromUrl(rawUrl);
+        if (!active) return;
+
+        setFormState((current) => mergeExtractedProductIntoForm(current, result));
+        setExtractionState({
+          status: result.warnings.length > 0 ? "partial" : "success",
+          message: result.warnings.length > 0
+            ? "Encontramos quase tudo. Confira as informações antes de adicionar."
+            : "Informações do produto preenchidas automaticamente.",
+          provider: result.provider,
+          preview: result,
+          extractedUrl: rawUrl,
+        });
+      } catch {
+        if (!active) return;
+        setExtractionState({
+          status: "error",
+          message: "Não conseguimos ler todos os dados deste link. Você ainda pode adicionar o item manualmente.",
+          provider: null,
+          preview: null,
+          extractedUrl: rawUrl,
+        });
+      }
+    }, 550);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [view, formState.productUrl, extractionState.extractedUrl, extractionState.status]);
+
+  useEffect(() => {
     if (!supabaseEnabled) return;
 
     let active = true;
@@ -1328,6 +1482,7 @@ function App() {
         {view === "add" && (
           <AddWishScreen
             formState={formState}
+            extractionState={extractionState}
             go={go}
             selectedPriority={selectedPriority}
             setFormState={setFormState}
@@ -2301,6 +2456,7 @@ function ListScreen({
 
 function AddWishScreen({
   formState,
+  extractionState,
   go,
   selectedPriority,
   setFormState,
@@ -2310,6 +2466,7 @@ function AddWishScreen({
   isRemoteMode,
 }: {
   formState: AddWishFormState;
+  extractionState: ProductExtractionState;
   go: (view: View) => void;
   selectedPriority: Priority;
   setFormState: (state: AddWishFormState) => void;
@@ -2329,11 +2486,9 @@ function AddWishScreen({
       >
         <div className="upload-card">
           <Search size={24} />
-          <h2>Cole um link ou descreva o desejo</h2>
+          <h2>Cole o link de qualquer produto</h2>
           <p>
-            {isRemoteMode
-              ? "Esse desejo será salvo na sua lista e pode ser compartilhado depois."
-              : "Adicione os detalhes do desejo para continuar montando sua lista."}
+            Preenchemos automaticamente nome, foto e preço sempre que possível.
           </p>
         </div>
         <Field
@@ -2342,11 +2497,139 @@ function AddWishScreen({
           value={formState.productUrl}
           onChange={(value) => setFormState({ ...formState, productUrl: value })}
         />
+        {extractionState.status === "loading" && (
+          <div className="product-extraction-card skeleton">
+            <div className="product-extraction-skeleton-media" />
+            <div className="product-extraction-skeleton-copy">
+              <span />
+              <span />
+              <span />
+            </div>
+            <p>Buscando informações do produto</p>
+          </div>
+        )}
+        {extractionState.status !== "idle" && extractionState.status !== "loading" && (
+          <div className={`sync-banner ${extractionState.status === "error" ? "error" : "success"}`}>{extractionState.message}</div>
+        )}
+        {(extractionState.preview || formState.title.trim() || formState.imageUrl.trim()) && (
+          <div className="product-extraction-card">
+            <img src={formState.imageUrl.trim() || images.setup} alt="" />
+            <div className="product-extraction-copy">
+              <strong>{formState.title.trim() || "Produto sem nome"}</strong>
+              <span>
+                {formState.storeName.trim() || "Loja não identificada"}
+                {formState.marketplace.trim() ? ` · ${formState.marketplace}` : ""}
+              </span>
+              <div className="product-extraction-price-row">
+                <strong>{formState.currentPrice.trim() || "Preço não identificado"}</strong>
+                {formState.originalPrice.trim() && <small>{formState.originalPrice}</small>}
+              </div>
+              {formState.selectedVariantText.trim() && <p>{formState.selectedVariantText}</p>}
+            </div>
+          </div>
+        )}
         <Field
           label="Nome do desejo"
           placeholder="Poltrona boucle creme"
           value={formState.title}
           onChange={(value) => setFormState({ ...formState, title: value })}
+        />
+        <Field
+          label="Descrição"
+          placeholder="Descrição do produto, detalhes ou observações"
+          textarea
+          value={formState.note}
+          onChange={(value) => setFormState({ ...formState, note: value })}
+        />
+        <div className="field-row split-row">
+          <Field
+            label="Loja"
+            placeholder="Mercado Livre"
+            value={formState.storeName}
+            onChange={(value) => setFormState({ ...formState, storeName: value })}
+          />
+          <Field
+            label="Marketplace"
+            placeholder="mercado_livre"
+            value={formState.marketplace}
+            onChange={(value) => setFormState({ ...formState, marketplace: value })}
+          />
+        </div>
+        <div className="field-row split-row">
+          <Field
+            label="Preço atual"
+            placeholder="R$ 199,90"
+            value={formState.currentPrice}
+            onChange={(value) => setFormState({ ...formState, currentPrice: value })}
+          />
+          <Field
+            label="Preço anterior"
+            placeholder="R$ 249,90"
+            value={formState.originalPrice}
+            onChange={(value) => setFormState({ ...formState, originalPrice: value })}
+          />
+        </div>
+        <div className="field-row split-row">
+          <Field
+            label="Moeda"
+            placeholder="BRL"
+            value={formState.currency}
+            onChange={(value) => setFormState({ ...formState, currency: value.toUpperCase() })}
+          />
+          <label className="field">
+            <span className="field-label">Disponibilidade</span>
+            <span className="input-wrap">
+              <select
+                value={formState.availability}
+                onChange={(event) => setFormState({ ...formState, availability: event.target.value as AddWishFormState["availability"] })}
+              >
+                <option value="unknown">Desconhecida</option>
+                <option value="in_stock">Em estoque</option>
+                <option value="out_of_stock">Sem estoque</option>
+                <option value="preorder">Pré-venda</option>
+              </select>
+            </span>
+          </label>
+        </div>
+        <Field
+          label="Imagem principal"
+          placeholder="https://..."
+          value={formState.imageUrl}
+          onChange={(value) => setFormState({ ...formState, imageUrl: value })}
+        />
+        <Field
+          label="Imagens adicionais"
+          placeholder={"Uma URL por linha"}
+          textarea
+          value={formState.imageUrlsText}
+          onChange={(value) => setFormState({ ...formState, imageUrlsText: value })}
+        />
+        <div className="field-row split-row">
+          <Field
+            label="Produto externo"
+            placeholder="MLB123456"
+            value={formState.externalProductId}
+            onChange={(value) => setFormState({ ...formState, externalProductId: value })}
+          />
+          <Field
+            label="Variante externa"
+            placeholder="987654321"
+            value={formState.externalVariantId}
+            onChange={(value) => setFormState({ ...formState, externalVariantId: value })}
+          />
+        </div>
+        <Field
+          label="Variação selecionada"
+          placeholder={"Cor: Preta\nVoltagem: 110V"}
+          textarea
+          value={formState.selectedVariantText}
+          onChange={(value) => setFormState({ ...formState, selectedVariantText: value })}
+        />
+        <Field
+          label="URL canônica"
+          placeholder="https://..."
+          value={formState.canonicalUrl}
+          onChange={(value) => setFormState({ ...formState, canonicalUrl: value })}
         />
         <div>
           <p className="field-label">Prioridade</p>
@@ -2363,13 +2646,6 @@ function AddWishScreen({
             ))}
           </div>
         </div>
-        <Field
-          label="Observacao"
-          placeholder="Tamanho, cor, motivo ou alternativa"
-          textarea
-          value={formState.note}
-          onChange={(value) => setFormState({ ...formState, note: value })}
-        />
         <div className="field-row">
           <button className="secondary-button" type="button" onClick={() => go("list")}>
             Voltar
@@ -2383,22 +2659,22 @@ function AddWishScreen({
 
       <aside className="desktop-flow-aside">
         <div className="desktop-flow-card">
-          <p className="label">Dica rápida</p>
-          <h2>Comece pelo link. O restante você ajusta depois.</h2>
-          <p>Você não precisa preencher tudo de primeira. Salve o desejo, organize a prioridade e refine os detalhes quando quiser.</p>
+          <p className="label">Extração automática</p>
+          <h2>O link puxa o máximo possível. Você revisa antes de salvar.</h2>
+          <p>Nada é salvo automaticamente. O formulário continua totalmente editável, mesmo quando a leitura do link vier incompleta.</p>
         </div>
         <div className="desktop-flow-points">
           <article>
-            <strong>Link do produto</strong>
-            <p>Facilita a compra para quem receber sua lista.</p>
+            <strong>Provider específico primeiro</strong>
+            <p>Mercado Livre, Shopify e dados estruturados têm prioridade antes do fallback genérico.</p>
           </article>
           <article>
-            <strong>Prioridade</strong>
-            <p>Ajuda a destacar o que faz mais sentido naquele momento.</p>
+            <strong>Preview antes de salvar</strong>
+            <p>Nome, foto, preço e variações aparecem para revisão antes do cadastro final.</p>
           </article>
           <article>
-            <strong>Observação</strong>
-            <p>Explique tamanho, cor ou alguma alternativa, se precisar.</p>
+            <strong>Fallback manual</strong>
+            <p>Se a leitura falhar, você ainda consegue preencher o item inteiro manualmente.</p>
           </article>
         </div>
       </aside>
@@ -2536,24 +2812,41 @@ function PublicWishlistPage({
 }
 
 function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracked: number[]; wishes: Array<LocalWish | DbWish> }) {
+  const radarItems = wishes
+    .map((wish, index) => buildRadarItem(wish, tracked.includes(index + 1)))
+    .sort((left, right) => right.priorityScore - left.priorityScore);
+  const potentialSavings = radarItems.reduce((sum, item) => sum + item.savingsInCurrency, 0);
+  const criticalCount = radarItems.filter((item) => item.state === "critical").length;
+  const opportunityCount = radarItems.filter((item) => item.state === "opportunity").length;
+  const reviewCount = radarItems.filter((item) => item.state === "review").length;
+
   return (
     <>
       <section className="radar-summary">
         <p className="label">Monitoramento Pro</p>
-        <h2>Economia potencial de R$ 740</h2>
-        <p>O radar acompanha preco, estoque e melhor momento de compra para os itens marcados.</p>
+        <h2>Economia potencial de {formatCurrency(potentialSavings, "BRL")}</h2>
+        <p>O radar prioriza queda real de preco, risco de estoque e confiabilidade dos dados do item.</p>
+        <div className="stat-grid">
+          <Stat value={String(opportunityCount)} label="oportunidades" />
+          <Stat value={String(criticalCount)} label="criticos" />
+          <Stat value={String(reviewCount)} label="revisar" />
+        </div>
         <button className="primary-button" type="button" onClick={() => go("pro")}>
           <Lock size={18} />
           Ver recursos Pro
         </button>
       </section>
       <section className="vertical-list">
-        {wishes.map((wish, index) => (
-          <article className="radar-row" key={getWishId(wish)}>
-            <img src={getWishImage(wish)} alt="" />
+        {radarItems.map((item) => (
+          <article className={`radar-row radar-row-${item.state}`} key={getWishId(item.wish)}>
+            <img src={getWishImage(item.wish)} alt="" />
             <div>
-              <p className="row-title">{getWishTitle(wish)}</p>
-              <p className="row-meta">{tracked.includes(index + 1) ? "Acompanhando preco" : "Radar pausado"}</p>
+              <p className="row-title">{getWishTitle(item.wish)}</p>
+              <p className="row-meta radar-row-topline">
+                {item.statusLabel}
+                {!isLocalWish(item.wish) ? ` · ${getWishAvailabilityLabel(item.wish)}` : ""}
+                {!isLocalWish(item.wish) && item.wish.provider ? ` · ${formatProviderLabel(item.wish.provider)}` : ""}
+              </p>
               <div className="sparkline" aria-hidden="true">
                 <span />
                 <span />
@@ -2561,8 +2854,16 @@ function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracke
                 <span />
                 <span />
               </div>
+              <div className="radar-row-detail">
+                <span className={`radar-pill radar-pill-${item.stateTone}`}>{item.stateLabel}</span>
+                <span className="row-meta">{item.metricLabel}</span>
+              </div>
+              <p className="row-meta">{item.supportLabel}</p>
             </div>
-            <strong>{getWishDrop(wish) ?? "0%"}</strong>
+            <div className="radar-score">
+              <strong>{getWishDrop(item.wish) ?? "0%"}</strong>
+              <span>{item.isTracked ? `Prioridade ${item.priorityScore}` : "Pausado"}</span>
+            </div>
           </article>
         ))}
       </section>
@@ -2992,12 +3293,23 @@ function AdminScreen({
                   <p className="label">Pendente</p>
                   <h3>{task.item_title}</h3>
                 </div>
-                <span className="status-pill">{task.merchant_name}</span>
+                <span className="status-pill">{task.store_name?.trim() || task.merchant_name}</span>
               </div>
               <div className="admin-meta">
                 <span>Lista: {task.wishlist_title}</span>
                 <span>Dono: {task.owner_name ?? task.owner_email}</span>
               </div>
+              <div className="admin-meta">
+                <span>Origem: {task.provider ? formatProviderLabel(task.provider) : task.merchant_name}</span>
+                <span>Autofill: {getAdminAutofillStatusLabel(task)}</span>
+                <span>Disponibilidade: {getAdminAvailabilityLabel(task)}</span>
+              </div>
+              {(task.current_price != null || task.original_price != null) && (
+                <div className="admin-meta">
+                  <span>Atual: {formatCurrency(task.current_price, "BRL")}</span>
+                  <span>Anterior: {formatCurrency(task.original_price, "BRL")}</span>
+                </div>
+              )}
               <label className="link-block">
                 <span className="field-label">Original URL</span>
                 <div className="link-line">
@@ -3007,6 +3319,17 @@ function AdminScreen({
                   </button>
                 </div>
               </label>
+              {task.canonical_url && task.canonical_url !== task.original_url && (
+                <label className="link-block">
+                  <span className="field-label">Canonical URL</span>
+                  <div className="link-line">
+                    <code>{task.canonical_url}</code>
+                    <button className="icon-button" type="button" onClick={() => openLink(task.canonical_url!)} aria-label="Abrir link canonico">
+                      <ExternalLink size={18} />
+                    </button>
+                  </div>
+                </label>
+              )}
               <Field
                 label="Affiliate URL"
                 placeholder="https://..."
@@ -3436,6 +3759,85 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
   );
 }
 
+function mergeExtractedProductIntoForm(formState: AddWishFormState, result: ProductExtractionResult): AddWishFormState {
+  return {
+    ...formState,
+    title: result.title ?? formState.title,
+    note: result.description ?? formState.note,
+    imageUrl: result.imageUrl ?? formState.imageUrl,
+    imageUrlsText: result.imageUrls.length > 0 ? result.imageUrls.join("\n") : formState.imageUrlsText,
+    currentPrice: result.currentPriceInCents != null ? formatPriceInput(result.currentPriceInCents, result.currency) : formState.currentPrice,
+    originalPrice: result.originalPriceInCents != null ? formatPriceInput(result.originalPriceInCents, result.currency) : formState.originalPrice,
+    currency: result.currency ?? formState.currency,
+    availability: result.availability !== "unknown" ? result.availability : formState.availability,
+    storeName: result.storeName ?? formState.storeName,
+    marketplace: result.provider,
+    canonicalUrl: result.canonicalUrl ?? formState.canonicalUrl,
+    externalProductId: result.externalProductId ?? formState.externalProductId,
+    externalVariantId: result.externalVariantId ?? formState.externalVariantId,
+    selectedVariantText: result.selectedVariant.length > 0
+      ? result.selectedVariant.map((variant) => `${variant.name}: ${variant.value}`).join("\n")
+      : formState.selectedVariantText,
+  };
+}
+
+function parseImageUrlsText(value: string) {
+  return value
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function parseSelectedVariantText(value: string) {
+  return value
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separatorIndex = entry.indexOf(":");
+      if (separatorIndex === -1) {
+        return {
+          name: "Detalhe",
+          value: entry,
+        };
+      }
+
+      return {
+        name: entry.slice(0, separatorIndex).trim() || "Detalhe",
+        value: entry.slice(separatorIndex + 1).trim(),
+      };
+    })
+    .filter((entry) => entry.value);
+}
+
+function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function formatPriceInput(amountInCents: number, currency: string | null) {
+  const normalizedCurrency = currency?.trim().toUpperCase() || "BRL";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: normalizedCurrency,
+  }).format(amountInCents / 100);
+}
+
+function parsePriceInputToCents(value: string) {
+  const normalized = value.replace(/[^\d,.-]/g, "").trim();
+  if (!normalized) return null;
+  const withDotDecimal = normalized.includes(",")
+    ? normalized.replace(/\./g, "").replace(",", ".")
+    : normalized;
+  const numeric = Number(withDotDecimal);
+  if (Number.isNaN(numeric)) return null;
+  return Math.round(numeric * 100);
+}
+
 function readLocalState<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   const raw = window.localStorage.getItem(key);
@@ -3561,18 +3963,30 @@ function getWishTitle(wish: LocalWish | DbWish) {
 }
 
 function getWishStore(wish: LocalWish | DbWish) {
-  return "store" in wish ? wish.store : getHostnameLabel(wish.store_url);
+  if ("store" in wish) return wish.store;
+  if (wish.store_name?.trim()) {
+    return wish.provider ? `${wish.store_name} · ${formatProviderLabel(wish.provider)}` : wish.store_name;
+  }
+  if (wish.provider) {
+    return formatProviderLabel(wish.provider);
+  }
+  return getHostnameLabel(wish.canonical_url || wish.store_url);
 }
 
 function getWishPrice(wish: LocalWish | DbWish) {
   if ("price" in wish) return wish.price;
-  if (wish.estimated_price == null) return "Sem preco";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: wish.currency || "BRL" }).format(wish.estimated_price);
+  const amount = wish.current_price ?? wish.estimated_price;
+  if (amount == null) return "Sem preco";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: getWishCurrency(wish) }).format(amount);
+}
+
+function getWishCurrency(wish: LocalWish | DbWish) {
+  return "currency" in wish ? wish.currency || "BRL" : "BRL";
 }
 
 function getWishImage(wish: LocalWish | DbWish) {
   if ("image" in wish) return wish.image;
-  return wish.image_url || images.setup;
+  return wish.image_url || wish.image_urls?.[0] || images.setup;
 }
 
 function getWishStatus(wish: LocalWish | DbWish) {
@@ -3581,7 +3995,29 @@ function getWishStatus(wish: LocalWish | DbWish) {
 }
 
 function getWishDrop(wish: LocalWish | DbWish) {
+  if (!isLocalWish(wish) && wish.current_price != null && wish.original_price != null && wish.original_price > wish.current_price) {
+    const delta = ((wish.current_price - wish.original_price) / wish.original_price) * 100;
+    return `${Math.round(delta)}%`;
+  }
   return "drop" in wish ? wish.drop : undefined;
+}
+
+function getWishDiscountPercent(wish: LocalWish | DbWish) {
+  if (!isLocalWish(wish) && wish.current_price != null && wish.original_price != null && wish.original_price > 0) {
+    return ((wish.current_price - wish.original_price) / wish.original_price) * 100;
+  }
+  if ("drop" in wish && wish.drop) {
+    const parsed = Number(wish.drop.replace(/[^\d-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function getWishSavingsAmount(wish: LocalWish | DbWish) {
+  if (!isLocalWish(wish) && wish.current_price != null && wish.original_price != null && wish.original_price > wish.current_price) {
+    return wish.original_price - wish.current_price;
+  }
+  return 0;
 }
 
 function getWishPriorityLabel(wish: LocalWish | DbWish) {
@@ -3594,7 +4030,7 @@ function getWishPriorityLabel(wish: LocalWish | DbWish) {
 function getWishPurchaseUrl(wish: LocalWish | DbWish) {
   if (!isLocalWish(wish)) {
     if (wish.affiliate_link?.status === "generated") return wish.affiliate_link.affiliate_url;
-    return wish.store_url || "#";
+    return wish.canonical_url || wish.store_url || "#";
   } else {
     if (wish.affiliateStatus === "generated" && wish.affiliateUrl) return wish.affiliateUrl;
     return wish.originalUrl;
@@ -3631,6 +4067,187 @@ function getHostnameLabel(url: string | null) {
   } catch {
     return "Loja externa";
   }
+}
+
+function formatProviderLabel(provider: NonNullable<ProductExtractionResult["provider"]>) {
+  switch (provider) {
+    case "mercado_livre":
+      return "Mercado Livre";
+    case "structured_data":
+      return "Structured Data";
+    case "open_graph":
+      return "Open Graph";
+    case "shopify":
+      return "Shopify";
+    case "generic":
+      return "Loja externa";
+    case "manual":
+      return "Manual";
+    case "amazon":
+      return "Amazon";
+    default:
+      return provider;
+  }
+}
+
+function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
+  const savingsInCurrency = getWishSavingsAmount(wish);
+  const availability = !isLocalWish(wish) ? wish.availability ?? "unknown" : "unknown";
+  const autofillStatus = !isLocalWish(wish) ? wish.autofill_status ?? "not_requested" : "not_requested";
+  const warningCount = !isLocalWish(wish) ? wish.extraction_warnings?.length ?? 0 : 0;
+  const hasRealDrop = savingsInCurrency > 0;
+  const largeDrop = getWishDiscountPercent(wish) <= -10;
+
+  if (!isTracked) {
+    return {
+      wish,
+      isTracked,
+      state: "paused" as const,
+      stateTone: "muted" as const,
+      stateLabel: "Radar pausado",
+      statusLabel: "Monitoramento inativo",
+      supportLabel: "Ative o radar para priorizar preco, estoque e sinais de extração.",
+      metricLabel: "Sem regras ativas",
+      priorityScore: 0,
+      savingsInCurrency: 0,
+    };
+  }
+
+  if (availability === "out_of_stock") {
+    return {
+      wish,
+      isTracked,
+      state: "critical" as const,
+      stateTone: "danger" as const,
+      stateLabel: "Atencao imediata",
+      statusLabel: "Risco de compra",
+      supportLabel: "O item está sem estoque e deve ser revisado antes de compartilhar ou comprar.",
+      metricLabel: "Estoque indisponivel",
+      priorityScore: 95,
+      savingsInCurrency,
+    };
+  }
+
+  if (hasRealDrop && largeDrop) {
+    return {
+      wish,
+      isTracked,
+      state: "opportunity" as const,
+      stateTone: "success" as const,
+      stateLabel: "Boa oportunidade",
+      statusLabel: "Queda relevante",
+      supportLabel: "A diferenca entre preco atual e anterior ja justifica destaque no radar.",
+      metricLabel: `Economia de ${formatCurrency(savingsInCurrency, getWishCurrency(wish))}`,
+      priorityScore: 88,
+      savingsInCurrency,
+    };
+  }
+
+  if (autofillStatus === "failed" || warningCount > 0 || autofillStatus === "partial") {
+    return {
+      wish,
+      isTracked,
+      state: "review" as const,
+      stateTone: "warning" as const,
+      stateLabel: "Revisar dados",
+      statusLabel: "Dados incompletos",
+      supportLabel: warningCount > 0
+        ? `${warningCount} sinal(is) de extração pedem revisão manual antes de confiar no monitoramento.`
+        : "O item ainda não tem dados confiáveis o suficiente para um radar completo.",
+      metricLabel: !isLocalWish(wish) ? `Autofill ${getWishAutofillStatusLabel(wish)}` : "Item manual",
+      priorityScore: 70,
+      savingsInCurrency,
+    };
+  }
+
+  if (!isLocalWish(wish) && wish.current_price == null && wish.estimated_price == null) {
+    return {
+      wish,
+      isTracked,
+      state: "review" as const,
+      stateTone: "warning" as const,
+      stateLabel: "Preco ausente",
+      statusLabel: "Sem base de preco",
+      supportLabel: "Sem preco confiável, o radar não consegue medir oportunidade real.",
+      metricLabel: "Adicionar preco",
+      priorityScore: 62,
+      savingsInCurrency,
+    };
+  }
+
+  return {
+    wish,
+    isTracked,
+    state: "stable" as const,
+    stateTone: "neutral" as const,
+    stateLabel: "Monitorando",
+    statusLabel: "Sinais estaveis",
+    supportLabel: "Item com dados suficientes para acompanhar variacao e disponibilidade.",
+    metricLabel: hasRealDrop ? `Economia de ${formatCurrency(savingsInCurrency, getWishCurrency(wish))}` : "Sem queda relevante",
+    priorityScore: hasRealDrop ? 58 : 42,
+    savingsInCurrency,
+  };
+}
+
+function getWishAvailabilityLabel(wish: DbWish) {
+  switch (wish.availability) {
+    case "in_stock":
+      return "Em estoque";
+    case "out_of_stock":
+      return "Sem estoque";
+    case "preorder":
+      return "Pre-venda";
+    default:
+      return "Disponibilidade indefinida";
+  }
+}
+
+function getWishAutofillStatusLabel(wish: DbWish) {
+  switch (wish.autofill_status) {
+    case "success":
+      return "completo";
+    case "partial":
+      return "parcial";
+    case "failed":
+      return "falhou";
+    case "pending":
+      return "pendente";
+    default:
+      return "manual";
+  }
+}
+
+function getAdminAutofillStatusLabel(task: AdminAffiliateQueueItem) {
+  switch (task.autofill_status) {
+    case "success":
+      return "completo";
+    case "partial":
+      return "parcial";
+    case "failed":
+      return "falhou";
+    case "pending":
+      return "pendente";
+    default:
+      return "manual";
+  }
+}
+
+function getAdminAvailabilityLabel(task: AdminAffiliateQueueItem) {
+  switch (task.availability) {
+    case "in_stock":
+      return "Em estoque";
+    case "out_of_stock":
+      return "Sem estoque";
+    case "preorder":
+      return "Pre-venda";
+    default:
+      return "Indefinida";
+  }
+}
+
+function formatCurrency(value: number | null | undefined, currency: string) {
+  if (value == null) return "Sem preco";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value);
 }
 
 function getStoreLabel(source: LocalSource) {
