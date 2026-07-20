@@ -60,6 +60,17 @@ export type AdminAffiliateQueueItem = {
   owner_email: string;
 };
 
+export type AdminAccountDeletionRequest = {
+  id: string;
+  user_id: string;
+  requested_email: string;
+  requested_name: string | null;
+  status: "pending" | "processed" | "cancelled";
+  requested_at: string;
+  processed_at: string | null;
+  notes: string | null;
+};
+
 export async function getInitialSession(): Promise<Session | null> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return null;
@@ -136,6 +147,137 @@ export async function signOut() {
 
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+export async function updateViewerProfile(input: { fullName: string; avatarFile?: File | null }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) throw new Error("Sessao indisponivel");
+
+  let avatarUrl = typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : null;
+
+  if (input.avatarFile) {
+    const extension = input.avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const bucket = import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || "avatars";
+    const path = `${user.id}/avatar.${extension}`;
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.avatarFile, {
+      cacheControl: "3600",
+      upsert: true,
+      contentType: input.avatarFile.type || undefined,
+    });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(path);
+    avatarUrl = publicUrlData.publicUrl;
+  }
+
+  const nextMetadata = {
+    ...user.user_metadata,
+    full_name: input.fullName,
+    avatar_url: avatarUrl,
+  };
+
+  const { data, error } = await supabase.auth.updateUser({
+    data: nextMetadata,
+  });
+
+  if (error) throw error;
+
+  return data.user;
+}
+
+export async function updateViewerEmail(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.auth.updateUser({
+    email,
+  });
+
+  if (error) throw error;
+
+  return data.user;
+}
+
+export async function updateViewerPassword(input: { currentPassword: string; nextPassword: string }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: input.nextPassword,
+    current_password: input.currentPassword,
+  });
+
+  if (error) throw error;
+
+  return data.user;
+}
+
+export async function updateViewerPreferences(input: {
+  profileVisibility: "public" | "private";
+  defaultListVisibility: "public" | "private";
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) throw new Error("Sessao indisponivel");
+
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      ...user.user_metadata,
+      privacy: {
+        profile_visibility: input.profileVisibility,
+        default_list_visibility: input.defaultListVisibility,
+      },
+    },
+  });
+
+  if (error) throw error;
+
+  return data.user;
+}
+
+export async function requestViewerAccountDeletion() {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) throw new Error("Sessao indisponivel");
+
+  const { data, error } = await supabase.rpc("request_account_deletion");
+
+  if (error) throw error;
+
+  const { error: metadataError } = await supabase.auth.updateUser({
+    data: {
+      ...user.user_metadata,
+      account_status: "pending_deletion",
+      deletion_requested_at: new Date().toISOString(),
+    },
+  });
+
+  if (metadataError) throw metadataError;
+
+  return data as AdminAccountDeletionRequest;
 }
 
 export async function loadViewerContext(user: User) {
@@ -233,6 +375,35 @@ export async function loadAdminAffiliateQueue() {
   if (error) throw error;
 
   return (data ?? []) as AdminAffiliateQueueItem[];
+}
+
+export async function loadAdminAccountDeletionRequests() {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.rpc("list_admin_account_deletion_requests");
+  if (error) throw error;
+
+  return (data ?? []) as AdminAccountDeletionRequest[];
+}
+
+export async function processAdminAccountDeletionRequest(input: {
+  requestId: string;
+  status: "processed" | "cancelled";
+  notes?: string;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.rpc("admin_process_account_deletion_request", {
+    p_request_id: input.requestId,
+    p_status: input.status,
+    p_notes: input.notes ?? null,
+  });
+
+  if (error) throw error;
+
+  return data as AdminAccountDeletionRequest;
 }
 
 export async function updateAdminAffiliateLink(input: {

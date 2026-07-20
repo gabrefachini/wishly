@@ -26,18 +26,22 @@ import {
   Sun,
   Tag,
   TrendingDown,
+  Upload,
   User,
+  Settings,
   XCircle,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import {
   createWishlist,
   createGift,
   getInitialSession,
   listenToAuthChanges,
   loadAdminAffiliateQueue,
+  loadAdminAccountDeletionRequests,
+  processAdminAccountDeletionRequest,
   resolvePublicGiftRedirect,
   loadViewerContext,
   loadWishlistGifts,
@@ -46,6 +50,12 @@ import {
   signOut,
   supabaseEnabled,
   updateAdminAffiliateLink,
+  updateViewerEmail,
+  updateViewerPassword,
+  updateViewerPreferences,
+  updateViewerProfile,
+  requestViewerAccountDeletion,
+  type AdminAccountDeletionRequest,
   type AdminAffiliateQueueItem,
   type DbWish,
   type DbWishlist,
@@ -53,7 +63,19 @@ import {
   loadPublicWishlist,
 } from "./lib/wishly-api";
 
-type View = "home" | "create_list" | "list" | "add" | "radar" | "activity" | "pro" | "checkout" | "success" | "admin";
+type View =
+  | "home"
+  | "create_list"
+  | "list"
+  | "add"
+  | "radar"
+  | "activity"
+  | "profile"
+  | "profile_settings"
+  | "pro"
+  | "checkout"
+  | "success"
+  | "admin";
 type Priority = "Alta" | "Media" | "Baixa";
 type AuthPanelMode = "create" | "login";
 type LocalSource = "mercado_livre" | "amazon" | "shopee" | "magalu" | "unknown";
@@ -121,6 +143,36 @@ type PublicState = {
   wishlist: PublicWishlist | null;
   loading: boolean;
   notFound: boolean;
+};
+
+type LocalProfile = {
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+  privacy: {
+    profileVisibility: "public" | "private";
+    defaultListVisibility: "public" | "private";
+  };
+  deletionRequestedAt: string | null;
+};
+
+type ProfileFormState = {
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+};
+
+type AccessFormState = {
+  nextEmail: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+};
+
+type PrivacyFormState = {
+  profileVisibility: "public" | "private";
+  defaultListVisibility: "public" | "private";
+  deleteConfirmText: string;
 };
 
 const images = {
@@ -212,6 +264,16 @@ const localListName = "Casa nova";
 const localCreatorName = "Gabriel Fachini";
 const localAdminName = "Time Wishly";
 const POST_AUTH_VIEW_KEY = "wishly-post-auth-view";
+const localProfileSeed: LocalProfile = {
+  fullName: localCreatorName,
+  email: "gabriel@wishly.app",
+  avatarUrl: images.avatar,
+  privacy: {
+    profileVisibility: "private",
+    defaultListVisibility: "public",
+  },
+  deletionRequestedAt: null,
+};
 
 function App() {
   const [view, setView] = useState<View>("home");
@@ -225,10 +287,26 @@ function App() {
   const [localAffiliateTasks, setLocalAffiliateTasks] = useState<LocalAffiliateTask[]>(() =>
     readLocalState("wishly-affiliate-tasks", []),
   );
+  const [localProfile, setLocalProfile] = useState<LocalProfile>(() => readLocalState("wishly-local-profile", localProfileSeed));
   const [formState, setFormState] = useState<AddWishFormState>({ productUrl: "", title: "", note: "" });
   const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(localProfileSeed);
+  const [accessForm, setAccessForm] = useState<AccessFormState>({
+    nextEmail: localProfileSeed.email,
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+  const [privacyForm, setPrivacyForm] = useState<PrivacyFormState>({
+    profileVisibility: localProfileSeed.privacy.profileVisibility,
+    defaultListVisibility: localProfileSeed.privacy.defaultListVisibility,
+    deleteConfirmText: "",
+  });
+  const [profileAvatarFile, setProfileAvatarFile] = useState<File | null>(null);
+  const [profileAvatarPreview, setProfileAvatarPreview] = useState<string | null>(null);
   const [draftAffiliateUrls, setDraftAffiliateUrls] = useState<Record<string, string>>({});
   const [marketingMenuOpen, setMarketingMenuOpen] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   const [session, setSession] = useState<Session | null>(null);
   const [authForm, setAuthForm] = useState<AuthFormState>({
@@ -249,6 +327,7 @@ function App() {
     isAdmin: false,
   });
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
+  const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
   const [publicState, setPublicState] = useState<PublicState>({
     shareId: readPublicShareId(),
     wishlist: null,
@@ -260,6 +339,11 @@ function App() {
   const isPublicMode = !session && Boolean(publicState.shareId);
   const isMarketingMode = view === "home" && !session && !isPublicMode;
   const isDesktopFlowMode = Boolean(session) && (view === "create_list" || view === "add");
+  const viewerProfile = useMemo(
+    () => (isRemoteMode && session?.user ? getRemoteProfile(session.user) : localProfile),
+    [isRemoteMode, localProfile, session],
+  );
+  const showFab = !["admin", "create_list", "profile", "profile_settings", "pro", "checkout", "success"].includes(view);
 
   const title = useMemo(() => {
     if (view === "home") return "";
@@ -268,6 +352,8 @@ function App() {
     if (view === "add") return "Adicionar desejo";
     if (view === "radar") return "Radar de precos";
     if (view === "activity") return "Atividade";
+    if (view === "profile") return "Profile";
+    if (view === "profile_settings") return "Configuracoes da conta";
     if (view === "pro") return "Upgrade para o Pro";
     if (view === "checkout") return "Finalizar assinatura";
     if (view === "admin") return "Fila de afiliados";
@@ -318,6 +404,32 @@ function App() {
     setAuthForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateProfileField<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) {
+    setProfileForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateAccessField<K extends keyof AccessFormState>(field: K, value: AccessFormState[K]) {
+    setAccessForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updatePrivacyField<K extends keyof PrivacyFormState>(field: K, value: PrivacyFormState[K]) {
+    setPrivacyForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleBack() {
+    if (view === "checkout") {
+      go("pro");
+      return;
+    }
+
+    if (view === "profile_settings") {
+      go("profile");
+      return;
+    }
+
+    go("home");
+  }
+
   function scrollToSection(sectionId: string) {
     const element = document.getElementById(sectionId);
     if (element) {
@@ -329,6 +441,35 @@ function App() {
   function exitPublicMode() {
     window.history.replaceState({}, "", window.location.pathname);
     setPublicState({ shareId: null, wishlist: null, loading: false, notFound: false });
+  }
+
+  function openAvatarPicker() {
+    avatarInputRef.current?.click();
+  }
+
+  async function handleAvatarSelected(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setSyncError("Selecione uma imagem valida para a foto de perfil.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setSyncError("A foto de perfil deve ter no maximo 5 MB.");
+      return;
+    }
+
+    try {
+      const preview = await readFileAsDataUrl(file);
+      setProfileAvatarFile(file);
+      setProfileAvatarPreview(preview);
+      setProfileForm((current) => ({ ...current, avatarUrl: preview }));
+      setSyncError("");
+    } catch {
+      setSyncError("Nao foi possivel carregar a imagem agora.");
+    }
   }
 
   async function handleShareCurrentList() {
@@ -394,6 +535,7 @@ function App() {
     if (!supabaseEnabled || !nextSession?.user) {
       setRemote({ wishlists: [], selectedWishlistId: null, gifts: [], isAdmin: false });
       setAdminQueue([]);
+      setAdminDeletionRequests([]);
       setRemoteReady(true);
       return;
     }
@@ -409,7 +551,9 @@ function App() {
           ? remote.selectedWishlistId
           : context.wishlists[0]?.id ?? null;
       const gifts = selectedWishlistId ? await loadWishlistGifts(selectedWishlistId) : [];
-      const queue = context.isAdmin ? await loadAdminAffiliateQueue() : [];
+      const [queue, deletionRequests] = context.isAdmin
+        ? await Promise.all([loadAdminAffiliateQueue(), loadAdminAccountDeletionRequests()])
+        : [[], []];
 
       setRemote({
         wishlists: context.wishlists,
@@ -418,6 +562,7 @@ function App() {
         isAdmin: context.isAdmin,
       });
       setAdminQueue(queue);
+      setAdminDeletionRequests(deletionRequests);
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -590,6 +735,22 @@ function App() {
     }
   }
 
+  async function handleRemoteDeletionRequestUpdate(requestId: string, status: "processed" | "cancelled") {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      await processAdminAccountDeletionRequest({
+        requestId,
+        status,
+      });
+      await refreshRemoteState(session);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function handleLocalAdminUpdate(taskId: string, status: LocalAffiliateTaskStatus) {
     const numericId = Number(taskId);
     const task = localAffiliateTasks.find((item) => item.id === numericId);
@@ -672,6 +833,197 @@ function App() {
     }
   }
 
+  async function handleSaveProfile() {
+    const fullName = profileForm.fullName.trim();
+    if (!fullName) {
+      setSyncError("Preencha seu nome para salvar o perfil.");
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+
+      if (isRemoteMode) {
+        await updateViewerProfile({
+          fullName,
+          avatarFile: profileAvatarFile,
+        });
+
+        const refreshed = await getInitialSession();
+        setSession(refreshed);
+        await refreshRemoteState(refreshed);
+      } else {
+        setLocalProfile({
+          fullName,
+          email: profileForm.email.trim() || localProfile.email,
+          avatarUrl: profileAvatarPreview ?? profileForm.avatarUrl ?? localProfile.avatarUrl,
+          privacy: localProfile.privacy,
+          deletionRequestedAt: localProfile.deletionRequestedAt,
+        });
+      }
+
+      setProfileAvatarFile(null);
+      setProfileAvatarPreview(null);
+      setAuthMessage("Perfil atualizado.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleSaveEmail() {
+    const nextEmail = accessForm.nextEmail.trim().toLowerCase();
+
+    if (!nextEmail) {
+      setSyncError("Preencha o novo e-mail para continuar.");
+      return;
+    }
+
+    if (nextEmail === viewerProfile.email.trim().toLowerCase()) {
+      setSyncError("Digite um e-mail diferente do atual.");
+      return;
+    }
+
+    if (!isRemoteMode) {
+      setLocalProfile((current) => ({ ...current, email: nextEmail }));
+      setAuthMessage("E-mail atualizado no modo local.");
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+      await updateViewerEmail(nextEmail);
+      setAuthMessage(`Pedido de troca enviado para ${nextEmail}. Confirme o novo e-mail para concluir a alteracao.`);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleSavePassword() {
+    const currentPassword = accessForm.currentPassword.trim();
+    const newPassword = accessForm.newPassword.trim();
+    const confirmNewPassword = accessForm.confirmNewPassword.trim();
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setSyncError("Preencha senha atual, nova senha e confirmacao.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setSyncError("Use uma nova senha com pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setSyncError("A confirmacao da nova senha nao confere.");
+      return;
+    }
+
+    if (!isRemoteMode) {
+      setAuthMessage("Senha atualizada no modo local.");
+      setAccessForm((current) => ({
+        ...current,
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      }));
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+      await updateViewerPassword({
+        currentPassword,
+        nextPassword: newPassword,
+      });
+      setAuthMessage("Senha atualizada.");
+      setAccessForm((current) => ({
+        ...current,
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      }));
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleSavePrivacy() {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+
+      if (isRemoteMode) {
+        await updateViewerPreferences({
+          profileVisibility: privacyForm.profileVisibility,
+          defaultListVisibility: privacyForm.defaultListVisibility,
+        });
+
+        const refreshed = await getInitialSession();
+        setSession(refreshed);
+        await refreshRemoteState(refreshed);
+      } else {
+        setLocalProfile((current) => ({
+          ...current,
+          privacy: {
+            profileVisibility: privacyForm.profileVisibility,
+            defaultListVisibility: privacyForm.defaultListVisibility,
+          },
+        }));
+      }
+
+      setAuthMessage("Preferencias de privacidade atualizadas.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleRequestAccountDeletion() {
+    if (privacyForm.deleteConfirmText.trim().toUpperCase() !== "EXCLUIR") {
+      setSyncError("Digite EXCLUIR para confirmar a solicitacao.");
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+
+      if (isRemoteMode) {
+        await requestViewerAccountDeletion();
+        const refreshed = await getInitialSession();
+        setSession(refreshed);
+        await refreshRemoteState(refreshed);
+      } else {
+        setLocalProfile((current) => ({
+          ...current,
+          deletionRequestedAt: new Date().toISOString(),
+        }));
+      }
+
+      setPrivacyForm((current) => ({ ...current, deleteConfirmText: "" }));
+      setAuthMessage("Solicitacao de exclusao registrada. A conta foi marcada para remocao.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   useEffect(() => {
     window.localStorage.setItem("wishly-theme", theme);
   }, [theme]);
@@ -687,6 +1039,33 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem("wishly-affiliate-tasks", JSON.stringify(localAffiliateTasks));
   }, [localAffiliateTasks]);
+
+  useEffect(() => {
+    window.localStorage.setItem("wishly-local-profile", JSON.stringify(localProfile));
+  }, [localProfile]);
+
+  useEffect(() => {
+    setProfileForm({
+      fullName: viewerProfile.fullName,
+      email: viewerProfile.email,
+      avatarUrl: profileAvatarPreview ?? viewerProfile.avatarUrl,
+    });
+  }, [viewerProfile, profileAvatarPreview]);
+
+  useEffect(() => {
+    setAccessForm((current) => ({
+      ...current,
+      nextEmail: viewerProfile.email,
+    }));
+  }, [viewerProfile.email]);
+
+  useEffect(() => {
+    setPrivacyForm((current) => ({
+      ...current,
+      profileVisibility: viewerProfile.privacy.profileVisibility,
+      defaultListVisibility: viewerProfile.privacy.defaultListVisibility,
+    }));
+  }, [viewerProfile.privacy.defaultListVisibility, viewerProfile.privacy.profileVisibility]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;
@@ -851,14 +1230,21 @@ function App() {
         />
       ) : (
         <>
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden-file-input"
+        onChange={(event) => void handleAvatarSelected(event.target.files)}
+      />
       <header className="topbar">
         {view === "home" ? (
           <button className="brand-lockup" type="button" onClick={() => go("home")} aria-label="Wishly Home">
-            <img className="avatar" src={images.avatar} alt="Gabriel" />
+            <img className="avatar" src={viewerProfile.avatarUrl || images.avatar} alt={viewerProfile.fullName} />
             <img className="wordmark" src={images.logo} alt="Wishly" />
           </button>
         ) : (
-          <button className="icon-button" type="button" onClick={() => go(view === "checkout" ? "pro" : "home")} aria-label="Voltar">
+          <button className="icon-button" type="button" onClick={handleBack} aria-label="Voltar">
             <ChevronLeft size={24} />
           </button>
         )}
@@ -958,14 +1344,45 @@ function App() {
             isRemoteMode={isRemoteMode}
             isAdmin={remote.isAdmin}
             remoteQueue={adminQueue}
+            remoteDeletionRequests={adminDeletionRequests}
             localTasks={localAffiliateTasks}
             draftAffiliateUrls={draftAffiliateUrls}
             onAffiliateChange={(taskId, value) => setDraftAffiliateUrls((current) => ({ ...current, [taskId]: value }))}
             onRemoteApply={(giftId) => void handleRemoteAdminUpdate(giftId, "generated")}
             onRemoteFail={(giftId) => void handleRemoteAdminUpdate(giftId, "failed")}
+            onRemoteDeletionProcess={(requestId) => void handleRemoteDeletionRequestUpdate(requestId, "processed")}
+            onRemoteDeletionCancel={(requestId) => void handleRemoteDeletionRequestUpdate(requestId, "cancelled")}
             onLocalApply={(taskId) => handleLocalAdminUpdate(taskId, "completed")}
             onLocalInvalid={(taskId) => handleLocalAdminUpdate(taskId, "invalid")}
             onLocalUnavailable={(taskId) => handleLocalAdminUpdate(taskId, "unavailable")}
+          />
+        )}
+        {view === "profile" && (
+          <ProfileScreen
+            profile={viewerProfile}
+            isRemoteMode={isRemoteMode}
+            onOpenSettings={() => go("profile_settings")}
+            onOpenPro={() => go("pro")}
+            onSignOut={() => void signOut()}
+          />
+        )}
+        {view === "profile_settings" && (
+          <ProfileSettingsScreen
+            profileForm={profileForm}
+            accessForm={accessForm}
+            privacyForm={privacyForm}
+            deletionRequestedAt={viewerProfile.deletionRequestedAt}
+            syncing={syncing}
+            isRemoteMode={isRemoteMode}
+            onChangeField={updateProfileField}
+            onChangeAccessField={updateAccessField}
+            onChangePrivacyField={updatePrivacyField}
+            onChoosePhoto={openAvatarPicker}
+            onSave={() => void handleSaveProfile()}
+            onSaveEmail={() => void handleSaveEmail()}
+            onSavePassword={() => void handleSavePassword()}
+            onSavePrivacy={() => void handleSavePrivacy()}
+            onRequestDeletion={() => void handleRequestAccountDeletion()}
           />
         )}
         {view === "pro" && <ProScreen go={go} />}
@@ -973,7 +1390,7 @@ function App() {
         {view === "success" && <SuccessScreen go={go} />}
       </main>
 
-      {view !== "admin" && view !== "create_list" && (
+      {showFab && (
         <button className="fab" type="button" onClick={() => go(view === "home" ? "list" : "add")}>
           <Plus size={19} />
           <span>{view === "home" ? "CRIAR NOVA LISTA" : "ADICIONAR DESEJO"}</span>
@@ -984,7 +1401,7 @@ function App() {
         <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
         <NavItem active={view === "radar"} icon={<LineChart size={22} />} label="Radar" onClick={() => go("radar")} />
         <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
-        <NavItem active={view === "pro"} icon={<User size={22} />} label="Profile" onClick={() => go("pro")} />
+        <NavItem active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"} icon={<User size={22} />} label="Profile" onClick={() => go("profile")} />
       </nav>
         </>
       )}
@@ -2169,15 +2586,348 @@ function ActivityScreen() {
   );
 }
 
+function ProfileScreen({
+  profile,
+  isRemoteMode,
+  onOpenSettings,
+  onOpenPro,
+  onSignOut,
+}: {
+  profile: ProfileFormState;
+  isRemoteMode: boolean;
+  onOpenSettings: () => void;
+  onOpenPro: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <section className="profile-stack">
+      <article className="profile-summary-card">
+        <img className="profile-summary-avatar" src={profile.avatarUrl || images.avatar} alt={profile.fullName} />
+        <div className="profile-summary-copy">
+          <p className="label">Sua conta</p>
+          <h2>{profile.fullName}</h2>
+          <p>{profile.email}</p>
+        </div>
+      </article>
+
+      <div className="profile-menu-list">
+        <button className="profile-menu-item" type="button" onClick={onOpenSettings}>
+          <span className="profile-menu-icon">
+            <Settings size={18} />
+          </span>
+          <div>
+            <strong>Configuracoes da conta</strong>
+            <p>Foto, nome, e-mail, senha e privacidade.</p>
+          </div>
+          <ArrowRight size={18} />
+        </button>
+
+        <button className="profile-menu-item" type="button" onClick={onOpenPro}>
+          <span className="profile-menu-icon">
+            <Sparkles size={18} />
+          </span>
+          <div>
+            <strong>Wishly Pro</strong>
+            <p>Radar de preco, alertas e experiencia premium.</p>
+          </div>
+          <ArrowRight size={18} />
+        </button>
+      </div>
+
+      {isRemoteMode ? (
+        <button className="secondary-button profile-signout" type="button" onClick={onSignOut}>
+          <LogOut size={18} />
+          Sair da conta
+        </button>
+      ) : (
+        <div className="profile-note-card">
+          <p className="label">Modo local</p>
+          <h3>Edite o perfil e veja o layout pronto</h3>
+          <p>No ambiente conectado, a foto e o nome passam a ser salvos na sua conta real.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProfileSettingsScreen({
+  profileForm,
+  accessForm,
+  privacyForm,
+  deletionRequestedAt,
+  syncing,
+  isRemoteMode,
+  onChangeField,
+  onChangeAccessField,
+  onChangePrivacyField,
+  onChoosePhoto,
+  onSave,
+  onSaveEmail,
+  onSavePassword,
+  onSavePrivacy,
+  onRequestDeletion,
+}: {
+  profileForm: ProfileFormState;
+  accessForm: AccessFormState;
+  privacyForm: PrivacyFormState;
+  deletionRequestedAt: string | null;
+  syncing: boolean;
+  isRemoteMode: boolean;
+  onChangeField: <K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => void;
+  onChangeAccessField: <K extends keyof AccessFormState>(field: K, value: AccessFormState[K]) => void;
+  onChangePrivacyField: <K extends keyof PrivacyFormState>(field: K, value: PrivacyFormState[K]) => void;
+  onChoosePhoto: () => void;
+  onSave: () => void;
+  onSaveEmail: () => void;
+  onSavePassword: () => void;
+  onSavePrivacy: () => void;
+  onRequestDeletion: () => void;
+}) {
+  return (
+    <section className="profile-settings-layout">
+      <div className="profile-settings-main">
+        <article className="profile-settings-card">
+          <div className="profile-settings-header">
+            <div>
+              <p className="label">Perfil</p>
+              <h2>Seus dados principais</h2>
+              <p>Atualize a foto e o nome usados na sua conta.</p>
+            </div>
+            <div className="profile-avatar-editor">
+              <img className="profile-settings-avatar" src={profileForm.avatarUrl || images.avatar} alt={profileForm.fullName} />
+              <button className="secondary-button" type="button" onClick={onChoosePhoto}>
+                <Upload size={18} />
+                Trocar foto
+              </button>
+            </div>
+          </div>
+
+          <div className="profile-settings-fields">
+            <Field
+              label="Nome completo"
+              placeholder="Gabriel Fachini"
+              value={profileForm.fullName}
+              onChange={(value) => onChangeField("fullName", value)}
+              autoComplete="name"
+            />
+            <Field
+              label="E-mail"
+              placeholder="voce@exemplo.com"
+              value={profileForm.email}
+              onChange={() => undefined}
+              disabled
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="field-row">
+            <button className="primary-button full" type="button" onClick={onSave} disabled={!profileForm.fullName.trim() || syncing}>
+              {syncing ? "Salvando..." : "Salvar alteracoes"}
+            </button>
+          </div>
+        </article>
+
+        <article className="profile-settings-card">
+          <div>
+            <p className="label">Acesso</p>
+            <h2>Trocar e-mail</h2>
+            <p>{isRemoteMode ? "O Supabase pode pedir confirmacao no novo e-mail para concluir a troca." : "No modo local, a mudanca fica salva apenas neste navegador."}</p>
+          </div>
+
+          <div className="profile-settings-fields">
+            <Field
+              label="Novo e-mail"
+              placeholder="voce@exemplo.com"
+              value={accessForm.nextEmail}
+              onChange={(value) => onChangeAccessField("nextEmail", value)}
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="field-row">
+            <button className="primary-button full" type="button" onClick={onSaveEmail} disabled={!accessForm.nextEmail.trim() || syncing}>
+              {syncing ? "Salvando..." : "Atualizar e-mail"}
+            </button>
+          </div>
+        </article>
+
+        <article className="profile-settings-card">
+          <div>
+            <p className="label">Seguranca</p>
+            <h2>Trocar senha</h2>
+            <p>Confirme sua senha atual antes de definir uma nova.</p>
+          </div>
+
+          <div className="profile-settings-fields">
+            <Field
+              label="Senha atual"
+              placeholder="Sua senha atual"
+              value={accessForm.currentPassword}
+              onChange={(value) => onChangeAccessField("currentPassword", value)}
+              inputType="password"
+              autoComplete="current-password"
+            />
+            <Field
+              label="Nova senha"
+              placeholder="Nova senha"
+              value={accessForm.newPassword}
+              onChange={(value) => onChangeAccessField("newPassword", value)}
+              inputType="password"
+              autoComplete="new-password"
+            />
+            <Field
+              label="Confirmar nova senha"
+              placeholder="Repita a nova senha"
+              value={accessForm.confirmNewPassword}
+              onChange={(value) => onChangeAccessField("confirmNewPassword", value)}
+              inputType="password"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="field-row">
+            <button
+              className="primary-button full"
+              type="button"
+              onClick={onSavePassword}
+              disabled={!accessForm.currentPassword.trim() || !accessForm.newPassword.trim() || !accessForm.confirmNewPassword.trim() || syncing}
+            >
+              {syncing ? "Salvando..." : "Atualizar senha"}
+            </button>
+          </div>
+        </article>
+
+        <article className="profile-settings-card">
+          <div>
+            <p className="label">Privacidade</p>
+            <h2>Controle de visibilidade</h2>
+            <p>Defina como sua conta e suas novas listas se comportam por padrão.</p>
+          </div>
+
+          <div className="privacy-option-list">
+            <div className="privacy-option-row">
+              <div>
+                <strong>Perfil</strong>
+                <p>Escolha se sua conta fica mais aberta ou mais reservada.</p>
+              </div>
+              <div className="segmented segmented-compact">
+                <button
+                  className={privacyForm.profileVisibility === "private" ? "selected" : ""}
+                  type="button"
+                  onClick={() => onChangePrivacyField("profileVisibility", "private")}
+                >
+                  Privado
+                </button>
+                <button
+                  className={privacyForm.profileVisibility === "public" ? "selected" : ""}
+                  type="button"
+                  onClick={() => onChangePrivacyField("profileVisibility", "public")}
+                >
+                  Publico
+                </button>
+              </div>
+            </div>
+
+            <div className="privacy-option-row">
+              <div>
+                <strong>Novas listas</strong>
+                <p>Defina a visibilidade padrão ao criar novas listas.</p>
+              </div>
+              <div className="segmented segmented-compact">
+                <button
+                  className={privacyForm.defaultListVisibility === "private" ? "selected" : ""}
+                  type="button"
+                  onClick={() => onChangePrivacyField("defaultListVisibility", "private")}
+                >
+                  Privadas
+                </button>
+                <button
+                  className={privacyForm.defaultListVisibility === "public" ? "selected" : ""}
+                  type="button"
+                  onClick={() => onChangePrivacyField("defaultListVisibility", "public")}
+                >
+                  Publicas
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="field-row">
+            <button className="primary-button full" type="button" onClick={onSavePrivacy} disabled={syncing}>
+              {syncing ? "Salvando..." : "Salvar privacidade"}
+            </button>
+          </div>
+        </article>
+
+        <article className="profile-settings-card danger-card">
+          <div>
+            <p className="label">Zona de perigo</p>
+            <h2>Solicitar exclusao da conta</h2>
+            <p>
+              Essa solicitacao marca a conta para remocao. Digite <strong>EXCLUIR</strong> para confirmar.
+            </p>
+          </div>
+
+          {deletionRequestedAt ? (
+            <div className="danger-status">
+              <strong>Solicitado em {formatDateTime(deletionRequestedAt)}</strong>
+              <p>A conta ja foi marcada para exclusao e deve seguir o fluxo administrativo.</p>
+            </div>
+          ) : null}
+
+          <Field
+            label="Confirmacao"
+            placeholder="Digite EXCLUIR"
+            value={privacyForm.deleteConfirmText}
+            onChange={(value) => onChangePrivacyField("deleteConfirmText", value)}
+          />
+
+          <div className="field-row">
+            <button
+              className="secondary-button danger-button"
+              type="button"
+              onClick={onRequestDeletion}
+              disabled={syncing || privacyForm.deleteConfirmText.trim().toUpperCase() !== "EXCLUIR"}
+            >
+              {syncing ? "Processando..." : "Solicitar exclusao"}
+            </button>
+          </div>
+        </article>
+      </div>
+
+      <aside className="profile-settings-aside">
+        <div className="profile-note-card">
+          <p className="label">Perfil</p>
+          <h3>Foto e nome ja funcionais</h3>
+          <p>{isRemoteMode ? "As alteracoes sao salvas na sua conta e refletidas no app." : "No modo local, as alteracoes ficam salvas neste navegador."}</p>
+        </div>
+        <div className="profile-note-card">
+          <p className="label">Acesso</p>
+          <h3>E-mail e senha agora entram aqui</h3>
+          <p>Os fluxos foram separados para reduzir erro do usuario e manter a tela objetiva.</p>
+        </div>
+        <div className="profile-note-card">
+          <p className="label">Conta</p>
+          <h3>Exclusao com trilha clara</h3>
+          <p>A remocao definitiva exige backend privilegiado. Por enquanto a conta fica marcada para exclusao de forma explicita.</p>
+        </div>
+      </aside>
+    </section>
+  );
+}
+
 function AdminScreen({
   isRemoteMode,
   isAdmin,
   remoteQueue,
+  remoteDeletionRequests,
   localTasks,
   draftAffiliateUrls,
   onAffiliateChange,
   onRemoteApply,
   onRemoteFail,
+  onRemoteDeletionProcess,
+  onRemoteDeletionCancel,
   onLocalApply,
   onLocalInvalid,
   onLocalUnavailable,
@@ -2185,11 +2935,14 @@ function AdminScreen({
   isRemoteMode: boolean;
   isAdmin: boolean;
   remoteQueue: AdminAffiliateQueueItem[];
+  remoteDeletionRequests: AdminAccountDeletionRequest[];
   localTasks: LocalAffiliateTask[];
   draftAffiliateUrls: Record<string, string>;
   onAffiliateChange: (taskId: string, value: string) => void;
   onRemoteApply: (giftId: string) => void;
   onRemoteFail: (giftId: string) => void;
+  onRemoteDeletionProcess: (requestId: string) => void;
+  onRemoteDeletionCancel: (requestId: string) => void;
   onLocalApply: (taskId: string) => void;
   onLocalInvalid: (taskId: string) => void;
   onLocalUnavailable: (taskId: string) => void;
@@ -2209,17 +2962,19 @@ function AdminScreen({
   if (isRemoteMode) {
     const pending = remoteQueue.filter((item) => item.affiliate_status !== "generated");
     const history = remoteQueue.filter((item) => item.affiliate_status === "generated");
+    const pendingDeletionRequests = remoteDeletionRequests.filter((item) => item.status === "pending");
+    const resolvedDeletionRequests = remoteDeletionRequests.filter((item) => item.status !== "pending");
 
     return (
       <section className="admin-stack">
         <div className="admin-summary">
           <p className="label">Operacao real</p>
           <h2>Fila unica para admins</h2>
-          <p>Essa tela usa RPCs do Supabase. Mercado Livre ja entra como merchant `manual` e aparece aqui para ajuste.</p>
+          <p>Essa tela usa RPCs do Supabase para afiliados e exclusao de conta.</p>
           <div className="stat-grid">
             <Stat value={String(pending.length)} label="pendentes" />
-            <Stat value={String(history.length)} label="gerados" />
-            <Stat value={String(remoteQueue.length)} label="total" />
+            <Stat value={String(pendingDeletionRequests.length)} label="exclusoes" />
+            <Stat value={String(remoteQueue.length + remoteDeletionRequests.length)} label="total" />
           </div>
         </div>
 
@@ -2272,6 +3027,40 @@ function AdminScreen({
           ))
         )}
 
+        {pendingDeletionRequests.length === 0 ? (
+          <div className="empty-admin">
+            <ShieldCheck size={24} />
+            <strong>Nenhuma exclusao aguardando acao</strong>
+            <p>Quando um usuario solicitar remocao da conta, o pedido aparece aqui.</p>
+          </div>
+        ) : (
+          pendingDeletionRequests.map((request) => (
+            <article className="admin-card danger-card" key={request.id}>
+              <div className="admin-card-head">
+                <div>
+                  <p className="label">Exclusao pendente</p>
+                  <h3>{request.requested_name ?? request.requested_email}</h3>
+                </div>
+                <span className="status-pill">conta</span>
+              </div>
+              <div className="admin-meta">
+                <span>{request.requested_email}</span>
+                <span>Solicitado em {formatDateTime(request.requested_at)}</span>
+              </div>
+              <div className="admin-actions">
+                <button className="secondary-button" type="button" onClick={() => onRemoteDeletionCancel(request.id)}>
+                  <XCircle size={18} />
+                  Cancelar pedido
+                </button>
+                <button className="primary-button" type="button" onClick={() => onRemoteDeletionProcess(request.id)}>
+                  <Check size={18} />
+                  Marcar processado
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+
         {history.length > 0 && (
           <div className="history-block">
             <div className="section-heading compact-heading">
@@ -2288,6 +3077,29 @@ function AdminScreen({
                       {task.item_title} • afiliado aplicado
                     </p>
                     <span>{task.merchant_name}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {resolvedDeletionRequests.length > 0 && (
+          <div className="history-block">
+            <div className="section-heading compact-heading">
+              <h2>Exclusoes resolvidas</h2>
+            </div>
+            <div className="vertical-list admin-history">
+              {resolvedDeletionRequests.map((request) => (
+                <article className="activity-row" key={request.id}>
+                  <div className="activity-icon">
+                    <Check size={18} />
+                  </div>
+                  <div>
+                    <p>
+                      {request.requested_name ?? request.requested_email} • {request.status}
+                    </p>
+                    <span>{request.processed_at ? formatDateTime(request.processed_at) : "Sem data"}</span>
                   </div>
                 </article>
               ))}
@@ -2647,6 +3459,42 @@ function buildPublicShareUrl(shareId: string) {
   return url.toString();
 }
 
+function getRemoteProfile(user: SupabaseUser): LocalProfile {
+  const metadata = user.user_metadata ?? {};
+  const fallbackName = typeof metadata.full_name === "string" && metadata.full_name.trim() ? metadata.full_name : user.email?.split("@")[0] || "Minha conta";
+  const avatarUrl = typeof metadata.avatar_url === "string" && metadata.avatar_url.trim() ? metadata.avatar_url : null;
+  const privacy: LocalProfile["privacy"] = typeof metadata.privacy === "object" && metadata.privacy
+    ? {
+        profileVisibility: metadata.privacy.profile_visibility === "public" ? "public" : "private",
+        defaultListVisibility: metadata.privacy.default_list_visibility === "private" ? "private" : "public",
+      }
+    : localProfileSeed.privacy;
+  const deletionRequestedAt = typeof metadata.deletion_requested_at === "string" ? metadata.deletion_requested_at : null;
+
+  return {
+    fullName: fallbackName,
+    email: user.email ?? "",
+    avatarUrl,
+    privacy,
+    deletionRequestedAt,
+  };
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error("Preview indisponivel"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Leitura da imagem falhou"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function getNextId(items: Array<{ id: number }>) {
   return items.length ? Math.max(...items.map((item) => item.id)) + 1 : 1;
 }
@@ -2759,6 +3607,16 @@ function formatEventDate(value: string) {
     month: "long",
     year: "numeric",
   }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function openLink(url: string) {

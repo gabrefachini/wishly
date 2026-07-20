@@ -888,6 +888,10 @@ button:disabled {
   object-fit: cover;
 }
 
+.hidden-file-input {
+  display: none;
+}
+
 .wordmark {
   width: 86px;
   height: auto;
@@ -1706,7 +1710,8 @@ button:disabled {
 .form-stack,
 .vertical-list,
 .feature-list,
-.admin-stack {
+.admin-stack,
+.profile-stack {
   display: grid;
   gap: 16px;
   padding: 18px 20px;
@@ -1719,7 +1724,10 @@ button:disabled {
 .plan-card,
 .admin-summary,
 .admin-card,
-.empty-admin {
+.empty-admin,
+.profile-summary-card,
+.profile-note-card,
+.profile-settings-card {
   padding: 22px;
   border-radius: 22px;
   background: var(--surface-low);
@@ -1757,6 +1765,174 @@ button:disabled {
   display: grid;
   gap: 8px;
   min-width: 0;
+}
+
+.profile-summary-card,
+.profile-settings-header,
+.profile-menu-item,
+.profile-avatar-editor {
+  display: flex;
+  align-items: center;
+}
+
+.profile-summary-card,
+.profile-settings-header {
+  gap: 16px;
+}
+
+.profile-summary-avatar,
+.profile-settings-avatar {
+  width: 88px;
+  height: 88px;
+  border: 2px solid var(--outline);
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.profile-summary-copy,
+.profile-settings-fields,
+.profile-settings-main,
+.profile-settings-aside,
+.profile-menu-list,
+.profile-note-card,
+.privacy-option-list,
+.danger-status {
+  display: grid;
+  gap: 14px;
+}
+
+.profile-summary-copy h2,
+.profile-note-card h3,
+.profile-settings-card h2 {
+  margin: 0;
+  color: var(--text);
+  font-family: "Epilogue", sans-serif;
+}
+
+.profile-summary-copy h2,
+.profile-settings-card h2 {
+  font-size: 24px;
+  line-height: 30px;
+}
+
+.profile-summary-copy p,
+.profile-note-card p,
+.profile-settings-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.profile-menu-list {
+  gap: 12px;
+}
+
+.profile-menu-item {
+  width: 100%;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  color: var(--text);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.profile-menu-item > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-menu-item strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.profile-menu-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.profile-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.profile-signout {
+  width: 100%;
+}
+
+.profile-settings-layout {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.profile-settings-card {
+  display: grid;
+  gap: 18px;
+}
+
+.privacy-option-row {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.privacy-option-row strong,
+.danger-status strong {
+  display: block;
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.privacy-option-row p,
+.danger-status p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.segmented-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.danger-card {
+  border: 1px solid rgba(153, 45, 45, 0.16);
+}
+
+.danger-button {
+  color: #8b2f2f;
+  border-color: rgba(139, 47, 47, 0.22);
+  background: rgba(139, 47, 47, 0.05);
+}
+
+.profile-settings-header {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.profile-avatar-editor {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .input-wrap {
@@ -2155,7 +2331,7 @@ textarea {
   }
 
   .app-shell.desktop-flow-shell .screen {
-    padding-bottom: 72px;
+    padding-bottom: 196px;
   }
 
   .app-shell.desktop-flow-shell .form-stack {
@@ -2221,7 +2397,7 @@ textarea {
     grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
     align-items: start;
     gap: 24px;
-    padding: 28px 28px 0;
+    padding: 28px 28px 28px;
   }
 
   .desktop-flow-aside {
@@ -2254,7 +2430,9 @@ textarea {
   .form-stack,
   .vertical-list,
   .feature-list,
-  .admin-stack {
+  .admin-stack,
+  .profile-stack,
+  .profile-settings-layout {
     padding: 24px 28px;
   }
 
@@ -2358,6 +2536,40 @@ textarea {
   .admin-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+  }
+
+  .profile-stack {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+  }
+
+  .profile-summary-card,
+  .profile-note-card {
+    min-height: 100%;
+  }
+
+  .profile-signout {
+    grid-column: 1 / 2;
+    width: max-content;
+  }
+
+  .profile-settings-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+    align-items: start;
+    gap: 18px;
+  }
+
+  .profile-settings-header {
+    align-items: center;
+  }
+
+  .profile-settings-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .privacy-option-row {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    align-items: center;
   }
 
   .admin-summary,
