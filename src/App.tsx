@@ -41,7 +41,8 @@ import {
   resolvePublicGiftRedirect,
   loadViewerContext,
   loadWishlistGifts,
-  signInWithEmailOtp,
+  signInWithPassword,
+  signUpWithPassword,
   signOut,
   supabaseEnabled,
   updateAdminAffiliateLink,
@@ -99,6 +100,13 @@ type AddWishFormState = {
 
 type CreateListFormState = {
   title: string;
+};
+
+type AuthFormState = {
+  fullName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
 };
 
 type ViewerState = {
@@ -223,7 +231,12 @@ function App() {
   const [marketingMenuOpen, setMarketingMenuOpen] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
-  const [authEmail, setAuthEmail] = useState("");
+  const [authForm, setAuthForm] = useState<AuthFormState>({
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [authMessage, setAuthMessage] = useState("");
   const [authPanelMode, setAuthPanelMode] = useState<AuthPanelMode>("login");
   const [syncError, setSyncError] = useState("");
@@ -293,7 +306,16 @@ function App() {
   function resetAuthFlow() {
     setAuthMessage("");
     setSyncError("");
-    setAuthEmail("");
+    setAuthForm({
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  }
+
+  function updateAuthField<K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) {
+    setAuthForm((current) => ({ ...current, [field]: value }));
   }
 
   function scrollToSection(sectionId: string) {
@@ -606,16 +628,45 @@ function App() {
     );
   }
 
-  async function handleSendMagicLink() {
+  async function handleSubmitAuth() {
     try {
       setAuthMessage("");
       setSyncError("");
-      await signInWithEmailOtp(authEmail.trim());
-      setAuthMessage(
-        authPanelMode === "create"
-          ? `Enviamos um link para ${authEmail.trim()}. Abra seu e-mail para criar sua conta e começar a lista.`
-          : `Enviamos um link para ${authEmail.trim()}. Abra seu e-mail para entrar no Wishly.`,
-      );
+
+      const email = authForm.email.trim();
+      const password = authForm.password.trim();
+      const fullName = authForm.fullName.trim();
+
+      if (!email || !password) {
+        throw new Error("Preencha e-mail e senha para continuar.");
+      }
+
+      if (authPanelMode === "create") {
+        if (!fullName) {
+          throw new Error("Preencha seu nome para criar a conta.");
+        }
+
+        if (password.length < 6) {
+          throw new Error("Use uma senha com pelo menos 6 caracteres.");
+        }
+
+        if (password !== authForm.confirmPassword.trim()) {
+          throw new Error("A confirmacao da senha nao confere.");
+        }
+
+        const result = await signUpWithPassword({
+          email,
+          password,
+          fullName,
+        });
+
+        if (!result.session) {
+          setAuthMessage(`Conta criada para ${email}. Confirme seu e-mail para entrar e criar sua lista.`);
+        }
+        return;
+      }
+
+      await signInWithPassword(email, password);
     } catch (error) {
       setSyncError(getErrorMessage(error));
     }
@@ -785,7 +836,7 @@ function App() {
     <div className={`app-shell ${isMarketingMode ? "marketing-shell" : ""} ${isDesktopFlowMode ? "desktop-flow-shell" : ""}`} data-theme={theme}>
       {isMarketingMode ? (
         <MarketingHomePage
-          authEmail={authEmail}
+          authForm={authForm}
           authMessage={authMessage}
           authPanelMode={authPanelMode}
           marketingMenuOpen={marketingMenuOpen}
@@ -793,8 +844,8 @@ function App() {
           onLogin={beginLoginFlow}
           onOpenListDemo={() => go("list")}
           onResetAuthFlow={resetAuthFlow}
-          onSendMagicLink={() => void handleSendMagicLink()}
-          onSetAuthEmail={setAuthEmail}
+          onSubmitAuth={() => void handleSubmitAuth()}
+          onSetAuthField={updateAuthField}
           onToggleMenu={() => setMarketingMenuOpen((current) => !current)}
           syncing={syncing}
         />
@@ -855,9 +906,12 @@ function App() {
             go={go}
             pendingCount={pendingCount}
             session={session}
-            authEmail={authEmail}
-            setAuthEmail={setAuthEmail}
-            onSendMagicLink={handleSendMagicLink}
+            authForm={authForm}
+            setAuthField={updateAuthField}
+            onCreateList={beginCreateListFlow}
+            onLogin={beginLoginFlow}
+            authPanelMode={authPanelMode}
+            onSubmitAuth={handleSubmitAuth}
             syncing={syncing}
           />
         )}
@@ -939,7 +993,7 @@ function App() {
 }
 
 function MarketingHomePage({
-  authEmail,
+  authForm,
   authMessage,
   authPanelMode,
   marketingMenuOpen,
@@ -947,12 +1001,12 @@ function MarketingHomePage({
   onLogin,
   onOpenListDemo,
   onResetAuthFlow,
-  onSendMagicLink,
-  onSetAuthEmail,
+  onSetAuthField,
+  onSubmitAuth,
   onToggleMenu,
   syncing,
 }: {
-  authEmail: string;
+  authForm: AuthFormState;
   authMessage: string;
   authPanelMode: AuthPanelMode;
   marketingMenuOpen: boolean;
@@ -960,8 +1014,8 @@ function MarketingHomePage({
   onLogin: () => void;
   onOpenListDemo: () => void;
   onResetAuthFlow: () => void;
-  onSendMagicLink: () => void;
-  onSetAuthEmail: (value: string) => void;
+  onSetAuthField: <K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) => void;
+  onSubmitAuth: () => void;
   onToggleMenu: () => void;
   syncing: boolean;
 }) {
@@ -1134,7 +1188,7 @@ function MarketingHomePage({
 
       {authPanelOpen ? (
         <div className="marketing-login-band" id="login-panel">
-          <div className="marketing-login-card">
+        <div className="marketing-login-card">
             {authMessage ? (
               <>
                 <div className="marketing-login-copy">
@@ -1144,10 +1198,14 @@ function MarketingHomePage({
                 </div>
                 <div className="marketing-login-actions">
                   <button className="secondary-button" type="button" onClick={onResetAuthFlow}>
-                    Usar outro e-mail
+                    Voltar para o formulario
                   </button>
-                  <button className="primary-button" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
-                    {syncing ? "Enviando..." : "Reenviar link"}
+                  <button
+                    className="text-button auth-switch-button"
+                    type="button"
+                    onClick={authPanelMode === "create" ? openLoginPanel : openCreateAccountPanel}
+                  >
+                    {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
                   </button>
                 </div>
               </>
@@ -1155,17 +1213,62 @@ function MarketingHomePage({
               <>
                 <div className="marketing-login-copy">
                   <p className="label">{authPanelMode === "create" ? "Criar conta" : "Entrar"}</p>
-                  <h2>{authPanelMode === "create" ? "Crie sua conta para começar a lista" : "Receba um link por e-mail"}</h2>
+                  <h2>{authPanelMode === "create" ? "Crie sua conta para montar a lista" : "Entre para continuar sua lista"}</h2>
                   <p>
                     {authPanelMode === "create"
-                      ? "Salve sua lista, continue depois e compartilhe quando estiver pronta."
-                      : "Use seu e-mail para entrar e continuar de onde parou."}
+                      ? "Seu cadastro ja abre o fluxo para criar a primeira lista."
+                      : "Use seu e-mail e senha para acessar suas listas e continuar de onde parou."}
                   </p>
                 </div>
                 <div className="marketing-login-form">
-                  <Field label="E-mail" placeholder="voce@exemplo.com" value={authEmail} onChange={onSetAuthEmail} />
-                  <button className="primary-button full" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
-                    {syncing ? "Enviando..." : authPanelMode === "create" ? "Continuar com e-mail" : "Receber link de acesso"}
+                  {authPanelMode === "create" && (
+                    <Field
+                      label="Nome"
+                      placeholder="Gabriel Fachini"
+                      value={authForm.fullName}
+                      onChange={(value) => onSetAuthField("fullName", value)}
+                      autoComplete="name"
+                    />
+                  )}
+                  <Field
+                    label="E-mail"
+                    placeholder="voce@exemplo.com"
+                    value={authForm.email}
+                    onChange={(value) => onSetAuthField("email", value)}
+                    autoComplete="email"
+                  />
+                  <Field
+                    label="Senha"
+                    placeholder={authPanelMode === "create" ? "Crie uma senha" : "Sua senha"}
+                    value={authForm.password}
+                    onChange={(value) => onSetAuthField("password", value)}
+                    inputType="password"
+                    autoComplete={authPanelMode === "create" ? "new-password" : "current-password"}
+                  />
+                  {authPanelMode === "create" && (
+                    <Field
+                      label="Confirmar senha"
+                      placeholder="Repita sua senha"
+                      value={authForm.confirmPassword}
+                      onChange={(value) => onSetAuthField("confirmPassword", value)}
+                      inputType="password"
+                      autoComplete="new-password"
+                    />
+                  )}
+                  <button
+                    className="primary-button full"
+                    type="button"
+                    onClick={onSubmitAuth}
+                    disabled={!authForm.email.trim() || !authForm.password.trim() || syncing}
+                  >
+                    {syncing ? "Enviando..." : authPanelMode === "create" ? "Criar conta" : "Entrar"}
+                  </button>
+                  <button
+                    className="text-button auth-switch-button"
+                    type="button"
+                    onClick={authPanelMode === "create" ? openLoginPanel : openCreateAccountPanel}
+                  >
+                    {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
                   </button>
                 </div>
               </>
@@ -1451,17 +1554,23 @@ function HomeScreen({
   go,
   pendingCount,
   session,
-  authEmail,
-  setAuthEmail,
-  onSendMagicLink,
+  authForm,
+  setAuthField,
+  onCreateList,
+  onLogin,
+  authPanelMode,
+  onSubmitAuth,
   syncing,
 }: {
   go: (view: View) => void;
   pendingCount: number;
   session: Session | null;
-  authEmail: string;
-  setAuthEmail: (value: string) => void;
-  onSendMagicLink: () => void;
+  authForm: AuthFormState;
+  setAuthField: <K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) => void;
+  onCreateList: () => void;
+  onLogin: () => void;
+  authPanelMode: AuthPanelMode;
+  onSubmitAuth: () => void;
   syncing: boolean;
 }) {
   return (
@@ -1470,13 +1579,78 @@ function HomeScreen({
         {supabaseEnabled && !session && (
           <section className="inset-section dashboard-auth">
             <div className="auth-card">
-              <p className="label">Acesse sua conta</p>
-              <h2>Entrar no Wishly</h2>
-              <p>Use seu e-mail para acessar suas listas e continuar de onde parou.</p>
+              <div className="auth-mode-row" role="tablist" aria-label="Fluxo de autenticacao">
+                <button
+                  className={authPanelMode === "create" ? "active" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={authPanelMode === "create"}
+                  onClick={onCreateList}
+                >
+                  Criar lista
+                </button>
+                <button
+                  className={authPanelMode === "login" ? "active" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={authPanelMode === "login"}
+                  onClick={onLogin}
+                >
+                  Entrar
+                </button>
+              </div>
+              <p className="label">{authPanelMode === "create" ? "Novo cadastro" : "Acesse sua conta"}</p>
+              <h2>{authPanelMode === "create" ? "Crie sua conta e comece a lista" : "Entre no Wishly"}</h2>
+              <p>
+                {authPanelMode === "create"
+                  ? "Cadastre seus dados para criar a primeira lista."
+                  : "Use seu e-mail e senha para voltar para suas listas."}
+              </p>
               <div className="auth-inline">
-                <Field label="Email" placeholder="voce@exemplo.com" value={authEmail} onChange={setAuthEmail} />
-                <button className="primary-button full" type="button" onClick={onSendMagicLink} disabled={!authEmail.trim() || syncing}>
-                  Entrar por email
+                {authPanelMode === "create" && (
+                  <Field
+                    label="Nome"
+                    placeholder="Gabriel Fachini"
+                    value={authForm.fullName}
+                    onChange={(value) => setAuthField("fullName", value)}
+                    autoComplete="name"
+                  />
+                )}
+                <Field
+                  label="Email"
+                  placeholder="voce@exemplo.com"
+                  value={authForm.email}
+                  onChange={(value) => setAuthField("email", value)}
+                  autoComplete="email"
+                />
+                <Field
+                  label="Senha"
+                  placeholder={authPanelMode === "create" ? "Crie uma senha" : "Sua senha"}
+                  value={authForm.password}
+                  onChange={(value) => setAuthField("password", value)}
+                  inputType="password"
+                  autoComplete={authPanelMode === "create" ? "new-password" : "current-password"}
+                />
+                {authPanelMode === "create" && (
+                  <Field
+                    label="Confirmar senha"
+                    placeholder="Repita sua senha"
+                    value={authForm.confirmPassword}
+                    onChange={(value) => setAuthField("confirmPassword", value)}
+                    inputType="password"
+                    autoComplete="new-password"
+                  />
+                )}
+                <button
+                  className="primary-button full"
+                  type="button"
+                  onClick={onSubmitAuth}
+                  disabled={!authForm.email.trim() || !authForm.password.trim() || syncing}
+                >
+                  {syncing ? "Enviando..." : authPanelMode === "create" ? "Criar conta" : "Entrar"}
+                </button>
+                <button className="text-button auth-switch-button" type="button" onClick={authPanelMode === "create" ? onLogin : onCreateList}>
+                  {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
                 </button>
               </div>
             </div>
@@ -2406,6 +2580,8 @@ function Field({
   value,
   onChange,
   disabled,
+  inputType,
+  autoComplete,
 }: {
   label: string;
   placeholder: string;
@@ -2414,6 +2590,8 @@ function Field({
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  inputType?: string;
+  autoComplete?: string;
 }) {
   return (
     <label className="field">
@@ -2423,7 +2601,14 @@ function Field({
         {textarea ? (
           <textarea placeholder={placeholder} rows={4} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
         ) : (
-          <input placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+          <input
+            type={inputType ?? "text"}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            disabled={disabled}
+            autoComplete={autoComplete}
+          />
         )}
       </span>
     </label>

@@ -79,20 +79,36 @@ export function listenToAuthChanges(callback: (session: Session | null) => void)
   return () => subscription.unsubscribe();
 }
 
-export async function signInWithEmailOtp(email: string) {
+export async function signInWithPassword(email: string, password: string) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
-  const redirectTo = window.location.origin;
-  const { error } = await supabase.auth.signInWithOtp({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
+    password,
+  });
+
+  if (error) throw error;
+
+  return data;
+}
+
+export async function signUpWithPassword(input: { email: string; password: string; fullName?: string }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.auth.signUp({
+    email: input.email,
+    password: input.password,
     options: {
-      shouldCreateUser: true,
-      emailRedirectTo: redirectTo,
+      emailRedirectTo: window.location.origin,
+      data: input.fullName ? { full_name: input.fullName } : undefined,
     },
   });
 
   if (error) throw error;
+
+  return data;
 }
 
 export async function createWishlist(input: { title: string; coverImageUrl?: string | null }) {
