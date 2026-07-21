@@ -1,3 +1,10 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  extractMercadoLivreProduct,
+  isMercadoLivreHost,
+  isMercadoLivreShortHost,
+} from "./lib/mercado-livre.mjs";
+
 type ProductExtractionResult = {
   originalUrl: string;
   canonicalUrl: string | null;
@@ -36,6 +43,10 @@ type ProductExtractionResult = {
     totalMs: number;
     steps: Record<string, number>;
   };
+  priceSource?: string;
+  resolvedUrl?: string;
+  resourceType?: string;
+  observability?: Record<string, unknown>;
 };
 
 type ExtractionContext = {
@@ -49,10 +60,137 @@ interface ProductProvider {
   extract(url: URL, context: ExtractionContext, timeoutMs: number): Promise<ProductExtractionResult | null>;
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = new Set([
+  "https://www.wishlyapp.com.br",
+  "https://wishlyapp.com.br",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
+  "http://127.0.0.1:5176",
+  "http://127.0.0.1:5177",
+  "http://127.0.0.1:5178",
+  "http://127.0.0.1:5179",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
+  "http://localhost:5177",
+  "http://localhost:5178",
+  "http://localhost:5179",
+]);
+
+function getAllowedOrigin(origin: string | null) {
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    return origin;
+  }
+  return "https://www.wishlyapp.com.br";
+}
+
+function buildCorsHeaders(origin: string | null) {
+  return {
+    "Access-Control-Allow-Origin": getAllowedOrigin(origin),
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
+
+function buildJsonResponse(
+  request: Request,
+  body: Record<string, unknown> | ProductExtractionResult,
+  status: number,
+) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...buildCorsHeaders(request.headers.get("Origin")),
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+function getSupabaseAnonKey() {
+  const directKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (directKey) return directKey;
+
+  const publishableKeys = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+  if (!publishableKeys) return "";
+
+  try {
+    const parsed = JSON.parse(publishableKeys) as Record<string, string>;
+    return parsed.default ?? Object.values(parsed)[0] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+async function requireAuthenticatedUser(request: Request) {
+  const authorization = request.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return {
+      user: null,
+      response: buildJsonResponse(request, {
+        error: "missing_session",
+        message: "Sessao ausente. Entre novamente para continuar.",
+      }, 401),
+    };
+  }
+
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) {
+    return {
+      user: null,
+      response: buildJsonResponse(request, {
+        error: "invalid_session",
+        message: "Sessao invalida. Entre novamente para continuar.",
+      }, 401),
+    };
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseAnonKey = getSupabaseAnonKey();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return {
+      user: null,
+      response: buildJsonResponse(request, {
+        error: "auth_config_unavailable",
+        message: "Configuracao de autenticacao indisponivel.",
+      }, 500),
+    };
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: authorization,
+      },
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return {
+      user: null,
+      response: buildJsonResponse(request, {
+        error: "invalid_session",
+        message: "Sessao invalida ou expirada. Entre novamente para continuar.",
+      }, 401),
+    };
+  }
+
+  return {
+    user,
+    response: null,
+  };
+}
 
 const TOTAL_TIMEOUT_MS = 8_000;
 const SPECIFIC_PROVIDER_TIMEOUT_MS = 3_000;
@@ -129,6 +267,10 @@ function mergeResults(base: ProductExtractionResult | null, candidate: ProductEx
   return {
     ...base,
     ...candidate,
+    provider:
+      base.provider === "mercado_livre" || candidate.provider === "mercado_livre"
+        ? "mercado_livre"
+        : candidate.provider,
     originalUrl,
     canonicalUrl: candidate.canonicalUrl ?? base.canonicalUrl,
     storeName: candidate.storeName ?? base.storeName,
@@ -154,6 +296,10 @@ function mergeResults(base: ProductExtractionResult | null, candidate: ProductEx
     },
     warnings: Array.from(new Set([...base.warnings, ...candidate.warnings])),
     timings: base.timings ?? candidate.timings,
+    priceSource: candidate.priceSource ?? base.priceSource,
+    resolvedUrl: candidate.resolvedUrl ?? base.resolvedUrl,
+    resourceType: candidate.resourceType ?? base.resourceType,
+    observability: candidate.observability ?? base.observability,
   };
 }
 
@@ -261,22 +407,6 @@ function assertSafeUrl(url: URL) {
   ) {
     throw new Error("unsafe_host");
   }
-}
-
-function isMercadoLivreHost(hostname: string) {
-  const normalized = hostname.toLowerCase();
-  return (
-    normalized === "mercadolivre.com.br" ||
-    normalized === "produto.mercadolivre.com.br" ||
-    normalized === "lista.mercadolivre.com.br" ||
-    normalized.endsWith(".mercadolivre.com.br") ||
-    normalized.endsWith(".mercadolibre.com") ||
-    normalized === "meli.la"
-  );
-}
-
-function isMercadoLivreShortHost(hostname: string) {
-  return hostname.toLowerCase() === "meli.la";
 }
 
 async function resolveShortUrl(url: URL, steps: Record<string, number>) {
@@ -407,22 +537,6 @@ function getHostnameStoreName(url: URL) {
   return url.hostname.replace(/^www\./, "");
 }
 
-function extractMercadoLivreItemId(url: URL) {
-  const matches = [
-    url.toString().match(/\b(MLB-?\d{8,})\b/i),
-    url.pathname.match(/\b(MLB-?\d{8,})\b/i),
-    url.search.match(/\b(MLB-?\d{8,})\b/i),
-  ];
-
-  for (const match of matches) {
-    if (!match?.[1]) continue;
-    const digits = match[1].replace(/[^0-9]/g, "");
-    if (digits) return `MLB${digits}`;
-  }
-
-  return null;
-}
-
 class MercadoLivreProvider implements ProductProvider {
   name = "mercado_livre";
 
@@ -431,46 +545,16 @@ class MercadoLivreProvider implements ProductProvider {
   }
 
   async extract(url: URL, context: ExtractionContext, timeoutMs: number) {
-    const itemId = extractMercadoLivreItemId(url);
-    if (!itemId) return null;
-
-    const item = await withStepTiming(context.steps, "mercado_livre_item_api", () =>
-      fetchJson(`https://api.mercadolibre.com/items/${itemId}`, timeoutMs),
-    );
-
-    return {
+    return await extractMercadoLivreProduct({
       originalUrl: url.toString(),
-      canonicalUrl: item.permalink ?? url.toString(),
-      provider: "mercado_livre",
-      storeName: "Mercado Livre",
-      sellerName: null,
-      externalProductId: item.id ?? itemId,
-      externalVariantId: null,
-      title: item.title ?? null,
-      description: null,
-      imageUrl: item.pictures?.[0]?.secure_url ?? item.thumbnail_secure_url ?? null,
-      imageUrls: (item.pictures ?? []).map((picture: { secure_url?: string; url?: string }) => picture.secure_url ?? picture.url).filter(Boolean),
-      currentPriceInCents: parseMoneyToCents(item.price),
-      originalPriceInCents: parseMoneyToCents(item.original_price),
-      currency: item.currency_id ?? "BRL",
-      availability: item.available_quantity > 0 ? "in_stock" : "out_of_stock",
-      selectedVariant: (item.attributes ?? [])
-        .map((attribute: { name?: string; value_name?: string }) => ({
-          name: attribute.name ?? "",
-          value: attribute.value_name ?? "",
-        }))
-        .filter((attribute: { name: string; value: string }) => attribute.name && attribute.value),
-      extractedAt: new Date().toISOString(),
-      partial: false,
-      confidence: {
-        title: 0.98,
-        description: 0,
-        image: 0.98,
-        price: 0.98,
-        variant: 0.8,
-      },
-      warnings: [],
-    };
+      resolvedUrl: url,
+      html: context.html,
+      timeoutMs,
+      steps: context.steps,
+      fetchJson,
+      ensureHtml: async (targetUrl: URL, innerTimeoutMs: number) => await ensureHtml(targetUrl, context, innerTimeoutMs),
+      withStepTiming,
+    }) as ProductExtractionResult;
   }
 }
 
@@ -734,8 +818,8 @@ async function extractProduct(originalUrl: string) {
   let bestResult: ProductExtractionResult | null = null;
 
   const providers: ProductProvider[] = [];
-  const mercadoItemId = isMercadoLivreHost(workingUrl.hostname) ? extractMercadoLivreItemId(workingUrl) : null;
-  if (mercadoItemId) {
+  const isMercadoLivreUrl = isMercadoLivreHost(workingUrl.hostname);
+  if (isMercadoLivreUrl) {
     providers.push(new MercadoLivreProvider());
   } else if (workingUrl.pathname.includes("/products/")) {
     providers.push(new ShopifyProvider());
@@ -772,43 +856,58 @@ async function extractProduct(originalUrl: string) {
   }
 
   const fallback = bestResult ?? buildEmptyResult(originalUrl);
+  if (isMercadoLivreUrl) {
+    fallback.provider = "mercado_livre";
+    fallback.storeName = fallback.storeName ?? "Mercado Livre";
+  }
   if (!hasEssentialFields(fallback)) {
     fallback.partial = true;
     fallback.warnings.push("essential_fields_incomplete");
   }
 
-  return finalizeResult(fallback, context.steps, startedAt);
+  const finalResult = finalizeResult(fallback, context.steps, startedAt);
+  if (finalResult.provider === "mercado_livre") {
+    console.log(JSON.stringify(finalResult.observability ?? {
+      originalUrl,
+      resolvedUrl: workingUrl.toString(),
+      providerMatched: "mercado_livre",
+      status: finalResult.partial ? "partial" : "success",
+      warnings: finalResult.warnings,
+      steps: finalResult.timings?.steps ?? context.steps,
+    }));
+  }
+
+  return finalResult;
 }
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", {
+      status: 200,
+      headers: buildCorsHeaders(request.headers.get("Origin")),
+    });
   }
 
   let requestedUrl = "";
 
   try {
+    const auth = await requireAuthenticatedUser(request);
+    if (auth.response) {
+      return auth.response;
+    }
+
     const { url } = await request.json();
     if (!url || typeof url !== "string") {
-      return new Response(JSON.stringify({ error: "invalid_url" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return buildJsonResponse(request, { error: "invalid_url" }, 400);
     }
 
     requestedUrl = url;
     const result = await extractProduct(url);
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return buildJsonResponse(request, result, 200);
   } catch {
     const fallback = buildEmptyResult(requestedUrl);
     fallback.partial = true;
     fallback.warnings.push("unexpected_error");
-    return new Response(JSON.stringify(finalizeResult(fallback, {}, Date.now())), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return buildJsonResponse(request, finalizeResult(fallback, {}, Date.now()), 200);
   }
 });

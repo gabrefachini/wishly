@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test --experimental-strip-types src/lib/*.test.mjs supabase/functions/extract-product/tests/*.test.mjs",
+    "test:extract-product": "node --test supabase/functions/extract-product/tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.6",

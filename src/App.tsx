@@ -64,6 +64,13 @@ import {
   type ProductExtractionResult,
   loadPublicWishlist,
 } from "./lib/wishly-api";
+import {
+  PRODUCT_PLACEHOLDER_DATA_URL,
+  WishSubmissionLock,
+  buildWishSubmissionFingerprint,
+  getProductImageSrc,
+  getWishSubmissionReadiness,
+} from "./lib/product-autofill";
 
 type View =
   | "home"
@@ -89,7 +96,7 @@ type LocalWish = {
   title: string;
   store: string;
   price: string;
-  image: string;
+  image: string | null;
   status?: string;
   priority?: Priority;
   drop?: string;
@@ -140,6 +147,7 @@ type ProductExtractionState = {
   provider: ProductExtractionResult["provider"] | null;
   preview: ProductExtractionResult | null;
   extractedUrl: string | null;
+  errorCode: string | null;
 };
 
 type CreateListFormState = {
@@ -335,7 +343,9 @@ function App() {
     provider: null,
     preview: null,
     extractedUrl: null,
+    errorCode: null,
   });
+  const addWishSubmissionLock = useRef(new WishSubmissionLock());
   const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
   const [profileForm, setProfileForm] = useState<ProfileFormState>(localProfileSeed);
   const [accessForm, setAccessForm] = useState<AccessFormState>({
@@ -667,9 +677,31 @@ function App() {
   }
 
   async function handleAddWish() {
-    const fallbackTitle = formState.title.trim() || "Novo desejo";
+    const submissionReadiness = getWishSubmissionReadiness({
+      title: formState.title,
+      productUrl: formState.productUrl,
+      extractionStatus: extractionState.status,
+      extractedUrl: extractionState.extractedUrl,
+      syncing,
+    });
+    if (!submissionReadiness.canSubmit) {
+      setSyncError(submissionReadiness.reason || "Revise o item antes de salvar.");
+      return;
+    }
+
+    const title = formState.title.trim();
     const priceInCents = parsePriceInputToCents(formState.currentPrice);
     const canonicalOrOriginalUrl = formState.canonicalUrl.trim() || formState.productUrl.trim();
+    const submissionFingerprint = buildWishSubmissionFingerprint({
+      wishlistId: remote.selectedWishlistId ?? localListId,
+      requestedUrl: formState.productUrl.trim() || canonicalOrOriginalUrl,
+      title,
+      canonicalUrl: canonicalOrOriginalUrl,
+    });
+
+    if (!addWishSubmissionLock.current.start(submissionFingerprint)) {
+      return;
+    }
 
     if (isRemoteMode && remote.selectedWishlistId) {
       try {
@@ -678,7 +710,7 @@ function App() {
 
         await createGift({
           wishlistId: remote.selectedWishlistId,
-          name: fallbackTitle,
+          name: title,
           description: formState.note.trim(),
           storeUrl: canonicalOrOriginalUrl,
           priority: mapPriorityToDb(selectedPriority),
@@ -696,7 +728,10 @@ function App() {
                 externalVariantId: extractionState.preview.externalVariantId,
                 availability: extractionState.preview.availability,
                 selectedVariant: extractionState.preview.selectedVariant,
+                imageUrl: extractionState.preview.imageUrl,
                 imageUrls: extractionState.preview.imageUrls,
+                currentPriceInCents: extractionState.preview.currentPriceInCents,
+                originalPriceInCents: extractionState.preview.originalPriceInCents,
                 extractedAt: extractionState.preview.extractedAt,
                 confidence: extractionState.preview.confidence,
                 warnings: extractionState.preview.warnings,
@@ -704,12 +739,14 @@ function App() {
                   ? "success"
                   : extractionState.status === "partial"
                     ? "partial"
-                    : extractionState.status === "loading"
-                      ? "pending"
-                      : extractionState.status === "error"
-                        ? "failed"
-                        : "not_requested",
+                    : extractionState.status === "error"
+                      ? extractionState.errorCode === "timeout"
+                        ? "timeout"
+                        : "failed"
+                      : "pending",
+                errorCode: extractionState.errorCode,
                 errorMessage: extractionState.status === "error" ? extractionState.message : null,
+                rawPayload: extractionState.preview.rawPayload ?? extractionState.preview,
               }
             : formState.productUrl.trim()
               ? {
@@ -722,23 +759,34 @@ function App() {
                   externalVariantId: formState.externalVariantId.trim() || null,
                   availability: formState.availability,
                   selectedVariant: parseSelectedVariantText(formState.selectedVariantText),
+                  imageUrl: formState.imageUrl.trim() || null,
                   imageUrls: parseImageUrlsText(formState.imageUrlsText),
+                  currentPriceInCents: priceInCents,
+                  originalPriceInCents: parsePriceInputToCents(formState.originalPrice),
                   extractedAt: null,
                   confidence: null,
                   warnings: [],
-                  status: extractionState.status === "error" ? "failed" : "not_requested",
+                  status: extractionState.status === "error"
+                    ? extractionState.errorCode === "timeout"
+                      ? "timeout"
+                      : "failed"
+                    : "pending",
+                  errorCode: extractionState.errorCode,
                   errorMessage: extractionState.status === "error" ? extractionState.message : null,
+                  rawPayload: {},
                 }
               : undefined,
         });
 
         await refreshRemoteState(session);
         setFormState(initialAddWishFormState);
-        setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
+        setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
         setSelectedPriority("Alta");
+        addWishSubmissionLock.current.finish(true);
         go("list");
         return;
       } catch (error) {
+        addWishSubmissionLock.current.finish(false);
         setSyncError(getErrorMessage(error));
       } finally {
         setSyncing(false);
@@ -749,10 +797,10 @@ function App() {
     const nextWishId = getNextId(localWishes);
     const createdWish: LocalWish = {
       id: nextWishId,
-      title: fallbackTitle,
+      title,
       store: formState.storeName.trim() || getStoreLabel(linkData.source),
       price: formState.currentPrice.trim() || "Adicionar preco",
-      image: formState.imageUrl.trim() || images.setup,
+      image: formState.imageUrl.trim() || null,
       priority: selectedPriority,
       originalUrl: linkData.originalUrl,
       resolvedUrl: formState.canonicalUrl.trim() || linkData.resolvedUrl,
@@ -786,8 +834,9 @@ function App() {
     }
 
     setFormState(initialAddWishFormState);
-    setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
+    setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
     setSelectedPriority("Alta");
+    addWishSubmissionLock.current.finish(true);
     go("list");
   }
 
@@ -1171,11 +1220,11 @@ function App() {
 
     const rawUrl = formState.productUrl.trim();
     if (!isValidHttpUrl(rawUrl)) {
-      setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null });
+      setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
       return;
     }
 
-    if (extractionState.extractedUrl === rawUrl && extractionState.status !== "error") {
+    if (extractionState.extractedUrl === rawUrl && extractionState.status !== "idle") {
       return;
     }
 
@@ -1189,6 +1238,7 @@ function App() {
           provider: null,
           preview: null,
           extractedUrl: rawUrl,
+          errorCode: null,
         });
 
         progressTimer = window.setTimeout(() => {
@@ -1216,18 +1266,21 @@ function App() {
             ? "Preenchemos o essencial. Os detalhes restantes podem ser revisados manualmente."
             : "Informações do produto preenchidas automaticamente.",
           provider: result.provider,
-          preview: result,
+          preview: { ...result, rawPayload: result.rawPayload ?? { result } },
           extractedUrl: rawUrl,
+          errorCode: null,
         });
-      } catch {
+      } catch (error) {
         if (!active) return;
         if (progressTimer != null) window.clearTimeout(progressTimer);
+        const isTimeout = error instanceof Error && error.message === "extraction_timeout";
         setExtractionState({
           status: "error",
-          message: "A extração excedeu o tempo limite ou falhou. Você ainda pode adicionar o item manualmente.",
+          message: "Não conseguimos preencher os dados. Complete o nome e confirme a inclusão manual.",
           provider: null,
           preview: null,
           extractedUrl: rawUrl,
+          errorCode: isTimeout ? "timeout" : "failed",
         });
       }
     }, 550);
@@ -2530,7 +2583,7 @@ function AddWishScreen({
         )}
         {(extractionState.preview || formState.title.trim() || formState.imageUrl.trim()) && (
           <div className="product-extraction-card">
-            <img src={formState.imageUrl.trim() || images.setup} alt="" />
+            <img src={formState.imageUrl.trim() || PRODUCT_PLACEHOLDER_DATA_URL} alt="" />
             <div className="product-extraction-copy">
               <strong>{formState.title.trim() || "Produto sem nome"}</strong>
               <span>
@@ -2667,9 +2720,19 @@ function AddWishScreen({
           <button className="secondary-button" type="button" onClick={() => go("list")}>
             Voltar
           </button>
-          <button className="primary-button full" type="submit" disabled={syncing}>
+          <button
+            className="primary-button full"
+            type="submit"
+            disabled={!getWishSubmissionReadiness({
+              title: formState.title,
+              productUrl: formState.productUrl,
+              extractionStatus: extractionState.status,
+              extractedUrl: extractionState.extractedUrl,
+              syncing,
+            }).canSubmit}
+          >
             <Sparkles size={18} />
-            {syncing ? "Salvando..." : "Salvar desejo"}
+            {syncing ? "Salvando..." : extractionState.status === "error" ? "Confirmar inclusão manual" : "Salvar desejo"}
           </button>
         </div>
       </form>
@@ -4002,8 +4065,8 @@ function getWishCurrency(wish: LocalWish | DbWish) {
 }
 
 function getWishImage(wish: LocalWish | DbWish) {
-  if ("image" in wish) return wish.image;
-  return wish.image_url || wish.image_urls?.[0] || images.setup;
+  if ("image" in wish) return wish.image || PRODUCT_PLACEHOLDER_DATA_URL;
+  return getProductImageSrc(wish.image_url, wish.image_urls) || PRODUCT_PLACEHOLDER_DATA_URL;
 }
 
 function getWishStatus(wish: LocalWish | DbWish) {
@@ -4319,6 +4382,16 @@ function detectMarketplace(hostname: string, pathname: string): LocalSource {
 }
 
 function getErrorMessage(error: unknown) {
+  if (typeof error === "object" && error && "message" in error && typeof error.message === "string") {
+    const supabaseError = error as { message: string; code?: string; details?: string | null; hint?: string | null };
+    console.error("[Wishly] UI error", {
+      code: supabaseError.code ?? null,
+      message: supabaseError.message,
+      details: supabaseError.details ?? null,
+      hint: supabaseError.hint ?? null,
+    });
+    return supabaseError.message;
+  }
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Nao foi possivel concluir a operacao.";

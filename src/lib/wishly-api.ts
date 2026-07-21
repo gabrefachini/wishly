@@ -1,5 +1,9 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient, hasSupabaseConfig } from "./supabase";
+import {
+  buildProductExtractionInsert,
+  mapAutofillStatusToExtractionStatus,
+} from "./product-autofill";
 
 export type DbWish = {
   id: string;
@@ -144,6 +148,7 @@ export type ProductExtractionResult = {
     totalMs: number;
     steps: Record<string, number>;
   };
+  rawPayload?: Record<string, unknown> | null;
 };
 
 export async function getInitialSession(): Promise<Session | null> {
@@ -466,11 +471,16 @@ export async function createGift(input: {
     availability?: ProductExtractionResult["availability"] | null;
     selectedVariant?: ProductExtractionResult["selectedVariant"];
     imageUrls?: string[];
+    imageUrl?: string | null;
+    currentPriceInCents?: number | null;
+    originalPriceInCents?: number | null;
     extractedAt?: string | null;
     confidence?: ProductExtractionResult["confidence"] | null;
     warnings?: string[];
-    status?: "not_requested" | "pending" | "success" | "partial" | "failed";
+    status?: "not_requested" | "pending" | "success" | "partial" | "failed" | "timeout";
+    errorCode?: string | null;
     errorMessage?: string | null;
+    rawPayload?: Record<string, unknown> | null;
   };
 }) {
   const supabase = getSupabaseBrowserClient();
@@ -499,10 +509,12 @@ export async function createGift(input: {
         availability: input.autofill.availability ?? "unknown",
         selected_variant: input.autofill.selectedVariant ?? [],
         image_urls: input.autofill.imageUrls ?? [],
+        current_price: input.autofill.currentPriceInCents ?? input.estimatedPriceInCents ?? null,
+        original_price: input.autofill.originalPriceInCents ?? null,
         extracted_at: input.autofill.extractedAt ?? null,
         extraction_confidence: input.autofill.confidence ?? {},
         extraction_warnings: input.autofill.warnings ?? [],
-        autofill_status: input.autofill.status ?? "not_requested",
+        autofill_status: mapAutofillStatusToExtractionStatus(input.autofill.status) ?? "failed",
         last_extraction_error: input.autofill.errorMessage ?? null,
       }
     : null;
@@ -538,38 +550,25 @@ export async function createGift(input: {
   if (!data) throw new Error("Nao foi possivel criar o item.");
 
   if (input.autofill) {
-    const extractionStatus = input.autofill.status ?? "not_requested";
-    const normalizedPayload = {
-      title: input.name,
-      description: input.description || null,
-      image_url: input.imageUrl ?? null,
-      image_urls: input.autofill.imageUrls ?? [],
-      currency: input.currency ?? "BRL",
-      estimated_price_in_cents: input.estimatedPriceInCents ?? null,
-      canonical_url: input.autofill.canonicalUrl ?? null,
-      provider: input.autofill.provider ?? null,
-      store_name: input.autofill.storeName ?? null,
-      seller_name: input.autofill.sellerName ?? null,
-      external_product_id: input.autofill.externalProductId ?? null,
-      external_variant_id: input.autofill.externalVariantId ?? null,
-      availability: input.autofill.availability ?? "unknown",
-      selected_variant: input.autofill.selectedVariant ?? [],
-    };
-
-    const { error: extractionError } = await supabase.from("product_extractions").insert({
-      gift_id: data.id,
-      requested_url: input.autofill.requestedUrl,
-      canonical_url: input.autofill.canonicalUrl ?? null,
-      provider: input.autofill.provider ?? null,
-      normalized_payload: normalizedPayload,
-      field_confidence: input.autofill.confidence ?? {},
-      extraction_status: extractionStatus,
-      error_message: input.autofill.errorMessage ?? null,
-      extracted_at: input.autofill.extractedAt ?? new Date().toISOString(),
+    const extractionInsert = buildProductExtractionInsert({
+      giftId: data.id,
+      name: input.name,
+      description: input.description,
+      imageUrl: input.imageUrl,
+      estimatedPriceInCents: input.estimatedPriceInCents,
+      currency: input.currency,
+      autofill: {
+        ...input.autofill,
+      },
     });
 
-    if (extractionError && !isSchemaCompatibilityInsertError(extractionError)) {
-      throw extractionError;
+    if (extractionInsert) {
+      const { error: extractionError } = await supabase.from("product_extractions").insert(extractionInsert);
+
+      if (extractionError && !isSchemaCompatibilityInsertError(extractionError)) {
+        logSupabaseError("product_extractions.insert", extractionError, extractionInsert);
+        throw extractionError;
+      }
     }
   }
 
@@ -694,7 +693,10 @@ export async function resolvePublicGiftRedirect(input: {
     p_referrer: window.location.href,
   });
 
-  if (error) throw error;
+  if (error) {
+    logSupabaseError("resolve_public_gift_redirect", error, input);
+    throw error;
+  }
 
   return data as { url: string; gift_id: string; wishlist_id: string };
 }
@@ -809,4 +811,14 @@ function isSchemaCompatibilityInsertError(error: { code?: string; message?: stri
     error.code === "42703" ||
     error.code === "42P01"
   );
+}
+
+function logSupabaseError(context: string, error: { code?: string; message?: string; details?: string | null; hint?: string | null }, meta?: unknown) {
+  console.error(`[Wishly] ${context}`, {
+    code: error.code ?? null,
+    message: error.message ?? null,
+    details: error.details ?? null,
+    hint: error.hint ?? null,
+    meta: meta ?? null,
+  });
 }
