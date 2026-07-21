@@ -131,6 +131,7 @@ export type ProductExtractionResult = {
     value: string;
   }>;
   extractedAt: string;
+  partial: boolean;
   confidence: {
     title: number;
     description: number;
@@ -139,6 +140,10 @@ export type ProductExtractionResult = {
     variant: number;
   };
   warnings: string[];
+  timings?: {
+    totalMs: number;
+    steps: Record<string, number>;
+  };
 };
 
 export async function getInitialSession(): Promise<Session | null> {

@@ -1181,23 +1181,39 @@ function App() {
 
     let active = true;
     const timeout = window.setTimeout(async () => {
+      let progressTimer: number | null = null;
       try {
         setExtractionState({
           status: "loading",
-          message: "Buscando informações do produto",
+          message: "Buscando dados essenciais do produto",
           provider: null,
           preview: null,
           extractedUrl: rawUrl,
         });
 
-        const result = await extractProductFromUrl(rawUrl);
+        progressTimer = window.setTimeout(() => {
+          if (!active) return;
+          setExtractionState((current) => (
+            current.status === "loading"
+              ? { ...current, message: "Tentando completar imagem, preço e detalhes da loja" }
+              : current
+          ));
+        }, 1800);
+
+        const result = await Promise.race([
+          extractProductFromUrl(rawUrl),
+          new Promise<ProductExtractionResult>((_, reject) => {
+            window.setTimeout(() => reject(new Error("extraction_timeout")), 8500);
+          }),
+        ]);
         if (!active) return;
+        if (progressTimer != null) window.clearTimeout(progressTimer);
 
         setFormState((current) => mergeExtractedProductIntoForm(current, result));
         setExtractionState({
-          status: result.warnings.length > 0 ? "partial" : "success",
-          message: result.warnings.length > 0
-            ? "Encontramos quase tudo. Confira as informações antes de adicionar."
+          status: result.partial || result.warnings.length > 0 ? "partial" : "success",
+          message: result.partial || result.warnings.length > 0
+            ? "Preenchemos o essencial. Os detalhes restantes podem ser revisados manualmente."
             : "Informações do produto preenchidas automaticamente.",
           provider: result.provider,
           preview: result,
@@ -1205,9 +1221,10 @@ function App() {
         });
       } catch {
         if (!active) return;
+        if (progressTimer != null) window.clearTimeout(progressTimer);
         setExtractionState({
           status: "error",
-          message: "Não conseguimos ler todos os dados deste link. Você ainda pode adicionar o item manualmente.",
+          message: "A extração excedeu o tempo limite ou falhou. Você ainda pode adicionar o item manualmente.",
           provider: null,
           preview: null,
           extractedUrl: rawUrl,
@@ -2498,15 +2515,15 @@ function AddWishScreen({
           onChange={(value) => setFormState({ ...formState, productUrl: value })}
         />
         {extractionState.status === "loading" && (
-          <div className="product-extraction-card skeleton">
-            <div className="product-extraction-skeleton-media" />
-            <div className="product-extraction-skeleton-copy">
-              <span />
-              <span />
-              <span />
-            </div>
-            <p>Buscando informações do produto</p>
+        <div className="product-extraction-card skeleton">
+          <div className="product-extraction-skeleton-media" />
+          <div className="product-extraction-skeleton-copy">
+            <span />
+            <span />
+            <span />
           </div>
+          <p>{extractionState.message || "Buscando dados essenciais do produto"}</p>
+        </div>
         )}
         {extractionState.status !== "idle" && extractionState.status !== "loading" && (
           <div className={`sync-banner ${extractionState.status === "error" ? "error" : "success"}`}>{extractionState.message}</div>
