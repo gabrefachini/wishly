@@ -48,6 +48,13 @@ export function normalizeVariationId(value) {
   return normalized ? normalized : null;
 }
 
+function buildMercadoLivreItemUrl(itemId) {
+  const normalizedItemId = normalizeMercadoLivreItemId(itemId);
+  if (!normalizedItemId) return null;
+  const digits = normalizedItemId.replace(/^MLB/i, "");
+  return `https://produto.mercadolivre.com.br/MLB-${digits}-_JM`;
+}
+
 function decodeHtml(value) {
   return value
     .replace(/&amp;/g, "&")
@@ -587,6 +594,33 @@ function applySignalsToResult(result, signals, state) {
   }
 }
 
+async function resolveMercadoLivreItemPageFallback({
+  ensureHtml,
+  itemId,
+  originalUrl,
+  steps,
+  timeoutMs,
+  withStepTiming,
+}) {
+  const itemUrl = buildMercadoLivreItemUrl(itemId);
+  if (!itemUrl) return null;
+
+  try {
+    const itemHtml = await withStepTiming(steps, "mercado_livre_item_page_html", () =>
+      ensureHtml(new URL(itemUrl), timeoutMs),
+    );
+    if (!itemHtml) return null;
+
+    return resolveMercadoLivreSignals({
+      originalUrl,
+      resolvedUrl: itemUrl,
+      html: itemHtml,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function extractMercadoLivreProduct({
   originalUrl,
   resolvedUrl,
@@ -724,6 +758,32 @@ export async function extractMercadoLivreProduct({
   } else {
     state.priceApiStatus = "failed";
     warnings.push("meli_price_api_failed");
+  }
+
+  if (!itemPayload && signals.itemId) {
+    const itemPageSignals = await resolveMercadoLivreItemPageFallback({
+      ensureHtml,
+      itemId: signals.itemId,
+      originalUrl,
+      steps,
+      timeoutMs,
+      withStepTiming,
+    });
+
+    if (itemPageSignals) {
+      signals = {
+        ...signals,
+        canonicalUrl: itemPageSignals.canonicalUrl ?? signals.canonicalUrl,
+        title: itemPageSignals.title ?? signals.title,
+        description: itemPageSignals.description ?? signals.description,
+        imageUrls: itemPageSignals.imageUrls.length > 0 ? itemPageSignals.imageUrls : signals.imageUrls,
+        currentPriceInCents: itemPageSignals.currentPriceInCents ?? signals.currentPriceInCents,
+        originalPriceInCents: itemPageSignals.originalPriceInCents ?? signals.originalPriceInCents,
+        currency: itemPageSignals.currency ?? signals.currency,
+        availability: itemPageSignals.availability ?? signals.availability,
+      };
+      applySignalsToResult(result, signals, state);
+    }
   }
 
   const selectedVariation = selectVariation(itemPayload, signals.variationId);
