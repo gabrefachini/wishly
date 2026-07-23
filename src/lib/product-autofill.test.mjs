@@ -5,9 +5,16 @@ import {
   PRODUCT_PLACEHOLDER_DATA_URL,
   WishSubmissionLock,
   buildProductExtractionInsert,
+  getExtractionFeedback,
   getProductImageSrc,
   getWishSubmissionReadiness,
+  isAutofillResultCurrent,
+  isGenericProductTitle,
+  isGenericMercadoLivreTitle,
+  isMercadoLivreItemId,
+  isMercadoLivreBrandImage,
   mapAutofillStatusToExtractionStatus,
+  sanitizeMercadoLivrePreview,
 } from "./product-autofill.ts";
 
 test("maps extraction statuses for success, partial and failed paths", () => {
@@ -97,6 +104,23 @@ test("manual creation is allowed only after explicit title confirmation", () => 
   assert.equal(allowed.manualConfirmationRequired, true);
 });
 
+test("generic marketplace title is rejected as wish name", () => {
+  assert.equal(isGenericProductTitle("Mercado Livre"), true);
+  assert.equal(isGenericProductTitle("Amazon"), true);
+  assert.equal(isGenericProductTitle("Fone bluetooth"), false);
+
+  const blocked = getWishSubmissionReadiness({
+    title: "Mercado Livre",
+    productUrl: "https://produto.mercadolivre.com.br/MLB-1",
+    extractionStatus: "partial",
+    extractedUrl: "https://produto.mercadolivre.com.br/MLB-1",
+    syncing: false,
+  });
+
+  assert.equal(blocked.canSubmit, false);
+  assert.match(blocked.reason ?? "", /nome do produto/i);
+});
+
 test("blocks save while extraction is pending or URL is still resolving", () => {
   const pending = getWishSubmissionReadiness({
     title: "Abajur",
@@ -124,6 +148,89 @@ test("submission lock blocks duplicate clicks for the same action", () => {
   lock.finish(true, 1500);
   assert.equal(lock.start("same", 2000), false);
   assert.equal(lock.start("other", 2000), true);
+});
+
+test("accepts only the latest autofill response for the active add view and url", () => {
+  assert.equal(
+    isAutofillResultCurrent({
+      requestId: 3,
+      latestRequestId: 3,
+      view: "add",
+      productUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+      requestedUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+    }),
+    true,
+  );
+
+  assert.equal(
+    isAutofillResultCurrent({
+      requestId: 2,
+      latestRequestId: 3,
+      view: "add",
+      productUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+      requestedUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+    }),
+    false,
+  );
+
+  assert.equal(
+    isAutofillResultCurrent({
+      requestId: 3,
+      latestRequestId: 3,
+      view: "home",
+      productUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+      requestedUrl: "https://www.mercadolivre.com.br/up/MLBU3543355871",
+    }),
+    false,
+  );
+});
+
+test("detects MLB item identifiers", () => {
+  assert.equal(isMercadoLivreItemId("MLB123456789"), true);
+  assert.equal(isMercadoLivreItemId("mlb123456789"), true);
+  assert.equal(isMercadoLivreItemId("MLBU123456789"), false);
+  assert.equal(isMercadoLivreItemId(null), false);
+});
+
+test("detects Mercado Livre generic brand title and image", () => {
+  assert.equal(isGenericMercadoLivreTitle("Mercado Libre"), true);
+  assert.equal(isGenericMercadoLivreTitle("Mercado Livre"), true);
+  assert.equal(isGenericMercadoLivreTitle("Forno de pizza"), false);
+  assert.equal(
+    isMercadoLivreBrandImage("https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__large_plus.png"),
+    true,
+  );
+  assert.equal(isMercadoLivreBrandImage("https://http2.mlstatic.com/D_Q_NP_2X_12345-MLB00000000001-F.webp"), false);
+});
+
+test("sanitizes Mercado Livre preview when only brand metadata is available", () => {
+  const sanitized = sanitizeMercadoLivrePreview({
+    provider: "mercado_livre",
+    title: "Mercado Libre",
+    imageUrl: "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__large_plus.png",
+    imageUrls: [
+      "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__large_plus.png",
+    ],
+    externalProductId: null,
+  });
+
+  assert.equal(sanitized.title, null);
+  assert.equal(sanitized.imageUrl, null);
+  assert.deepEqual(sanitized.imageUrls, []);
+});
+
+test("shows explicit MLB guidance when Mercado Livre returns only MLBU partial data", () => {
+  const feedback = getExtractionFeedback({
+    provider: "mercado_livre",
+    warnings: ["meli_user_product_detected", "meli_item_id_not_found"],
+    partial: true,
+    externalProductId: "MLBU3543355871",
+    hasEssentialFields: false,
+  });
+
+  assert.equal(feedback.status, "error");
+  assert.match(feedback.message, /MLBU/);
+  assert.match(feedback.message, /MLB/);
 });
 
 test("missing image returns neutral placeholder instead of random product image", () => {

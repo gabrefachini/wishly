@@ -176,6 +176,14 @@ export function getWishSubmissionReadiness(input: {
     };
   }
 
+  if (isGenericProductTitle(title)) {
+    return {
+      canSubmit: false,
+      reason: "O nome do desejo precisa ser o nome do produto, não o nome do marketplace.",
+      manualConfirmationRequired: hasUrl,
+    };
+  }
+
   return {
     canSubmit: true,
     reason: null,
@@ -207,4 +215,123 @@ export class WishSubmissionLock {
 
 export function getProductImageSrc(primaryImage: string | null | undefined, extraImages?: string[] | null) {
   return primaryImage?.trim() || extraImages?.find((entry) => entry.trim()) || null;
+}
+
+const GENERIC_PRODUCT_TITLE_PATTERNS = [
+  /^\s*mercado\s+libre\s*$/i,
+  /^\s*mercado\s+livre\s*$/i,
+  /^\s*amazon\s*$/i,
+  /^\s*shopee\s*$/i,
+  /^\s*magalu\s*$/i,
+  /^\s*magazine\s+luiza\s*$/i,
+  /^\s*loja\s+externa\s*$/i,
+];
+
+export function isGenericProductTitle(value: string | null | undefined) {
+  const normalized = value?.trim() ?? "";
+  return GENERIC_PRODUCT_TITLE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+export function isAutofillResultCurrent(input: {
+  requestId: number;
+  latestRequestId: number;
+  view: string;
+  productUrl: string;
+  requestedUrl: string;
+}) {
+  return (
+    input.requestId === input.latestRequestId &&
+    input.view === "add" &&
+    input.productUrl.trim() === input.requestedUrl.trim()
+  );
+}
+
+export function isMercadoLivreItemId(value: string | null | undefined) {
+  return /^MLB\d{6,}$/i.test(value?.trim() ?? "");
+}
+
+export function isGenericMercadoLivreTitle(value: string | null | undefined) {
+  return isGenericProductTitle(value) && /mercado\s+(libre|livre)/i.test(value?.trim() ?? "");
+}
+
+export function isMercadoLivreBrandImage(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const normalized = `${url.hostname}${url.pathname}${url.search}`.toLowerCase();
+    return /logo|mercado[\-_ ]?(livre|libre)|frontend-assets|org-img|brand/.test(normalized);
+  } catch {
+    return /logo|mercado[\-_ ]?(livre|libre)|frontend-assets|org-img|brand/.test(value.toLowerCase());
+  }
+}
+
+export function sanitizeMercadoLivrePreview<T extends {
+  provider?: string | null;
+  title?: string | null;
+  imageUrl?: string | null;
+  imageUrls?: string[];
+  externalProductId?: string | null;
+}>(preview: T): T {
+  if (preview.provider !== "mercado_livre") return preview;
+
+  const next = { ...preview };
+  const hasReliableItemId = isMercadoLivreItemId(preview.externalProductId);
+
+  if (!hasReliableItemId && isGenericMercadoLivreTitle(preview.title)) {
+    next.title = null;
+  }
+
+  if (!hasReliableItemId && isMercadoLivreBrandImage(preview.imageUrl)) {
+    next.imageUrl = null;
+    next.imageUrls = (preview.imageUrls ?? []).filter((entry) => !isMercadoLivreBrandImage(entry));
+  }
+
+  return next;
+}
+
+export function getExtractionFeedback(input: {
+  provider: string | null | undefined;
+  warnings: string[];
+  partial: boolean;
+  externalProductId: string | null | undefined;
+  hasEssentialFields: boolean;
+}) {
+  const warnings = input.warnings ?? [];
+
+  if (
+    input.provider === "mercado_livre" &&
+    !input.hasEssentialFields &&
+    warnings.includes("meli_user_product_detected") &&
+    !isMercadoLivreItemId(input.externalProductId)
+  ) {
+    return {
+      status: "error" as const,
+      message:
+        "Esse link do Mercado Livre usa MLBU. No momento o Wishly preenche automaticamente melhor links MLB do item. Abra o anuncio do produto e copie o link direto do item.",
+    };
+  }
+
+  if (
+    input.provider === "mercado_livre" &&
+    !input.hasEssentialFields &&
+    warnings.includes("meli_item_id_not_found")
+  ) {
+    return {
+      status: "partial" as const,
+      message:
+        "O link foi reconhecido como Mercado Livre, mas ainda não encontramos a oferta MLB real para preencher preço e imagem do produto.",
+    };
+  }
+
+  if (input.partial || warnings.length > 0) {
+    return {
+      status: "partial" as const,
+      message: "Preenchemos o essencial. Os detalhes restantes podem ser revisados manualmente.",
+    };
+  }
+
+  return {
+    status: "success" as const,
+    message: "Informações do produto preenchidas automaticamente.",
+  };
 }

@@ -141,6 +141,53 @@ test("resolveMercadoLivreSignals detects item, catalog, user product and variati
   assert.equal(variation.variationId, "2001");
 });
 
+test("resolveMercadoLivreSignals prefers listing item id from query params over catalog id", () => {
+  const catalogWithListing = resolveMercadoLivreSignals({
+    originalUrl:
+      "https://www.mercadolivre.com.br/placa-de-video-nvidia-geforce-palit-rtx5060-8gb-infinity2-oc/p/MLB65407224?wid=MLB4577516683",
+    resolvedUrl:
+      "https://www.mercadolivre.com.br/placa-de-video-nvidia-geforce-palit-rtx5060-8gb-infinity2-oc/p/MLB65407224?wid=MLB4577516683",
+    html: null,
+  });
+
+  assert.equal(catalogWithListing.resourceType, "catalog_product");
+  assert.equal(catalogWithListing.catalogProductId, "MLB65407224");
+  assert.equal(catalogWithListing.itemId, "MLB4577516683");
+});
+
+test("resolveMercadoLivreSignals reads listing item id from hash params on Mercado Livre catalog links", () => {
+  const catalogWithHashListing = resolveMercadoLivreSignals({
+    originalUrl:
+      "https://www.mercadolivre.com.br/placa-de-video/p/MLB65407224#polycard_client=search-desktop&wid=MLB4577516683&sid=search",
+    resolvedUrl:
+      "https://www.mercadolivre.com.br/placa-de-video/p/MLB65407224#polycard_client=search-desktop&wid=MLB4577516683&sid=search",
+    html: null,
+  });
+
+  assert.equal(catalogWithHashListing.resourceType, "catalog_product");
+  assert.equal(catalogWithHashListing.catalogProductId, "MLB65407224");
+  assert.equal(catalogWithHashListing.itemId, "MLB4577516683");
+});
+
+test("resolveMercadoLivreSignals drops generic Mercado Livre title and brand image when no item id is found", () => {
+  const genericSignals = resolveMercadoLivreSignals({
+    originalUrl: "https://www.mercadolivre.com.br/oferta",
+    resolvedUrl: "https://www.mercadolivre.com.br/oferta",
+    html: `
+      <html>
+        <head>
+          <meta property="og:title" content="Mercado Libre">
+          <meta property="og:image" content="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__large_plus.png">
+        </head>
+      </html>
+    `,
+  });
+
+  assert.equal(genericSignals.itemId, null);
+  assert.equal(genericSignals.title, null);
+  assert.deepEqual(genericSignals.imageUrls, []);
+});
+
 test("MercadoLivreProvider preserves provider mercado_livre on catalog and user product partials", async () => {
   const catalogEntry = mercadoLivreCorpus.find((entry) => entry.id === "catalog-structured-only");
   const userProductEntry = mercadoLivreCorpus.find((entry) => entry.id === "user-product-structured-only");
@@ -200,4 +247,3 @@ test("MercadoLivreProvider corpus meets recognition and extraction targets", asy
   assert.ok(afterMetrics.recognized > beforeMetrics.recognized);
   assert.ok(afterMetrics.price > beforeMetrics.price);
 });
-

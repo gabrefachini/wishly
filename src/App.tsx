@@ -68,8 +68,11 @@ import {
   PRODUCT_PLACEHOLDER_DATA_URL,
   WishSubmissionLock,
   buildWishSubmissionFingerprint,
+  getExtractionFeedback,
   getProductImageSrc,
   getWishSubmissionReadiness,
+  isAutofillResultCurrent,
+  sanitizeMercadoLivrePreview,
 } from "./lib/product-autofill";
 
 type View =
@@ -346,6 +349,7 @@ function App() {
     errorCode: null,
   });
   const addWishSubmissionLock = useRef(new WishSubmissionLock());
+  const extractionRequestIdRef = useRef(0);
   const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
   const [profileForm, setProfileForm] = useState<ProfileFormState>(localProfileSeed);
   const [accessForm, setAccessForm] = useState<AccessFormState>({
@@ -1220,16 +1224,14 @@ function App() {
 
     const rawUrl = formState.productUrl.trim();
     if (!isValidHttpUrl(rawUrl)) {
+      extractionRequestIdRef.current += 1;
       setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
       return;
     }
 
-    if (extractionState.extractedUrl === rawUrl && extractionState.status !== "idle") {
-      return;
-    }
-
-    let active = true;
     const timeout = window.setTimeout(async () => {
+      const requestId = extractionRequestIdRef.current + 1;
+      extractionRequestIdRef.current = requestId;
       let progressTimer: number | null = null;
       try {
         setExtractionState({
@@ -1242,7 +1244,15 @@ function App() {
         });
 
         progressTimer = window.setTimeout(() => {
-          if (!active) return;
+          if (
+            !isAutofillResultCurrent({
+              requestId,
+              latestRequestId: extractionRequestIdRef.current,
+              view,
+              productUrl: formState.productUrl,
+              requestedUrl: rawUrl,
+            })
+          ) return;
           setExtractionState((current) => (
             current.status === "loading"
               ? { ...current, message: "Tentando completar imagem, preço e detalhes da loja" }
@@ -1256,22 +1266,46 @@ function App() {
             window.setTimeout(() => reject(new Error("extraction_timeout")), 8500);
           }),
         ]);
-        if (!active) return;
+        if (
+          !isAutofillResultCurrent({
+            requestId,
+            latestRequestId: extractionRequestIdRef.current,
+            view,
+            productUrl: formState.productUrl,
+            requestedUrl: rawUrl,
+          })
+        ) return;
         if (progressTimer != null) window.clearTimeout(progressTimer);
 
-        setFormState((current) => mergeExtractedProductIntoForm(current, result));
+        const sanitizedResult = sanitizeMercadoLivrePreview(result);
+
+        const feedback = getExtractionFeedback({
+          provider: sanitizedResult.provider,
+          warnings: sanitizedResult.warnings,
+          partial: sanitizedResult.partial,
+          externalProductId: sanitizedResult.externalProductId,
+          hasEssentialFields: Boolean(sanitizedResult.title && sanitizedResult.imageUrl && sanitizedResult.currentPriceInCents != null),
+        });
+
+        setFormState((current) => mergeExtractedProductIntoForm(current, sanitizedResult));
         setExtractionState({
-          status: result.partial || result.warnings.length > 0 ? "partial" : "success",
-          message: result.partial || result.warnings.length > 0
-            ? "Preenchemos o essencial. Os detalhes restantes podem ser revisados manualmente."
-            : "Informações do produto preenchidas automaticamente.",
-          provider: result.provider,
-          preview: { ...result, rawPayload: result.rawPayload ?? { result } },
+          status: feedback.status,
+          message: feedback.message,
+          provider: sanitizedResult.provider,
+          preview: { ...sanitizedResult, rawPayload: sanitizedResult.rawPayload ?? { result: sanitizedResult } },
           extractedUrl: rawUrl,
-          errorCode: null,
+          errorCode: feedback.status === "error" ? "limited_support" : null,
         });
       } catch (error) {
-        if (!active) return;
+        if (
+          !isAutofillResultCurrent({
+            requestId,
+            latestRequestId: extractionRequestIdRef.current,
+            view,
+            productUrl: formState.productUrl,
+            requestedUrl: rawUrl,
+          })
+        ) return;
         if (progressTimer != null) window.clearTimeout(progressTimer);
         const isTimeout = error instanceof Error && error.message === "extraction_timeout";
         setExtractionState({
@@ -1286,10 +1320,9 @@ function App() {
     }, 550);
 
     return () => {
-      active = false;
       window.clearTimeout(timeout);
     };
-  }, [view, formState.productUrl, extractionState.extractedUrl, extractionState.status]);
+  }, [view, formState.productUrl]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;

@@ -14,6 +14,9 @@ const ITEM_PATTERN = /\b(MLB-?\d{6,})\b/i;
 const CATALOG_PATH_PATTERN = /\/p\/(MLB\d{6,})/i;
 const USER_PRODUCT_PATH_PATTERN = /\/up\/(MLBU\d{6,})/i;
 const VARIATION_PATTERN = /\b(?:variation|variation_id|selected_variation|selectedVariation)=([A-Za-z0-9_-]+)/i;
+const GENERIC_MARKETPLACE_TITLE_PATTERN = /^\s*mercado\s+libre\s*$/i;
+const GENERIC_MARKETPLACE_TITLE_PT_PATTERN = /^\s*mercado\s+livre\s*$/i;
+const BRAND_IMAGE_HINT_PATTERN = /(logo|mercado[\-_ ]?(livre|libre)|frontend-assets|org-img|brand)/i;
 
 export function isMercadoLivreHost(hostname) {
   const normalized = hostname.toLowerCase();
@@ -99,6 +102,109 @@ function normalizeImages(value) {
   if (Array.isArray(value)) return value.flatMap((entry) => normalizeImages(entry));
   if (typeof value === "object" && value && "url" in value && typeof value.url === "string") return [value.url];
   return [];
+}
+
+function isGenericMarketplaceTitle(value) {
+  if (!value) return false;
+  const normalized = decodeHtml(String(value)).trim();
+  return GENERIC_MARKETPLACE_TITLE_PATTERN.test(normalized) || GENERIC_MARKETPLACE_TITLE_PT_PATTERN.test(normalized);
+}
+
+function isBrandImageUrl(value) {
+  if (!value) return false;
+  try {
+    const url = new URL(String(value));
+    const host = url.hostname.toLowerCase();
+    const path = `${url.pathname}${url.search}`.toLowerCase();
+    return (
+      !host.includes("mlstatic.com") ||
+      BRAND_IMAGE_HINT_PATTERN.test(path)
+    );
+  } catch {
+    return BRAND_IMAGE_HINT_PATTERN.test(String(value));
+  }
+}
+
+function sanitizeStructuredProductSignals(signals) {
+  const next = {
+    ...signals,
+    imageUrls: [...signals.imageUrls],
+  };
+
+  if (!next.itemId && isGenericMarketplaceTitle(next.title)) {
+    next.title = null;
+  }
+
+  if (!next.itemId) {
+    next.imageUrls = next.imageUrls.filter((imageUrl) => !isBrandImageUrl(imageUrl));
+  }
+
+  return next;
+}
+
+function extractItemIdFromSearchParams(url) {
+  const directCandidates = [
+    url.searchParams.get("wid"),
+    url.searchParams.get("item_id"),
+    url.searchParams.get("itemId"),
+  ];
+
+  for (const candidate of directCandidates) {
+    const normalized = normalizeMercadoLivreItemId(candidate);
+    if (normalized) return normalized;
+  }
+
+  const paramValues = [];
+  for (const value of url.searchParams.values()) {
+    paramValues.push(value);
+  }
+
+  for (const value of paramValues) {
+    const pdpItemMatch = String(value).match(/item_id:?(MLB-?\d{6,})/i)?.[1] ?? null;
+    const normalized = normalizeMercadoLivreItemId(pdpItemMatch ?? value);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+function parseHashParams(hash) {
+  const normalized = String(hash ?? "").replace(/^#/, "").trim();
+  if (!normalized) return new URLSearchParams();
+  return new URLSearchParams(normalized);
+}
+
+function extractItemIdFromHash(url) {
+  const hashParams = parseHashParams(url.hash);
+  const directCandidates = [
+    hashParams.get("wid"),
+    hashParams.get("item_id"),
+    hashParams.get("itemId"),
+  ];
+
+  for (const candidate of directCandidates) {
+    const normalized = normalizeMercadoLivreItemId(candidate);
+    if (normalized) return normalized;
+  }
+
+  for (const value of hashParams.values()) {
+    const pdpItemMatch = String(value).match(/item_id:?(MLB-?\d{6,})/i)?.[1] ?? null;
+    const normalized = normalizeMercadoLivreItemId(pdpItemMatch ?? value);
+    if (normalized) return normalized;
+  }
+
+  return normalizeMercadoLivreItemId(url.hash);
+}
+
+function extractVariationIdFromHash(url) {
+  const hashParams = parseHashParams(url.hash);
+  return (
+    normalizeVariationId(hashParams.get("variation")) ||
+    normalizeVariationId(hashParams.get("variation_id")) ||
+    normalizeVariationId(hashParams.get("selectedVariation")) ||
+    normalizeVariationId(url.hash.match(VARIATION_PATTERN)?.[1]) ||
+    null
+  );
 }
 
 function parseMoneyToCents(value) {
@@ -187,7 +293,7 @@ function getStructuredSignals(resolvedUrl, html) {
     normalizeMercadoLivreItemId(typeof offer?.url === "string" ? offer.url : null) ||
     normalizeMercadoLivreItemId(canonicalUrl);
 
-  return {
+  return sanitizeStructuredProductSignals({
     canonicalUrl,
     title: typeof productNode?.name === "string" ? decodeHtml(productNode.name).trim() : metas.get("og:title") ?? null,
     description:
@@ -205,7 +311,7 @@ function getStructuredSignals(resolvedUrl, html) {
     itemId: structuredItemId ?? scriptSignals.itemId,
     userProductId: scriptSignals.userProductId,
     variationId: scriptSignals.variationId,
-  };
+  });
 }
 
 function detectResourceType(url) {
@@ -220,10 +326,17 @@ export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
   const original = new URL(originalUrl);
   const resolved = new URL(resolvedUrl ?? originalUrl);
   const resourceType = detectResourceType(resolved);
+  const searchItemId =
+    extractItemIdFromSearchParams(resolved) ??
+    extractItemIdFromSearchParams(original) ??
+    extractItemIdFromHash(resolved) ??
+    extractItemIdFromHash(original);
   const urlVariationId =
     normalizeVariationId(resolved.searchParams.get("variation")) ||
     normalizeVariationId(resolved.searchParams.get("variation_id")) ||
     normalizeVariationId(resolved.searchParams.get("selectedVariation")) ||
+    extractVariationIdFromHash(resolved) ||
+    extractVariationIdFromHash(original) ||
     normalizeVariationId(resolved.search.match(VARIATION_PATTERN)?.[1]) ||
     null;
 
@@ -232,6 +345,9 @@ export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
     resolvedUrl: resolved.toString(),
     resourceType,
     itemId:
+      searchItemId ||
+      normalizeMercadoLivreItemId(resolved.pathname) ||
+      normalizeMercadoLivreItemId(original.pathname) ||
       normalizeMercadoLivreItemId(resolved.toString()) ||
       normalizeMercadoLivreItemId(original.toString()) ||
       null,
