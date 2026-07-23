@@ -219,6 +219,26 @@ test("sanitizes Mercado Livre preview when only brand metadata is available", ()
   assert.deepEqual(sanitized.imageUrls, []);
 });
 
+test("sanitizes Mercado Livre catalog partials even when the catalog id looks like MLB", () => {
+  const sanitized = sanitizeMercadoLivrePreview({
+    provider: "mercado_livre",
+    resourceType: "catalog_product",
+    canonicalUrl: "https://www.mercadolivre.com.br/p/MLB65407224",
+    title: "Mercado Libre",
+    imageUrl: "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__small@2x.png",
+    imageUrls: [
+      "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__small@2x.png",
+    ],
+    externalProductId: "MLB65407224",
+    currentPriceInCents: null,
+  });
+
+  assert.equal(sanitized.title, null);
+  assert.equal(sanitized.imageUrl, null);
+  assert.equal(sanitized.externalProductId, null);
+  assert.deepEqual(sanitized.imageUrls, []);
+});
+
 test("shows explicit MLB guidance when Mercado Livre returns only MLBU partial data", () => {
   const feedback = getExtractionFeedback({
     provider: "mercado_livre",
@@ -231,6 +251,20 @@ test("shows explicit MLB guidance when Mercado Livre returns only MLBU partial d
   assert.equal(feedback.status, "error");
   assert.match(feedback.message, /MLBU/);
   assert.match(feedback.message, /MLB/);
+});
+
+test("shows catalog guidance when Mercado Livre returns only catalog partial data", () => {
+  const feedback = getExtractionFeedback({
+    provider: "mercado_livre",
+    warnings: ["meli_catalog_product_detected", "price_missing"],
+    partial: true,
+    externalProductId: "MLB65407224",
+    hasEssentialFields: false,
+  });
+
+  assert.equal(feedback.status, "partial");
+  assert.match(feedback.message, /catálogo/i);
+  assert.match(feedback.message, /MLB/i);
 });
 
 test("missing image returns neutral placeholder instead of random product image", () => {

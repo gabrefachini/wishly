@@ -110,6 +110,7 @@ export type AdminAccountDeletionRequest = {
 export type ProductExtractionResult = {
   originalUrl: string;
   canonicalUrl: string | null;
+  resolvedUrl?: string;
   provider:
     | "mercado_livre"
     | "amazon"
@@ -122,12 +123,14 @@ export type ProductExtractionResult = {
   sellerName: string | null;
   externalProductId: string | null;
   externalVariantId: string | null;
+  resourceType?: string;
   title: string | null;
   description: string | null;
   imageUrl: string | null;
   imageUrls: string[];
   currentPriceInCents: number | null;
   originalPriceInCents: number | null;
+  priceSource?: string;
   currency: string | null;
   availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
   selectedVariant: Array<{
@@ -148,6 +151,7 @@ export type ProductExtractionResult = {
     totalMs: number;
     steps: Record<string, number>;
   };
+  observability?: Record<string, unknown>;
   rawPayload?: Record<string, unknown> | null;
 };
 

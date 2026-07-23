@@ -11,11 +11,14 @@ export type ExtractionInsertStatus = "pending" | "success" | "partial" | "failed
 export type AutofillDraft = {
   requestedUrl: string;
   canonicalUrl?: string | null;
+  resolvedUrl?: string | null;
   provider?: string | null;
   storeName?: string | null;
   sellerName?: string | null;
   externalProductId?: string | null;
   externalVariantId?: string | null;
+  resourceType?: string | null;
+  priceSource?: string | null;
   availability?: string | null;
   selectedVariant?: Array<{ name: string; value: string }>;
   imageUrl?: string | null;
@@ -265,25 +268,50 @@ export function isMercadoLivreBrandImage(value: string | null | undefined) {
   }
 }
 
+export function isMercadoLivreCatalogUrl(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return /^\/p\/MLB\d{6,}/i.test(url.pathname);
+  } catch {
+    return /\/p\/MLB\d{6,}/i.test(value);
+  }
+}
+
 export function sanitizeMercadoLivrePreview<T extends {
   provider?: string | null;
   title?: string | null;
   imageUrl?: string | null;
   imageUrls?: string[];
   externalProductId?: string | null;
+  canonicalUrl?: string | null;
+  resourceType?: string | null;
+  currentPriceInCents?: number | null;
+  warnings?: string[];
 }>(preview: T): T {
   if (preview.provider !== "mercado_livre") return preview;
 
   const next = { ...preview };
   const hasReliableItemId = isMercadoLivreItemId(preview.externalProductId);
+  const isCatalogPartial =
+    (preview.resourceType === "catalog_product" || isMercadoLivreCatalogUrl(preview.canonicalUrl)) &&
+    preview.currentPriceInCents == null;
 
-  if (!hasReliableItemId && isGenericMercadoLivreTitle(preview.title)) {
+  if ((!hasReliableItemId || isCatalogPartial) && isGenericMercadoLivreTitle(preview.title)) {
     next.title = null;
   }
 
-  if (!hasReliableItemId && isMercadoLivreBrandImage(preview.imageUrl)) {
+  if ((!hasReliableItemId || isCatalogPartial) && isMercadoLivreBrandImage(preview.imageUrl)) {
     next.imageUrl = null;
     next.imageUrls = (preview.imageUrls ?? []).filter((entry) => !isMercadoLivreBrandImage(entry));
+  }
+
+  if (
+    isCatalogPartial &&
+    isGenericMercadoLivreTitle(preview.title) &&
+    isMercadoLivreBrandImage(preview.imageUrl)
+  ) {
+    next.externalProductId = null;
   }
 
   return next;
@@ -320,6 +348,18 @@ export function getExtractionFeedback(input: {
       status: "partial" as const,
       message:
         "O link foi reconhecido como Mercado Livre, mas ainda não encontramos a oferta MLB real para preencher preço e imagem do produto.",
+    };
+  }
+
+  if (
+    input.provider === "mercado_livre" &&
+    !input.hasEssentialFields &&
+    warnings.includes("meli_catalog_product_detected")
+  ) {
+    return {
+      status: "partial" as const,
+      message:
+        "O link foi reconhecido como catálogo do Mercado Livre, mas a oferta MLB real ainda não trouxe nome, foto e preço completos.",
     };
   }
 

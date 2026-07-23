@@ -169,6 +169,33 @@ test("resolveMercadoLivreSignals reads listing item id from hash params on Merca
   assert.equal(catalogWithHashListing.itemId, "MLB4577516683");
 });
 
+test("resolveMercadoLivreSignals keeps listing item id when structured data exposes only catalog product id", () => {
+  const catalogWithStructuredOverride = resolveMercadoLivreSignals({
+    originalUrl:
+      "https://www.mercadolivre.com.br/placa-de-video/p/MLB65407224#polycard_client=search-desktop&wid=MLB4577516683&sid=search",
+    resolvedUrl:
+      "https://www.mercadolivre.com.br/placa-de-video/p/MLB65407224#polycard_client=search-desktop&wid=MLB4577516683&sid=search",
+    html: `
+      <html>
+        <head>
+          <link rel="canonical" href="https://www.mercadolivre.com.br/placa-de-video/p/MLB65407224">
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org",
+              "@type": "Product",
+              "name": "Mercado Libre",
+              "sku": "MLB65407224"
+            }
+          </script>
+        </head>
+      </html>
+    `,
+  });
+
+  assert.equal(catalogWithStructuredOverride.catalogProductId, "MLB65407224");
+  assert.equal(catalogWithStructuredOverride.itemId, "MLB4577516683");
+});
+
 test("resolveMercadoLivreSignals does not treat catalog product id as listing item id when no listing id exists", () => {
   const catalogOnly = resolveMercadoLivreSignals({
     originalUrl: "https://www.mercadolivre.com.br/p/MLB65407224",

@@ -341,6 +341,19 @@ function getUrlDerivedItemId({ resourceType, resolved, original, searchItemId })
   );
 }
 
+function getResolvedSignalItemId({ resourceType, urlItemId, structuredItemId, catalogProductId }) {
+  if (resourceType === "catalog_product") {
+    if (urlItemId && urlItemId !== catalogProductId) return urlItemId;
+    return structuredItemId ?? urlItemId ?? null;
+  }
+
+  if (resourceType === "user_product") {
+    return urlItemId ?? structuredItemId ?? null;
+  }
+
+  return structuredItemId ?? urlItemId ?? null;
+}
+
 export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
   const original = new URL(originalUrl);
   const resolved = new URL(resolvedUrl ?? originalUrl);
@@ -359,11 +372,13 @@ export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
     normalizeVariationId(resolved.search.match(VARIATION_PATTERN)?.[1]) ||
     null;
 
+  const urlItemId = getUrlDerivedItemId({ resourceType, resolved, original, searchItemId });
+
   const signals = {
     originalUrl,
     resolvedUrl: resolved.toString(),
     resourceType,
-    itemId: getUrlDerivedItemId({ resourceType, resolved, original, searchItemId }),
+    itemId: urlItemId,
     catalogProductId:
       resolved.pathname.match(CATALOG_PATH_PATTERN)?.[1] ??
       original.pathname.match(CATALOG_PATH_PATTERN)?.[1] ??
@@ -392,7 +407,12 @@ export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
   const structured = getStructuredSignals(resolved, html);
   return {
     ...signals,
-    itemId: structured.itemId ?? signals.itemId,
+    itemId: getResolvedSignalItemId({
+      resourceType,
+      urlItemId,
+      structuredItemId: structured.itemId ?? null,
+      catalogProductId: signals.catalogProductId,
+    }),
     userProductId: structured.userProductId ?? signals.userProductId,
     variationId: structured.variationId ?? signals.variationId,
     canonicalUrl: structured.canonicalUrl ?? signals.canonicalUrl,
