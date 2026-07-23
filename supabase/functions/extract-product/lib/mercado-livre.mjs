@@ -322,6 +322,25 @@ function detectResourceType(url) {
   return "unknown";
 }
 
+function getUrlDerivedItemId({ resourceType, resolved, original, searchItemId }) {
+  if (resourceType === "catalog_product") {
+    return searchItemId ?? null;
+  }
+
+  if (resourceType === "user_product") {
+    return searchItemId ?? null;
+  }
+
+  return (
+    searchItemId ||
+    normalizeMercadoLivreItemId(resolved.pathname) ||
+    normalizeMercadoLivreItemId(original.pathname) ||
+    normalizeMercadoLivreItemId(resolved.toString()) ||
+    normalizeMercadoLivreItemId(original.toString()) ||
+    null
+  );
+}
+
 export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
   const original = new URL(originalUrl);
   const resolved = new URL(resolvedUrl ?? originalUrl);
@@ -344,13 +363,7 @@ export function resolveMercadoLivreSignals({ originalUrl, resolvedUrl, html }) {
     originalUrl,
     resolvedUrl: resolved.toString(),
     resourceType,
-    itemId:
-      searchItemId ||
-      normalizeMercadoLivreItemId(resolved.pathname) ||
-      normalizeMercadoLivreItemId(original.pathname) ||
-      normalizeMercadoLivreItemId(resolved.toString()) ||
-      normalizeMercadoLivreItemId(original.toString()) ||
-      null,
+    itemId: getUrlDerivedItemId({ resourceType, resolved, original, searchItemId }),
     catalogProductId:
       resolved.pathname.match(CATALOG_PATH_PATTERN)?.[1] ??
       original.pathname.match(CATALOG_PATH_PATTERN)?.[1] ??
@@ -538,6 +551,22 @@ function dedupeWarnings(warnings) {
   return Array.from(new Set(warnings.filter(Boolean)));
 }
 
+function applySignalsToResult(result, signals, state) {
+  result.canonicalUrl = signals.canonicalUrl ?? result.canonicalUrl;
+  result.externalProductId = signals.itemId ?? signals.catalogProductId ?? signals.userProductId ?? result.externalProductId;
+  result.externalVariantId = signals.variationId ?? result.externalVariantId;
+  result.title = signals.title ?? result.title;
+  result.imageUrls = signals.imageUrls.length > 0 ? signals.imageUrls : result.imageUrls;
+  result.imageUrl = result.imageUrls[0] ?? result.imageUrl;
+  result.currentPriceInCents = signals.currentPriceInCents ?? result.currentPriceInCents;
+  result.originalPriceInCents = signals.originalPriceInCents ?? result.originalPriceInCents;
+  result.currency = signals.currency ?? result.currency;
+  result.availability = signals.availability ?? result.availability;
+  if (result.currentPriceInCents != null) {
+    state.priceSource = "meli_structured_data";
+  }
+}
+
 export async function extractMercadoLivreProduct({
   originalUrl,
   resolvedUrl,
@@ -609,27 +638,26 @@ export async function extractMercadoLivreProduct({
     warnings,
   };
 
-  if (!signals.itemId && !htmlBody) {
-    const htmlSettled = await Promise.allSettled([htmlPromise]);
-    const htmlCandidate = htmlSettled[0];
-    if (htmlCandidate.status === "fulfilled" && htmlCandidate.value) {
-      htmlBody = htmlCandidate.value;
+  const shouldResolveHtmlBeforeApi =
+    !htmlBody &&
+    (signals.resourceType === "catalog_product" ||
+      signals.resourceType === "user_product" ||
+      !signals.itemId);
+
+  if (shouldResolveHtmlBeforeApi) {
+    try {
+      htmlBody = await htmlPromise;
+    } catch {
+      htmlBody = null;
+    }
+
+    if (htmlBody) {
       signals = resolveMercadoLivreSignals({
         originalUrl,
         resolvedUrl: requestUrl.toString(),
         html: htmlBody,
       });
-      result.canonicalUrl = signals.canonicalUrl ?? result.canonicalUrl;
-      result.externalProductId = signals.itemId ?? signals.catalogProductId ?? signals.userProductId ?? result.externalProductId;
-      result.externalVariantId = signals.variationId ?? result.externalVariantId;
-      result.title = signals.title ?? result.title;
-      result.imageUrls = signals.imageUrls.length > 0 ? signals.imageUrls : result.imageUrls;
-      result.imageUrl = result.imageUrls[0] ?? result.imageUrl;
-      result.currentPriceInCents = signals.currentPriceInCents ?? result.currentPriceInCents;
-      result.originalPriceInCents = signals.originalPriceInCents ?? result.originalPriceInCents;
-      result.currency = signals.currency ?? result.currency;
-      result.availability = signals.availability ?? result.availability;
-      state.priceSource = result.currentPriceInCents != null ? "meli_structured_data" : state.priceSource;
+      applySignalsToResult(result, signals, state);
     }
   }
 
@@ -661,15 +689,7 @@ export async function extractMercadoLivreProduct({
       resolvedUrl: requestUrl.toString(),
       html: htmlBody,
     });
-    result.canonicalUrl = signals.canonicalUrl ?? result.canonicalUrl;
-    result.title = result.title ?? signals.title ?? null;
-    result.imageUrls = result.imageUrls.length > 0 ? result.imageUrls : signals.imageUrls;
-    result.imageUrl = result.imageUrl ?? signals.imageUrls[0] ?? null;
-    result.currentPriceInCents = result.currentPriceInCents ?? signals.currentPriceInCents;
-    result.originalPriceInCents = result.originalPriceInCents ?? signals.originalPriceInCents;
-    result.currency = signals.currency ?? result.currency;
-    result.availability = signals.availability ?? result.availability;
-    state.priceSource = result.currentPriceInCents != null ? "meli_structured_data" : state.priceSource;
+    applySignalsToResult(result, signals, state);
   }
 
   if (itemPayload) {

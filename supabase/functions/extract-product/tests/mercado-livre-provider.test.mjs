@@ -169,6 +169,18 @@ test("resolveMercadoLivreSignals reads listing item id from hash params on Merca
   assert.equal(catalogWithHashListing.itemId, "MLB4577516683");
 });
 
+test("resolveMercadoLivreSignals does not treat catalog product id as listing item id when no listing id exists", () => {
+  const catalogOnly = resolveMercadoLivreSignals({
+    originalUrl: "https://www.mercadolivre.com.br/p/MLB65407224",
+    resolvedUrl: "https://www.mercadolivre.com.br/p/MLB65407224",
+    html: null,
+  });
+
+  assert.equal(catalogOnly.resourceType, "catalog_product");
+  assert.equal(catalogOnly.catalogProductId, "MLB65407224");
+  assert.equal(catalogOnly.itemId, null);
+});
+
 test("resolveMercadoLivreSignals drops generic Mercado Livre title and brand image when no item id is found", () => {
   const genericSignals = resolveMercadoLivreSignals({
     originalUrl: "https://www.mercadolivre.com.br/oferta",
@@ -201,6 +213,91 @@ test("MercadoLivreProvider preserves provider mercado_livre on catalog and user 
   assert.equal(userProductResult.result.provider, "mercado_livre");
   assert.ok(catalogResult.result.warnings.includes("meli_catalog_product_detected"));
   assert.ok(userProductResult.result.warnings.includes("meli_user_product_detected"));
+});
+
+test("MercadoLivreProvider resolves catalog links from HTML before calling item API", async () => {
+  const html = `
+    <html>
+      <head>
+        <link rel="canonical" href="https://www.mercadolivre.com.br/p/MLB65407224">
+        <meta property="og:title" content="Mercado Libre">
+        <meta property="og:image" content="https://http2.mlstatic.com/frontend-assets/ui-navigation/5.21.22/mercadolibre/logo__small@2x.png">
+        <script type="application/ld+json">
+          {"@context":"https://schema.org","@type":"Product","name":"Placa de video Palit RTX 5060 8GB","sku":"MLB4577516683","image":["https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp"],"offers":{"@type":"Offer","price":"2199.90","priceCurrency":"BRL","availability":"https://schema.org/InStock"}}
+        </script>
+      </head>
+      <body></body>
+    </html>
+  `;
+
+  const steps = {};
+  const requestedUrls = [];
+  const result = await extractMercadoLivreProduct({
+    originalUrl:
+      "https://www.mercadolivre.com.br/placa-de-video-nvidia-geforce-palit-rtx5060-8gb-infinity2-oc/p/MLB65407224#polycard_client=search-desktop&be_origin=backend&search_layout=grid&position=5&type=product&tracking_id=8e05bdf1-c596-4d7b-9995-4ff072524b03&wid=MLB4577516683&sid=search",
+    resolvedUrl: new URL(
+      "https://www.mercadolivre.com.br/placa-de-video-nvidia-geforce-palit-rtx5060-8gb-infinity2-oc/p/MLB65407224#polycard_client=search-desktop&be_origin=backend&search_layout=grid&position=5&type=product&tracking_id=8e05bdf1-c596-4d7b-9995-4ff072524b03&wid=MLB4577516683&sid=search",
+    ),
+    html: null,
+    timeoutMs: 3000,
+    steps,
+    ensureHtml: async () => html,
+    withStepTiming: async (localSteps, label, task) => {
+      const startedAt = performance.now();
+      try {
+        return await task();
+      } finally {
+        localSteps[label] = Math.round(performance.now() - startedAt);
+      }
+    },
+    fetchJson: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith("/prices")) {
+        return {
+          prices: [
+            {
+              type: "promotion",
+              amount: 2199.9,
+              regular_amount: 2499.9,
+              currency_id: "BRL",
+              conditions: { context_restrictions: [] },
+            },
+          ],
+        };
+      }
+
+      if (url.endsWith("/description")) {
+        return { plain_text: "Descricao da placa." };
+      }
+
+      return {
+        id: "MLB4577516683",
+        title: "Placa de video Palit RTX 5060 8GB",
+        permalink: "https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-palit-rtx-5060-_JM",
+        price: 2499.9,
+        original_price: 2499.9,
+        currency_id: "BRL",
+        available_quantity: 3,
+        pictures: [
+          {
+            id: "PIC-1",
+            secure_url: "https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp",
+            url: "https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp",
+          },
+        ],
+        attributes: [],
+        variations: [],
+      };
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.externalProductId, "MLB4577516683");
+  assert.equal(result.title, "Placa de video Palit RTX 5060 8GB");
+  assert.equal(result.imageUrl, "https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp");
+  assert.equal(result.currentPriceInCents, 219990);
+  assert.equal(result.partial, false);
+  assert.ok(requestedUrls.some((url) => url.includes("/items/MLB4577516683")));
 });
 
 test("MercadoLivreProvider corpus meets recognition and extraction targets", async () => {
