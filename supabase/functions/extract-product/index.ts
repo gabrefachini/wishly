@@ -51,6 +51,7 @@ type ProductExtractionResult = {
 
 type ExtractionContext = {
   html?: string;
+  htmlUrl?: string;
   steps: Record<string, number>;
 };
 
@@ -362,8 +363,10 @@ async function fetchJson(url: string, timeoutMs: number, init: RequestInit = {})
 }
 
 async function ensureHtml(url: URL, context: ExtractionContext, timeoutMs: number) {
-  if (!context.html) {
+  const targetUrl = url.toString();
+  if (!context.html || context.htmlUrl !== targetUrl) {
     context.html = await withStepTiming(context.steps, "fetch_html", () => fetchText(url.toString(), timeoutMs));
+    context.htmlUrl = targetUrl;
   }
   return context.html;
 }
