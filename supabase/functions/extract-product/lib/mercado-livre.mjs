@@ -568,6 +568,7 @@ function buildObservability(signals, steps, state) {
     priceApiStatus: state.priceApiStatus,
     descriptionApiStatus: state.descriptionApiStatus,
     priceSource: state.priceSource,
+    authState: state.authState,
     steps,
     status: state.status,
     warnings: state.warnings,
@@ -630,6 +631,7 @@ export async function extractMercadoLivreProduct({
   ensureHtml,
   steps,
   withStepTiming,
+  meliAuthState = "not_connected",
 }) {
   const requestUrl = resolvedUrl instanceof URL ? resolvedUrl : new URL(resolvedUrl ?? originalUrl);
   const resourceType = detectResourceType(requestUrl);
@@ -688,6 +690,7 @@ export async function extractMercadoLivreProduct({
     priceApiStatus: "skipped",
     descriptionApiStatus: "skipped",
     priceSource: signals.currentPriceInCents != null ? "meli_structured_data" : "none",
+    authState: meliAuthState,
     status: "partial",
     warnings,
   };

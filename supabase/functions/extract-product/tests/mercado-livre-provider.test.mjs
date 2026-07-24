@@ -327,6 +327,71 @@ test("MercadoLivreProvider resolves catalog links from HTML before calling item 
   assert.ok(requestedUrls.some((url) => url.includes("/items/MLB4577516683")));
 });
 
+test("MercadoLivreProvider keeps auth state in observability", async () => {
+  const result = await extractMercadoLivreProduct({
+    originalUrl: "https://produto.mercadolivre.com.br/MLB-100000008-cadeira-_JM",
+    resolvedUrl: new URL("https://produto.mercadolivre.com.br/MLB-100000008-cadeira-_JM"),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "connected",
+    ensureHtml: async () => `
+      <html>
+        <head>
+          <link rel="canonical" href="https://produto.mercadolivre.com.br/MLB-100000008-cadeira-_JM">
+          <meta property="og:title" content="Cadeira office ergonomica">
+          <meta property="og:image" content="https://http2.mlstatic.com/D_Q_NP_2X_12345-MLB100000008-F.webp">
+          <script type="application/ld+json">
+            {"@context":"https://schema.org","@type":"Product","name":"Cadeira office ergonomica","sku":"MLB100000008","image":["https://http2.mlstatic.com/D_Q_NP_2X_12345-MLB100000008-F.webp"],"offers":{"@type":"Offer","price":"189.90","priceCurrency":"BRL","availability":"https://schema.org/InStock"}}
+          </script>
+        </head>
+      </html>
+    `,
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      if (url.endsWith("/prices")) {
+        return {
+          prices: [
+            {
+              type: "promotion",
+              amount: 189.9,
+              regular_amount: 229.9,
+              currency_id: "BRL",
+              conditions: { context_restrictions: [] },
+            },
+          ],
+        };
+      }
+
+      if (url.endsWith("/description")) {
+        return { plain_text: "Descricao autenticada" };
+      }
+
+      return {
+        id: "MLB100000008",
+        title: "Cadeira office ergonomica",
+        permalink: "https://produto.mercadolivre.com.br/MLB-100000008-cadeira-_JM",
+        price: 189.9,
+        original_price: 229.9,
+        currency_id: "BRL",
+        available_quantity: 3,
+        pictures: [
+          {
+            id: "PIC-1",
+            secure_url: "https://http2.mlstatic.com/D_Q_NP_2X_12345-MLB100000008-F.webp",
+            url: "https://http2.mlstatic.com/D_Q_NP_2X_12345-MLB100000008-F.webp",
+          },
+        ],
+        attributes: [],
+        variations: [],
+      };
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.observability?.authState, "connected");
+});
+
 test("MercadoLivreProvider falls back to item page HTML when item API fails after resolving wid", async () => {
   const catalogHtml = `
     <html>

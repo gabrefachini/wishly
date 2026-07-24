@@ -1,5 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  createServiceRoleClient,
+  getRequiredEnv,
+  refreshMercadoLivreAccessToken,
+} from "../_shared/meli.ts";
+import {
   extractMercadoLivreProduct,
   isMercadoLivreHost,
   isMercadoLivreShortHost,
@@ -53,6 +58,21 @@ type ExtractionContext = {
   html?: string;
   htmlUrl?: string;
   steps: Record<string, number>;
+  meliAccessToken?: string | null;
+  meliAuthState?: "connected" | "public_fallback" | "refresh_failed" | "not_connected";
+};
+
+type MercadoLivreConnection = {
+  auth_user_id: string;
+  meli_user_id: string;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  scope: string | null;
+  expires_at: string | null;
+  connected_at: string;
+  last_refreshed_at: string | null;
+  revoked_at: string | null;
 };
 
 interface ProductProvider {
@@ -191,6 +211,84 @@ async function requireAuthenticatedUser(request: Request) {
     user,
     response: null,
   };
+}
+
+async function loadMercadoLivreConnection(authUserId: string) {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("meli_connections")
+    .select("auth_user_id, meli_user_id, access_token, refresh_token, token_type, scope, expires_at, connected_at, last_refreshed_at, revoked_at")
+    .eq("auth_user_id", authUserId)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (error) {
+    console.error("meli_connection_load_failed", {
+      authUserId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw error;
+  }
+
+  return (data ?? null) as MercadoLivreConnection | null;
+}
+
+function isExpiredConnection(connection: MercadoLivreConnection) {
+  if (!connection.expires_at) return false;
+  const expiresAt = Date.parse(connection.expires_at);
+  if (!Number.isFinite(expiresAt)) return false;
+  return expiresAt <= Date.now() + 60_000;
+}
+
+async function refreshMercadoLivreConnection(connection: MercadoLivreConnection) {
+  const appId = getRequiredEnv("MELI_APP_ID");
+  const clientSecret = getRequiredEnv("MELI_SECRET_KEY");
+  const tokenPayload = await refreshMercadoLivreAccessToken({
+    refreshToken: connection.refresh_token,
+    appId,
+    clientSecret,
+  });
+
+  const supabase = createServiceRoleClient();
+  const expiresAt = new Date(Date.now() + Number(tokenPayload.expires_in ?? 0) * 1000).toISOString();
+  const nextConnection = {
+    ...connection,
+    access_token: tokenPayload.access_token,
+    refresh_token: tokenPayload.refresh_token ?? connection.refresh_token,
+    token_type: tokenPayload.token_type ?? connection.token_type,
+    scope: tokenPayload.scope ?? connection.scope,
+    expires_at: expiresAt,
+    last_refreshed_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("meli_connections")
+    .update({
+      access_token: nextConnection.access_token,
+      refresh_token: nextConnection.refresh_token,
+      token_type: nextConnection.token_type,
+      scope: nextConnection.scope,
+      expires_at: nextConnection.expires_at,
+      last_refreshed_at: nextConnection.last_refreshed_at,
+      revoked_at: null,
+    })
+    .eq("auth_user_id", connection.auth_user_id);
+
+  if (error) {
+    console.error("meli_connection_refresh_persist_failed", {
+      authUserId: connection.auth_user_id,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw error;
+  }
+
+  return nextConnection;
 }
 
 const TOTAL_TIMEOUT_MS = 8_000;
@@ -548,15 +646,22 @@ class MercadoLivreProvider implements ProductProvider {
   }
 
   async extract(url: URL, context: ExtractionContext, timeoutMs: number) {
+    const authHeaders = context.meliAccessToken
+      ? {
+          Authorization: `Bearer ${context.meliAccessToken}`,
+        }
+      : undefined;
+
     return await extractMercadoLivreProduct({
       originalUrl: url.toString(),
       resolvedUrl: url,
       html: context.html,
       timeoutMs,
       steps: context.steps,
-      fetchJson,
+      fetchJson: async (targetUrl: string, innerTimeoutMs: number) => await fetchJson(targetUrl, innerTimeoutMs, authHeaders ? { headers: authHeaders } : {}),
       ensureHtml: async (targetUrl: URL, innerTimeoutMs: number) => await ensureHtml(targetUrl, context, innerTimeoutMs),
       withStepTiming,
+      meliAuthState: context.meliAuthState ?? "not_connected",
     }) as ProductExtractionResult;
   }
 }
@@ -796,13 +901,15 @@ async function runProvider(
   });
 }
 
-async function extractProduct(originalUrl: string) {
+async function extractProduct(originalUrl: string, options?: { authUserId?: string | null }) {
   const startedAt = Date.now();
   const parsedOriginalUrl = new URL(originalUrl);
   assertSafeUrl(parsedOriginalUrl);
 
   const context: ExtractionContext = {
     steps: {},
+    meliAccessToken: null,
+    meliAuthState: "not_connected",
   };
 
   let workingUrl = normalizeMercadoLivreUrl(parsedOriginalUrl);
@@ -823,6 +930,40 @@ async function extractProduct(originalUrl: string) {
   const providers: ProductProvider[] = [];
   const isMercadoLivreUrl = isMercadoLivreHost(workingUrl.hostname);
   if (isMercadoLivreUrl) {
+    if (options?.authUserId) {
+      try {
+        const connection = await loadMercadoLivreConnection(options.authUserId);
+        if (connection?.access_token) {
+          if (isExpiredConnection(connection)) {
+            try {
+              const activeConnection = await refreshMercadoLivreConnection(connection);
+              context.meliAuthState = "connected";
+              context.meliAccessToken = activeConnection.access_token;
+            } catch (error) {
+              context.meliAuthState = "refresh_failed";
+              console.error("meli_connection_refresh_failed", {
+                authUserId: options.authUserId,
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
+          } else {
+            context.meliAuthState = "connected";
+            context.meliAccessToken = connection.access_token;
+          }
+        } else {
+          context.meliAuthState = "not_connected";
+        }
+      } catch (error) {
+        context.meliAuthState = "public_fallback";
+        console.error("meli_connection_prepare_failed", {
+          authUserId: options.authUserId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else {
+      context.meliAuthState = "public_fallback";
+    }
+
     providers.push(new MercadoLivreProvider());
   } else if (workingUrl.pathname.includes("/products/")) {
     providers.push(new ShopifyProvider());
@@ -905,7 +1046,7 @@ Deno.serve(async (request) => {
     }
 
     requestedUrl = url;
-    const result = await extractProduct(url);
+    const result = await extractProduct(url, { authUserId: auth.user?.id ?? null });
     return buildJsonResponse(request, result, 200);
   } catch {
     const fallback = buildEmptyResult(requestedUrl);

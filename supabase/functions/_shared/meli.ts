@@ -200,6 +200,41 @@ export async function exchangeMercadoLivreCodeForToken(input: {
   };
 }
 
+export async function refreshMercadoLivreAccessToken(input: {
+  refreshToken: string;
+  appId: string;
+  clientSecret: string;
+}) {
+  const response = await fetch("https://api.mercadolibre.com/oauth/token", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: input.appId,
+      client_secret: input.clientSecret,
+      refresh_token: input.refreshToken,
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const errorCode = typeof payload?.error === "string" ? payload.error : `meli_refresh_http_${response.status}`;
+    throw new Error(errorCode);
+  }
+
+  return payload as {
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    scope?: string;
+    user_id?: number;
+    refresh_token?: string;
+  };
+}
+
 export function buildOauthCompletionRedirect(input: {
   returnTo: string;
   status: "success" | "error";
