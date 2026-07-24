@@ -1690,6 +1690,7 @@ function App() {
             syncing={syncing}
             meliConnecting={meliConnecting}
             isRemoteMode={isRemoteMode}
+            isAdmin={remote.isAdmin}
             meliConnection={remote.meliConnection}
             onChangeField={updateProfileField}
             onChangeAccessField={updateAccessField}
@@ -3132,6 +3133,7 @@ function ProfileSettingsScreen({
   syncing,
   meliConnecting,
   isRemoteMode,
+  isAdmin,
   meliConnection,
   onChangeField,
   onChangeAccessField,
@@ -3151,6 +3153,7 @@ function ProfileSettingsScreen({
   syncing: boolean;
   meliConnecting: boolean;
   isRemoteMode: boolean;
+  isAdmin: boolean;
   meliConnection: MercadoLivreConnectionStatus | null;
   onChangeField: <K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => void;
   onChangeAccessField: <K extends keyof AccessFormState>(field: K, value: AccessFormState[K]) => void;
@@ -3207,12 +3210,12 @@ function ProfileSettingsScreen({
           </div>
         </article>
 
-        <article className="profile-settings-card">
+        {isAdmin ? <article className="profile-settings-card">
           <div>
             <p className="label">Integracoes</p>
-            <h2>Mercado Livre</h2>
+            <h2>Mercado Livre da plataforma</h2>
             <p>
-              Conecte sua conta para habilitar a integracao oficial do Meli no Wishly.
+              Esta conexao administrativa habilita a extracao oficial para todos os usuarios do Wishly.
             </p>
           </div>
 
@@ -3237,7 +3240,7 @@ function ProfileSettingsScreen({
           ) : (
             <p className="field-help">O fluxo abre a autorizacao oficial do Mercado Livre e retorna para esta tela.</p>
           )}
-        </article>
+        </article> : null}
 
         <article className="profile-settings-card">
           <div>

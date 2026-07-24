@@ -54,6 +54,33 @@ Deno.serve(async (request) => {
 
     const supabase = createServiceRoleClient();
     const expiresAt = new Date(Date.now() + Number(tokenPayload.expires_in ?? 0) * 1000).toISOString();
+    const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(state.sub);
+    const authEmail = authUserData?.user?.email?.trim() ?? "";
+    if (authUserError || !authEmail) {
+      throw new Error("oauth_user_lookup_failed");
+    }
+
+    const { data: adminUser, error: adminLookupError } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("active", true)
+      .ilike("email", authEmail)
+      .maybeSingle();
+    if (adminLookupError) {
+      throw new Error("admin_lookup_failed");
+    }
+
+    const isPlatformConnection = Boolean(adminUser);
+    if (isPlatformConnection) {
+      const { error: clearPlatformError } = await supabase
+        .from("meli_connections")
+        .update({ is_platform: false })
+        .eq("is_platform", true)
+        .neq("auth_user_id", state.sub);
+      if (clearPlatformError) {
+        throw new Error("platform_connection_rotation_failed");
+      }
+    }
 
     const { error: upsertError } = await supabase.from("meli_connections").upsert({
       auth_user_id: state.sub,
@@ -65,6 +92,7 @@ Deno.serve(async (request) => {
       expires_at: expiresAt,
       connected_at: new Date().toISOString(),
       revoked_at: null,
+      is_platform: isPlatformConnection,
     }, {
       onConflict: "auth_user_id",
     });

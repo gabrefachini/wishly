@@ -59,7 +59,7 @@ type ExtractionContext = {
   htmlUrl?: string;
   steps: Record<string, number>;
   meliAccessToken?: string | null;
-  meliAuthState?: "connected" | "public_fallback" | "refresh_failed" | "not_connected";
+  meliAuthState?: "platform_connected" | "user_connected" | "public_fallback" | "refresh_failed" | "not_connected";
 };
 
 type MercadoLivreConnection = {
@@ -73,6 +73,7 @@ type MercadoLivreConnection = {
   connected_at: string;
   last_refreshed_at: string | null;
   revoked_at: string | null;
+  is_platform: boolean;
 };
 
 interface ProductProvider {
@@ -213,27 +214,55 @@ async function requireAuthenticatedUser(request: Request) {
   };
 }
 
-async function loadMercadoLivreConnection(authUserId: string) {
+async function loadMercadoLivreConnection(authUserId: string | null) {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
+  const connectionFields =
+    "auth_user_id, meli_user_id, access_token, refresh_token, token_type, scope, expires_at, connected_at, last_refreshed_at, revoked_at, is_platform";
+
+  const { data: platformConnection, error: platformError } = await supabase
     .from("meli_connections")
-    .select("auth_user_id, meli_user_id, access_token, refresh_token, token_type, scope, expires_at, connected_at, last_refreshed_at, revoked_at")
+    .select(connectionFields)
+    .eq("is_platform", true)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (platformError) {
+    console.error("meli_connection_load_failed", {
+      scope: "platform",
+      code: platformError.code,
+      message: platformError.message,
+      details: platformError.details,
+      hint: platformError.hint,
+    });
+    throw platformError;
+  }
+
+  if (platformConnection) {
+    return platformConnection as MercadoLivreConnection;
+  }
+
+  if (!authUserId) return null;
+
+  const { data: userConnection, error: userError } = await supabase
+    .from("meli_connections")
+    .select(connectionFields)
     .eq("auth_user_id", authUserId)
     .is("revoked_at", null)
     .maybeSingle();
 
-  if (error) {
+  if (userError) {
     console.error("meli_connection_load_failed", {
+      scope: "user",
       authUserId,
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      code: userError.code,
+      message: userError.message,
+      details: userError.details,
+      hint: userError.hint,
     });
-    throw error;
+    throw userError;
   }
 
-  return (data ?? null) as MercadoLivreConnection | null;
+  return (userConnection ?? null) as MercadoLivreConnection | null;
 }
 
 function isExpiredConnection(connection: MercadoLivreConnection) {
@@ -937,7 +966,7 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
           if (isExpiredConnection(connection)) {
             try {
               const activeConnection = await refreshMercadoLivreConnection(connection);
-              context.meliAuthState = "connected";
+              context.meliAuthState = activeConnection.is_platform ? "platform_connected" : "user_connected";
               context.meliAccessToken = activeConnection.access_token;
             } catch (error) {
               context.meliAuthState = "refresh_failed";
@@ -947,7 +976,7 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
               });
             }
           } else {
-            context.meliAuthState = "connected";
+            context.meliAuthState = connection.is_platform ? "platform_connected" : "user_connected";
             context.meliAccessToken = connection.access_token;
           }
         } else {

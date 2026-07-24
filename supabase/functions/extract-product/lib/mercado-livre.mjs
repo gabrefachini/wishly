@@ -2,6 +2,7 @@ export const MERCADO_LIVRE_WARNING_CODES = [
   "meli_item_id_not_found",
   "meli_user_product_detected",
   "meli_catalog_product_detected",
+  "meli_catalog_api_failed",
   "meli_item_api_failed",
   "meli_price_api_failed",
   "meli_price_not_found",
@@ -138,13 +139,11 @@ function sanitizeStructuredProductSignals(signals) {
     imageUrls: [...signals.imageUrls],
   };
 
-  if (!next.itemId && isGenericMarketplaceTitle(next.title)) {
+  if (isGenericMarketplaceTitle(next.title)) {
     next.title = null;
   }
 
-  if (!next.itemId) {
-    next.imageUrls = next.imageUrls.filter((imageUrl) => !isBrandImageUrl(imageUrl));
-  }
+  next.imageUrls = next.imageUrls.filter((imageUrl) => !isBrandImageUrl(imageUrl));
 
   return next;
 }
@@ -351,7 +350,8 @@ function getUrlDerivedItemId({ resourceType, resolved, original, searchItemId })
 function getResolvedSignalItemId({ resourceType, urlItemId, structuredItemId, catalogProductId }) {
   if (resourceType === "catalog_product") {
     if (urlItemId && urlItemId !== catalogProductId) return urlItemId;
-    return structuredItemId ?? urlItemId ?? null;
+    if (structuredItemId && structuredItemId !== catalogProductId) return structuredItemId;
+    return null;
   }
 
   if (resourceType === "user_product") {
@@ -548,6 +548,39 @@ function getEssentialFieldsFromItem(itemPayload, selectedVariation, htmlSignals)
   };
 }
 
+function getCatalogPictureUrls(productPayload) {
+  if (!Array.isArray(productPayload?.pictures)) return [];
+  return productPayload.pictures
+    .map((picture) => picture?.secure_url ?? picture?.url)
+    .filter(Boolean);
+}
+
+function getEssentialFieldsFromCatalogProduct(productPayload, signals) {
+  const winner = productPayload?.buy_box_winner ?? null;
+  const winnerItemId = normalizeMercadoLivreItemId(winner?.item_id ?? winner?.id);
+  const currentPriceInCents = parseMoneyToCents(winner?.price);
+  const originalPriceInCents = parseMoneyToCents(winner?.original_price);
+  const imageUrls = getCatalogPictureUrls(productPayload);
+
+  return {
+    itemId: winnerItemId,
+    canonicalUrl: productPayload?.permalink ?? signals.canonicalUrl ?? signals.resolvedUrl,
+    title: productPayload?.name ?? productPayload?.family_name ?? signals.title ?? null,
+    imageUrls: imageUrls.length > 0 ? imageUrls : signals.imageUrls,
+    currentPriceInCents,
+    originalPriceInCents,
+    currency: winner?.currency_id ?? signals.currency ?? "BRL",
+    availability:
+      winner?.available_quantity != null
+        ? winner.available_quantity > 0
+          ? "in_stock"
+          : "out_of_stock"
+        : signals.availability,
+    selectedVariant: mapItemAttributes(productPayload),
+    priceSource: currentPriceInCents != null ? "meli_catalog_buy_box" : null,
+  };
+}
+
 function withMercadoLivreProvider(result) {
   return {
     ...result,
@@ -565,6 +598,7 @@ function buildObservability(signals, steps, state) {
     variationId: signals.variationId,
     providerMatched: "mercado_livre",
     itemApiStatus: state.itemApiStatus,
+    catalogApiStatus: state.catalogApiStatus,
     priceApiStatus: state.priceApiStatus,
     descriptionApiStatus: state.descriptionApiStatus,
     priceSource: state.priceSource,
@@ -590,7 +624,7 @@ function applySignalsToResult(result, signals, state) {
   result.originalPriceInCents = signals.originalPriceInCents ?? result.originalPriceInCents;
   result.currency = signals.currency ?? result.currency;
   result.availability = signals.availability ?? result.availability;
-  if (result.currentPriceInCents != null) {
+  if (result.currentPriceInCents != null && state.priceSource === "none") {
     state.priceSource = "meli_structured_data";
   }
 }
@@ -686,6 +720,7 @@ export async function extractMercadoLivreProduct({
   });
 
   const state = {
+    catalogApiStatus: "skipped",
     itemApiStatus: "skipped",
     priceApiStatus: "skipped",
     descriptionApiStatus: "skipped",
@@ -718,12 +753,52 @@ export async function extractMercadoLivreProduct({
     }
   }
 
+  if (!signals.itemId && signals.resourceType === "catalog_product" && signals.catalogProductId) {
+    try {
+      const catalogPayload = await withStepTiming(steps, "mercado_livre_catalog_api", () =>
+        fetchJson(`https://api.mercadolibre.com/products/${signals.catalogProductId}`, timeoutMs),
+      );
+      const catalogFields = getEssentialFieldsFromCatalogProduct(catalogPayload, signals);
+      state.catalogApiStatus = "success";
+      signals = {
+        ...signals,
+        itemId: catalogFields.itemId,
+        canonicalUrl: catalogFields.canonicalUrl,
+        title: catalogFields.title,
+        imageUrls: catalogFields.imageUrls,
+        currentPriceInCents: catalogFields.currentPriceInCents,
+        originalPriceInCents: catalogFields.originalPriceInCents,
+        currency: catalogFields.currency,
+        availability: catalogFields.availability,
+      };
+      applySignalsToResult(result, signals, state);
+      result.externalProductId = catalogFields.itemId ?? signals.catalogProductId ?? result.externalProductId;
+      result.selectedVariant = catalogFields.selectedVariant;
+      result.confidence = {
+        ...result.confidence,
+        title: result.title ? 0.99 : result.confidence.title,
+        image: result.imageUrl ? 0.99 : result.confidence.image,
+        price: result.currentPriceInCents != null ? 0.99 : result.confidence.price,
+        variant: result.selectedVariant.length > 0 ? 0.8 : result.confidence.variant,
+      };
+      state.priceSource = catalogFields.priceSource ?? state.priceSource;
+    } catch {
+      state.catalogApiStatus = "failed";
+      warnings.push("meli_catalog_api_failed");
+    }
+  }
+
   if (!signals.itemId) {
     warnings.push("meli_item_id_not_found");
     if (signals.currentPriceInCents == null) {
       warnings.push("meli_price_not_found");
     }
     result.description = signals.description ?? null;
+    result.partial = !(result.title && result.imageUrl && result.currentPriceInCents != null);
+    state.status = result.partial ? "partial" : "success";
+    result.priceSource = state.priceSource;
+    result.resolvedUrl = signals.resolvedUrl;
+    result.resourceType = signals.resourceType;
     result.warnings = dedupeWarnings(warnings);
     result.observability = buildObservability(signals, steps, state);
     return result;

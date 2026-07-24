@@ -327,6 +327,69 @@ test("MercadoLivreProvider resolves catalog links from HTML before calling item 
   assert.ok(requestedUrls.some((url) => url.includes("/items/MLB4577516683")));
 });
 
+test("MercadoLivreProvider resolves catalog name, image and price through official product API", async () => {
+  const requestedUrls = [];
+  const result = await extractMercadoLivreProduct({
+    originalUrl:
+      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242",
+    resolvedUrl: new URL(
+      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242",
+    ),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => `
+      <html>
+        <head>
+          <title>Mercado Libre</title>
+          <meta property="og:image" content="https://http2.mlstatic.com/frontend-assets/logo.png">
+        </head>
+      </html>
+    `,
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith("/products/MLB19320242")) {
+        return {
+          id: "MLB19320242",
+          status: "active",
+          permalink:
+            "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242",
+          name: "Forno A Gas Glp Ooni Koda 12 Preto Cinza Para Pizza Bancada Compacto",
+          pictures: [
+            {
+              url: "https://http2.mlstatic.com/D_NQ_NP_2X_ooni-catalog.webp",
+            },
+          ],
+          buy_box_winner: {
+            item_id: "MLB4992081638",
+            price: 2499.9,
+            original_price: 2799.9,
+            currency_id: "BRL",
+            available_quantity: 4,
+          },
+          attributes: [],
+        };
+      }
+
+      throw new Error("secondary_api_unavailable");
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.externalProductId, "MLB4992081638");
+  assert.equal(result.title, "Forno A Gas Glp Ooni Koda 12 Preto Cinza Para Pizza Bancada Compacto");
+  assert.equal(result.imageUrl, "https://http2.mlstatic.com/D_NQ_NP_2X_ooni-catalog.webp");
+  assert.equal(result.currentPriceInCents, 249990);
+  assert.equal(result.originalPriceInCents, 279990);
+  assert.equal(result.priceSource, "meli_catalog_buy_box");
+  assert.equal(result.partial, false);
+  assert.equal(result.observability?.authState, "platform_connected");
+  assert.equal(result.observability?.catalogApiStatus, "success");
+  assert.ok(requestedUrls.some((url) => url.endsWith("/products/MLB19320242")));
+});
+
 test("MercadoLivreProvider keeps auth state in observability", async () => {
   const result = await extractMercadoLivreProduct({
     originalUrl: "https://produto.mercadolivre.com.br/MLB-100000008-cadeira-_JM",
