@@ -146,39 +146,39 @@ function getSupabaseAnonKey() {
   }
 }
 
-async function requireAuthenticatedUser(request: Request) {
+function isPublishableBrowserCall(request: Request) {
+  const publishableKey = getSupabaseAnonKey();
+  if (!publishableKey) return false;
+
+  const apikey = request.headers.get("apikey")?.trim() ?? "";
+  if (apikey && apikey === publishableKey) return true;
+
+  const authorization = request.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) return false;
+
+  const token = authorization.slice("Bearer ".length).trim();
+  return token === publishableKey;
+}
+
+async function resolveAuthenticatedUser(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) {
-    return {
-      user: null,
-      response: buildJsonResponse(request, {
-        error: "missing_session",
-        message: "Sessao ausente. Entre novamente para continuar.",
-      }, 401),
-    };
+    return { user: null, caller: isPublishableBrowserCall(request) ? "publishable" : "anonymous" } as const;
   }
 
   const token = authorization.slice("Bearer ".length).trim();
   if (!token) {
-    return {
-      user: null,
-      response: buildJsonResponse(request, {
-        error: "invalid_session",
-        message: "Sessao invalida. Entre novamente para continuar.",
-      }, 401),
-    };
+    return { user: null, caller: isPublishableBrowserCall(request) ? "publishable" : "anonymous" } as const;
+  }
+
+  if (isPublishableBrowserCall(request) && token === getSupabaseAnonKey()) {
+    return { user: null, caller: "publishable" } as const;
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const supabaseAnonKey = getSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) {
-    return {
-      user: null,
-      response: buildJsonResponse(request, {
-        error: "auth_config_unavailable",
-        message: "Configuracao de autenticacao indisponivel.",
-      }, 500),
-    };
+    throw new Error("auth_config_unavailable");
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -199,19 +199,13 @@ async function requireAuthenticatedUser(request: Request) {
   } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return {
-      user: null,
-      response: buildJsonResponse(request, {
-        error: "invalid_session",
-        message: "Sessao invalida ou expirada. Entre novamente para continuar.",
-      }, 401),
-    };
+    console.warn("extract_product_invalid_session_fallback", {
+      message: error?.message ?? "missing_user",
+    });
+    return { user: null, caller: isPublishableBrowserCall(request) ? "publishable" : "anonymous" } as const;
   }
 
-  return {
-    user,
-    response: null,
-  };
+  return { user, caller: "user" } as const;
 }
 
 async function loadMercadoLivreConnection(authUserId: string | null) {
@@ -959,38 +953,34 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
   const providers: ProductProvider[] = [];
   const isMercadoLivreUrl = isMercadoLivreHost(workingUrl.hostname);
   if (isMercadoLivreUrl) {
-    if (options?.authUserId) {
-      try {
-        const connection = await loadMercadoLivreConnection(options.authUserId);
-        if (connection?.access_token) {
-          if (isExpiredConnection(connection)) {
-            try {
-              const activeConnection = await refreshMercadoLivreConnection(connection);
-              context.meliAuthState = activeConnection.is_platform ? "platform_connected" : "user_connected";
-              context.meliAccessToken = activeConnection.access_token;
-            } catch (error) {
-              context.meliAuthState = "refresh_failed";
-              console.error("meli_connection_refresh_failed", {
-                authUserId: options.authUserId,
-                message: error instanceof Error ? error.message : String(error),
-              });
-            }
-          } else {
-            context.meliAuthState = connection.is_platform ? "platform_connected" : "user_connected";
-            context.meliAccessToken = connection.access_token;
+    try {
+      const connection = await loadMercadoLivreConnection(options?.authUserId ?? null);
+      if (connection?.access_token) {
+        if (isExpiredConnection(connection)) {
+          try {
+            const activeConnection = await refreshMercadoLivreConnection(connection);
+            context.meliAuthState = activeConnection.is_platform ? "platform_connected" : "user_connected";
+            context.meliAccessToken = activeConnection.access_token;
+          } catch (error) {
+            context.meliAuthState = "refresh_failed";
+            console.error("meli_connection_refresh_failed", {
+              authUserId: options?.authUserId ?? null,
+              message: error instanceof Error ? error.message : String(error),
+            });
           }
         } else {
-          context.meliAuthState = "not_connected";
+          context.meliAuthState = connection.is_platform ? "platform_connected" : "user_connected";
+          context.meliAccessToken = connection.access_token;
         }
-      } catch (error) {
-        context.meliAuthState = "public_fallback";
-        console.error("meli_connection_prepare_failed", {
-          authUserId: options.authUserId,
-          message: error instanceof Error ? error.message : String(error),
-        });
+      } else {
+        context.meliAuthState = "not_connected";
       }
-    } else {
+    } catch (error) {
       context.meliAuthState = "public_fallback";
+      console.error("meli_connection_prepare_failed", {
+        authUserId: options?.authUserId ?? null,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
 
     providers.push(new MercadoLivreProvider());
@@ -1100,9 +1090,12 @@ Deno.serve(async (request) => {
   let requestedUrl = "";
 
   try {
-    const auth = await requireAuthenticatedUser(request);
-    if (auth.response) {
-      return auth.response;
+    const auth = await resolveAuthenticatedUser(request);
+    if (auth.caller === "anonymous") {
+      return buildJsonResponse(request, {
+        error: "missing_caller_credentials",
+        message: "Chamada sem credenciais do app.",
+      }, 401);
     }
 
     const { url } = await request.json();

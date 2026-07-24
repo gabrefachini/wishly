@@ -1333,13 +1333,22 @@ function App() {
         ) return;
         if (progressTimer != null) window.clearTimeout(progressTimer);
         const isTimeout = error instanceof Error && error.message === "extraction_timeout";
+        const sessionExpired =
+          error instanceof Error &&
+          (
+            (error as Error & { code?: string; status?: number }).code === "missing_session" ||
+            (error as Error & { code?: string; status?: number }).code === "invalid_session" ||
+            (error as Error & { code?: string; status?: number }).status === 401
+          );
         setExtractionState({
           status: "error",
-          message: "Não conseguimos preencher os dados. Complete o nome e confirme a inclusão manual.",
+          message: sessionExpired
+            ? "Sua sessao do Wishly expirou. Entre novamente para continuar com o preenchimento automatico."
+            : "Não conseguimos preencher os dados. Complete o nome e confirme a inclusão manual.",
           provider: null,
           preview: null,
           extractedUrl: rawUrl,
-          errorCode: isTimeout ? "timeout" : "failed",
+          errorCode: sessionExpired ? "session_expired" : isTimeout ? "timeout" : "failed",
         });
       }
     }, 550);

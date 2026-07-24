@@ -250,7 +250,28 @@ export async function extractProductFromUrl(url: string) {
     body: { url },
   });
 
-  if (error) throw error;
+  if (error) {
+    const response = (error as { context?: unknown; response?: unknown }).context instanceof Response
+      ? (error as { context: Response }).context
+      : (error as { response?: unknown }).response instanceof Response
+        ? (error as { response: Response }).response
+        : null;
+
+    let payload: { error?: string; message?: string } | null = null;
+    if (response) {
+      try {
+        payload = await response.clone().json() as { error?: string; message?: string };
+      } catch {
+        payload = null;
+      }
+    }
+
+    const nextError = new Error(payload?.message || error.message || "Falha ao extrair produto");
+    (nextError as Error & { code?: string; status?: number; cause?: unknown }).code = payload?.error || error.name;
+    (nextError as Error & { code?: string; status?: number; cause?: unknown }).status = response?.status;
+    (nextError as Error & { code?: string; status?: number; cause?: unknown }).cause = error;
+    throw nextError;
+  }
 
   return data as ProductExtractionResult;
 }
