@@ -107,6 +107,15 @@ export type AdminAccountDeletionRequest = {
   notes: string | null;
 };
 
+export type MercadoLivreConnectionStatus = {
+  meli_user_id: string;
+  scope: string | null;
+  expires_at: string | null;
+  connected_at: string;
+  last_refreshed_at: string | null;
+  revoked_at: string | null;
+};
+
 export type ProductExtractionResult = {
   originalUrl: string;
   canonicalUrl: string | null;
@@ -246,6 +255,21 @@ export async function extractProductFromUrl(url: string) {
   return data as ProductExtractionResult;
 }
 
+export async function getMercadoLivreAuthorizationUrl(returnTo?: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.functions.invoke("meli-oauth-start", {
+    body: {
+      returnTo: returnTo ?? window.location.href,
+    },
+  });
+
+  if (error) throw error;
+
+  return (data as { authorizationUrl: string }).authorizationUrl;
+}
+
 export async function updateViewerProfile(input: { fullName: string; avatarFile?: File | null }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
@@ -381,18 +405,25 @@ export async function loadViewerContext(user: User) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
-  const [{ data: wishlistRows, error: wishlistError }, { data: adminFlag, error: adminError }] = await Promise.all([
+  const [{ data: wishlistRows, error: wishlistError }, { data: adminFlag, error: adminError }, { data: meliConnectionRow, error: meliConnectionError }] = await Promise.all([
     supabase.from("wishlists").select("id, title, share_id, cover_image_url").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.rpc("is_admin_user"),
+    supabase
+      .from("meli_connections")
+      .select("meli_user_id, scope, expires_at, connected_at, last_refreshed_at, revoked_at")
+      .is("revoked_at", null)
+      .maybeSingle(),
   ]);
 
   if (wishlistError) throw wishlistError;
   if (adminError) throw adminError;
+  if (meliConnectionError) throw meliConnectionError;
 
   return {
     user,
     wishlists: (wishlistRows ?? []) as DbWishlist[],
     isAdmin: Boolean(adminFlag),
+    meliConnection: (meliConnectionRow ?? null) as MercadoLivreConnectionStatus | null,
   };
 }
 

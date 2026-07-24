@@ -46,6 +46,7 @@ import {
   resolvePublicGiftRedirect,
   loadViewerContext,
   loadWishlistGifts,
+  getMercadoLivreAuthorizationUrl,
   signInWithPassword,
   signUpWithPassword,
   signOut,
@@ -60,6 +61,7 @@ import {
   type AdminAffiliateQueueItem,
   type DbWish,
   type DbWishlist,
+  type MercadoLivreConnectionStatus,
   type PublicWishlist,
   type ProductExtractionResult,
   loadPublicWishlist,
@@ -169,6 +171,7 @@ type ViewerState = {
   selectedWishlistId: string | null;
   gifts: DbWish[];
   isAdmin: boolean;
+  meliConnection: MercadoLivreConnectionStatus | null;
 };
 
 type PublicState = {
@@ -380,12 +383,14 @@ function App() {
   const [authPanelMode, setAuthPanelMode] = useState<AuthPanelMode>("login");
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [meliConnecting, setMeliConnecting] = useState(false);
   const [remoteReady, setRemoteReady] = useState(!supabaseEnabled);
   const [remote, setRemote] = useState<ViewerState>({
     wishlists: [],
     selectedWishlistId: null,
     gifts: [],
     isAdmin: false,
+    meliConnection: null,
   });
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
   const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
@@ -594,7 +599,7 @@ function App() {
 
   async function refreshRemoteState(nextSession: Session | null) {
     if (!supabaseEnabled || !nextSession?.user) {
-      setRemote({ wishlists: [], selectedWishlistId: null, gifts: [], isAdmin: false });
+      setRemote({ wishlists: [], selectedWishlistId: null, gifts: [], isAdmin: false, meliConnection: null });
       setAdminQueue([]);
       setAdminDeletionRequests([]);
       setRemoteReady(true);
@@ -621,6 +626,7 @@ function App() {
         selectedWishlistId,
         gifts,
         isAdmin: context.isAdmin,
+        meliConnection: context.meliConnection,
       });
       setAdminQueue(queue);
       setAdminDeletionRequests(deletionRequests);
@@ -1176,6 +1182,25 @@ function App() {
     }
   }
 
+  async function handleConnectMercadoLivre() {
+    if (!isRemoteMode) {
+      setSyncError("Entre na sua conta antes de conectar o Mercado Livre.");
+      return;
+    }
+
+    try {
+      setMeliConnecting(true);
+      setSyncError("");
+      setAuthMessage("");
+
+      const authorizationUrl = await getMercadoLivreAuthorizationUrl(`${window.location.origin}/?view=profile_settings`);
+      window.location.assign(authorizationUrl);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+      setMeliConnecting(false);
+    }
+  }
+
   useEffect(() => {
     window.localStorage.setItem("wishly-theme", theme);
   }, [theme]);
@@ -1445,6 +1470,38 @@ function App() {
     };
   }, [isMarketingMode]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const oauthStatus = url.searchParams.get("meli_oauth");
+    const oauthCode = url.searchParams.get("meli_code");
+    const targetView = url.searchParams.get("view");
+
+    if (targetView === "profile_settings") {
+      setView("profile_settings");
+    }
+
+    if (!oauthStatus) return;
+
+    if (oauthStatus === "success") {
+      setAuthMessage(oauthCode === "connected" ? "Mercado Livre conectado com sucesso." : "Conexao com Mercado Livre atualizada.");
+      setSyncError("");
+      if (session) {
+        void refreshRemoteState(session);
+      }
+    } else {
+      setSyncError("Nao foi possivel concluir a conexao com o Mercado Livre.");
+      setAuthMessage("");
+    }
+
+    setMeliConnecting(false);
+    url.searchParams.delete("meli_oauth");
+    url.searchParams.delete("meli_code");
+    url.searchParams.delete("view");
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+  }, [session]);
+
   if (isPublicMode) {
     return (
       <div className="app-shell public-shell" data-theme={theme}>
@@ -1631,11 +1688,14 @@ function App() {
             privacyForm={privacyForm}
             deletionRequestedAt={viewerProfile.deletionRequestedAt}
             syncing={syncing}
+            meliConnecting={meliConnecting}
             isRemoteMode={isRemoteMode}
+            meliConnection={remote.meliConnection}
             onChangeField={updateProfileField}
             onChangeAccessField={updateAccessField}
             onChangePrivacyField={updatePrivacyField}
             onChoosePhoto={openAvatarPicker}
+            onConnectMercadoLivre={() => void handleConnectMercadoLivre()}
             onSave={() => void handleSaveProfile()}
             onSaveEmail={() => void handleSaveEmail()}
             onSavePassword={() => void handleSavePassword()}
@@ -3070,11 +3130,14 @@ function ProfileSettingsScreen({
   privacyForm,
   deletionRequestedAt,
   syncing,
+  meliConnecting,
   isRemoteMode,
+  meliConnection,
   onChangeField,
   onChangeAccessField,
   onChangePrivacyField,
   onChoosePhoto,
+  onConnectMercadoLivre,
   onSave,
   onSaveEmail,
   onSavePassword,
@@ -3086,11 +3149,14 @@ function ProfileSettingsScreen({
   privacyForm: PrivacyFormState;
   deletionRequestedAt: string | null;
   syncing: boolean;
+  meliConnecting: boolean;
   isRemoteMode: boolean;
+  meliConnection: MercadoLivreConnectionStatus | null;
   onChangeField: <K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => void;
   onChangeAccessField: <K extends keyof AccessFormState>(field: K, value: AccessFormState[K]) => void;
   onChangePrivacyField: <K extends keyof PrivacyFormState>(field: K, value: PrivacyFormState[K]) => void;
   onChoosePhoto: () => void;
+  onConnectMercadoLivre: () => void;
   onSave: () => void;
   onSaveEmail: () => void;
   onSavePassword: () => void;
@@ -3139,6 +3205,38 @@ function ProfileSettingsScreen({
               {syncing ? "Salvando..." : "Salvar alteracoes"}
             </button>
           </div>
+        </article>
+
+        <article className="profile-settings-card">
+          <div>
+            <p className="label">Integracoes</p>
+            <h2>Mercado Livre</h2>
+            <p>
+              Conecte sua conta para habilitar a integracao oficial do Meli no Wishly.
+            </p>
+          </div>
+
+          {isRemoteMode && meliConnection ? (
+            <div className="danger-status">
+              <strong>Conectado como usuario {meliConnection.meli_user_id}</strong>
+              <p>
+                Vinculado em {formatDateTime(meliConnection.connected_at)}
+                {meliConnection.last_refreshed_at ? ` · ultimo refresh em ${formatDateTime(meliConnection.last_refreshed_at)}` : ""}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="field-row">
+            <button className="primary-button full" type="button" onClick={onConnectMercadoLivre} disabled={!isRemoteMode || meliConnecting}>
+              {meliConnecting ? "Conectando..." : meliConnection ? "Reconectar Mercado Livre" : "Conectar Mercado Livre"}
+            </button>
+          </div>
+
+          {!isRemoteMode ? (
+            <p className="field-help">Entre na sua conta antes de iniciar a conexao.</p>
+          ) : (
+            <p className="field-help">O fluxo abre a autorizacao oficial do Mercado Livre e retorna para esta tela.</p>
+          )}
         </article>
 
         <article className="profile-settings-card">
