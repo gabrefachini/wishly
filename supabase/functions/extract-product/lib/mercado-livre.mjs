@@ -3,6 +3,7 @@ export const MERCADO_LIVRE_WARNING_CODES = [
   "meli_user_product_detected",
   "meli_catalog_product_detected",
   "meli_catalog_api_failed",
+  "meli_catalog_items_api_failed",
   "meli_item_api_failed",
   "meli_price_api_failed",
   "meli_price_not_found",
@@ -581,6 +582,31 @@ function getEssentialFieldsFromCatalogProduct(productPayload, signals) {
   };
 }
 
+function getEssentialFieldsFromCatalogItems(itemsPayload, preferredItemId, signals) {
+  const results = Array.isArray(itemsPayload?.results) ? itemsPayload.results : [];
+  const preferred =
+    results.find((entry) => normalizeMercadoLivreItemId(entry?.item_id ?? entry?.id) === preferredItemId) ??
+    results.find((entry) => entry?.price != null) ??
+    null;
+  if (!preferred) return null;
+
+  const itemId = normalizeMercadoLivreItemId(preferred.item_id ?? preferred.id);
+  const currentPriceInCents = parseMoneyToCents(preferred.price);
+  return {
+    itemId,
+    currentPriceInCents,
+    originalPriceInCents: parseMoneyToCents(preferred.original_price),
+    currency: preferred.currency_id ?? signals.currency ?? "BRL",
+    availability:
+      preferred.available_quantity != null
+        ? preferred.available_quantity > 0
+          ? "in_stock"
+          : "out_of_stock"
+        : signals.availability,
+    priceSource: currentPriceInCents != null ? "meli_catalog_items" : null,
+  };
+}
+
 function withMercadoLivreProvider(result) {
   return {
     ...result,
@@ -599,6 +625,7 @@ function buildObservability(signals, steps, state) {
     providerMatched: "mercado_livre",
     itemApiStatus: state.itemApiStatus,
     catalogApiStatus: state.catalogApiStatus,
+    catalogItemsApiStatus: state.catalogItemsApiStatus,
     priceApiStatus: state.priceApiStatus,
     descriptionApiStatus: state.descriptionApiStatus,
     priceSource: state.priceSource,
@@ -611,6 +638,10 @@ function buildObservability(signals, steps, state) {
 
 function dedupeWarnings(warnings) {
   return Array.from(new Set(warnings.filter(Boolean)));
+}
+
+function getErrorStatus(error) {
+  return error instanceof Error && error.message ? error.message : "failed";
 }
 
 function applySignalsToResult(result, signals, state) {
@@ -721,6 +752,7 @@ export async function extractMercadoLivreProduct({
 
   const state = {
     catalogApiStatus: "skipped",
+    catalogItemsApiStatus: "skipped",
     itemApiStatus: "skipped",
     priceApiStatus: "skipped",
     descriptionApiStatus: "skipped",
@@ -753,7 +785,7 @@ export async function extractMercadoLivreProduct({
     }
   }
 
-  if (!signals.itemId && signals.resourceType === "catalog_product" && signals.catalogProductId) {
+  if (signals.resourceType === "catalog_product" && signals.catalogProductId) {
     try {
       const catalogPayload = await withStepTiming(steps, "mercado_livre_catalog_api", () =>
         fetchJson(`https://api.mercadolibre.com/products/${signals.catalogProductId}`, timeoutMs),
@@ -762,7 +794,7 @@ export async function extractMercadoLivreProduct({
       state.catalogApiStatus = "success";
       signals = {
         ...signals,
-        itemId: catalogFields.itemId,
+        itemId: catalogFields.itemId ?? signals.itemId,
         canonicalUrl: catalogFields.canonicalUrl,
         title: catalogFields.title,
         imageUrls: catalogFields.imageUrls,
@@ -772,7 +804,7 @@ export async function extractMercadoLivreProduct({
         availability: catalogFields.availability,
       };
       applySignalsToResult(result, signals, state);
-      result.externalProductId = catalogFields.itemId ?? signals.catalogProductId ?? result.externalProductId;
+      result.externalProductId = catalogFields.itemId ?? signals.itemId ?? signals.catalogProductId ?? result.externalProductId;
       result.selectedVariant = catalogFields.selectedVariant;
       result.confidence = {
         ...result.confidence,
@@ -782,8 +814,50 @@ export async function extractMercadoLivreProduct({
         variant: result.selectedVariant.length > 0 ? 0.8 : result.confidence.variant,
       };
       state.priceSource = catalogFields.priceSource ?? state.priceSource;
-    } catch {
-      state.catalogApiStatus = "failed";
+
+      if (result.currentPriceInCents == null) {
+        try {
+          const catalogItemsPayload = await withStepTiming(steps, "mercado_livre_catalog_items_api", () =>
+            fetchJson(`https://api.mercadolibre.com/products/${signals.catalogProductId}/items`, timeoutMs),
+          );
+          const catalogItemFields = getEssentialFieldsFromCatalogItems(
+            catalogItemsPayload,
+            signals.itemId,
+            signals,
+          );
+          state.catalogItemsApiStatus = catalogItemFields ? "success" : "empty";
+          if (catalogItemFields) {
+            signals = {
+              ...signals,
+              itemId: catalogItemFields.itemId ?? signals.itemId,
+              currentPriceInCents: catalogItemFields.currentPriceInCents,
+              originalPriceInCents: catalogItemFields.originalPriceInCents,
+              currency: catalogItemFields.currency,
+              availability: catalogItemFields.availability,
+            };
+            applySignalsToResult(result, signals, state);
+            result.externalProductId = signals.itemId ?? result.externalProductId;
+            result.confidence.price = result.currentPriceInCents != null ? 0.98 : result.confidence.price;
+            state.priceSource = catalogItemFields.priceSource ?? state.priceSource;
+          }
+        } catch (error) {
+          state.catalogItemsApiStatus = getErrorStatus(error);
+          warnings.push("meli_catalog_items_api_failed");
+        }
+      }
+
+      if (result.title && result.imageUrl && result.currentPriceInCents != null) {
+        result.partial = false;
+        state.status = "success";
+        result.priceSource = state.priceSource;
+        result.resolvedUrl = signals.resolvedUrl;
+        result.resourceType = signals.resourceType;
+        result.warnings = dedupeWarnings(warnings);
+        result.observability = buildObservability(signals, steps, state);
+        return result;
+      }
+    } catch (error) {
+      state.catalogApiStatus = getErrorStatus(error);
       warnings.push("meli_catalog_api_failed");
     }
   }
@@ -812,7 +886,7 @@ export async function extractMercadoLivreProduct({
   );
 
   const [itemSettled, priceSettled, htmlSettled] = await Promise.allSettled([itemPromise, pricePromise, htmlPromise]);
-  const itemPayload = itemSettled.status === "fulfilled" ? itemSettled.value : null;
+  let itemPayload = itemSettled.status === "fulfilled" ? itemSettled.value : null;
   const pricePayload = priceSettled.status === "fulfilled" ? priceSettled.value : null;
   if (!htmlBody && htmlSettled.status === "fulfilled" && htmlSettled.value) {
     htmlBody = htmlSettled.value;
@@ -824,17 +898,50 @@ export async function extractMercadoLivreProduct({
     applySignalsToResult(result, signals, state);
   }
 
+  if (!itemPayload) {
+    try {
+      const attributes = [
+        "id",
+        "title",
+        "price",
+        "base_price",
+        "original_price",
+        "currency_id",
+        "available_quantity",
+        "permalink",
+        "pictures",
+        "attributes",
+        "variations",
+      ].join(",");
+      const multigetPayload = await withStepTiming(steps, "mercado_livre_item_multiget_api", () =>
+        fetchJson(
+          `https://api.mercadolibre.com/items?ids=${encodeURIComponent(signals.itemId)}&attributes=${encodeURIComponent(attributes)}`,
+          timeoutMs,
+        ),
+      );
+      const multigetEntry = Array.isArray(multigetPayload) ? multigetPayload[0] : null;
+      if (multigetEntry?.code === 200 && multigetEntry?.body) {
+        itemPayload = multigetEntry.body;
+        state.itemApiStatus = "success_multiget";
+      }
+    } catch {
+      // The item-page fallback below still has a chance to enrich the result.
+    }
+  }
+
   if (itemPayload) {
-    state.itemApiStatus = "success";
+    if (state.itemApiStatus !== "success_multiget") {
+      state.itemApiStatus = "success";
+    }
   } else {
-    state.itemApiStatus = "failed";
+    state.itemApiStatus = itemSettled.status === "rejected" ? getErrorStatus(itemSettled.reason) : "failed";
     warnings.push("meli_item_api_failed");
   }
 
   if (pricePayload) {
     state.priceApiStatus = "success";
   } else {
-    state.priceApiStatus = "failed";
+    state.priceApiStatus = priceSettled.status === "rejected" ? getErrorStatus(priceSettled.reason) : "failed";
     warnings.push("meli_price_api_failed");
   }
 

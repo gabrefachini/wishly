@@ -10,6 +10,26 @@ function redirect(url: string) {
   return Response.redirect(url, 302);
 }
 
+async function recordOauthEvent(input: {
+  topic: "oauth_success" | "oauth_error";
+  authUserId: string;
+  payload: Record<string, unknown>;
+}) {
+  try {
+    const supabase = createServiceRoleClient();
+    await supabase.from("meli_notification_events").insert({
+      topic: input.topic,
+      resource: input.authUserId,
+      payload: input.payload,
+      headers: {},
+    });
+  } catch (error) {
+    console.error("meli_oauth_event_record_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 Deno.serve(async (request) => {
   const requestUrl = new URL(request.url);
   const errorCode = requestUrl.searchParams.get("error");
@@ -51,26 +71,41 @@ Deno.serve(async (request) => {
       clientSecret,
       redirectUri,
     });
+    if (!tokenPayload.access_token || !tokenPayload.refresh_token || !tokenPayload.user_id) {
+      throw new Error("incomplete_token_payload");
+    }
 
     const supabase = createServiceRoleClient();
     const expiresAt = new Date(Date.now() + Number(tokenPayload.expires_in ?? 0) * 1000).toISOString();
+    const { data: existingConnection, error: existingConnectionError } = await supabase
+      .from("meli_connections")
+      .select("is_platform")
+      .eq("auth_user_id", state.sub)
+      .maybeSingle();
+    if (existingConnectionError) {
+      throw new Error("existing_connection_lookup_failed");
+    }
+
     const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(state.sub);
     const authEmail = authUserData?.user?.email?.trim() ?? "";
-    if (authUserError || !authEmail) {
+    if ((authUserError || !authEmail) && !existingConnection?.is_platform) {
       throw new Error("oauth_user_lookup_failed");
     }
 
-    const { data: adminUser, error: adminLookupError } = await supabase
-      .from("admin_users")
-      .select("id")
-      .eq("active", true)
-      .ilike("email", authEmail)
-      .maybeSingle();
-    if (adminLookupError) {
-      throw new Error("admin_lookup_failed");
+    let isPlatformConnection = Boolean(existingConnection?.is_platform);
+    if (authEmail) {
+      const { data: adminUser, error: adminLookupError } = await supabase
+        .from("admin_users")
+        .select("id")
+        .eq("active", true)
+        .ilike("email", authEmail)
+        .maybeSingle();
+      if (adminLookupError) {
+        throw new Error("admin_lookup_failed");
+      }
+      isPlatformConnection = Boolean(adminUser);
     }
 
-    const isPlatformConnection = Boolean(adminUser);
     if (isPlatformConnection) {
       const { error: clearPlatformError } = await supabase
         .from("meli_connections")
@@ -111,16 +146,35 @@ Deno.serve(async (request) => {
       }));
     }
 
+    await recordOauthEvent({
+      topic: "oauth_success",
+      authUserId: state.sub,
+      payload: {
+        isPlatformConnection,
+        meliUserId: String(tokenPayload.user_id),
+        hasRefreshToken: Boolean(tokenPayload.refresh_token),
+        scope: tokenPayload.scope ?? null,
+      },
+    });
+
     return redirect(buildOauthCompletionRedirect({
       returnTo: state.returnTo,
       status: "success",
     }));
   } catch (error) {
     console.error("meli_oauth_callback_failed", error);
+    const errorMessage = error instanceof Error ? error.message : "callback_failed";
+    await recordOauthEvent({
+      topic: "oauth_error",
+      authUserId: state.sub,
+      payload: {
+        error: errorMessage,
+      },
+    });
     return redirect(buildOauthCompletionRedirect({
       returnTo: state.returnTo,
       status: "error",
-      code: error instanceof Error ? error.message : "callback_failed",
+      code: errorMessage,
     }));
   }
 });

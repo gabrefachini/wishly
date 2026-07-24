@@ -279,6 +279,10 @@ test("MercadoLivreProvider resolves catalog links from HTML before calling item 
     },
     fetchJson: async (url) => {
       requestedUrls.push(url);
+      if (url.includes("/products/")) {
+        throw new Error("catalog_api_unavailable");
+      }
+
       if (url.endsWith("/prices")) {
         return {
           prices: [
@@ -331,9 +335,9 @@ test("MercadoLivreProvider resolves catalog name, image and price through offici
   const requestedUrls = [];
   const result = await extractMercadoLivreProduct({
     originalUrl:
-      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242",
+      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242?wid=MLB4992081638",
     resolvedUrl: new URL(
-      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242",
+      "https://www.mercadolivre.com.br/forno-a-gas-glp-ooni-koda-12-preto-cinza-para-pizza-bancada-compacto/p/MLB19320242?wid=MLB4992081638",
     ),
     html: null,
     timeoutMs: 3000,
@@ -372,7 +376,6 @@ test("MercadoLivreProvider resolves catalog name, image and price through offici
           attributes: [],
         };
       }
-
       throw new Error("secondary_api_unavailable");
     },
   });
@@ -388,6 +391,90 @@ test("MercadoLivreProvider resolves catalog name, image and price through offici
   assert.equal(result.observability?.authState, "platform_connected");
   assert.equal(result.observability?.catalogApiStatus, "success");
   assert.ok(requestedUrls.some((url) => url.endsWith("/products/MLB19320242")));
+  assert.ok(!requestedUrls.some((url) => url.includes("/items/")));
+});
+
+test("MercadoLivreProvider preserves wid when catalog has no buy box price", async () => {
+  const requestedUrls = [];
+  const result = await extractMercadoLivreProduct({
+    originalUrl:
+      "https://www.mercadolivre.com.br/forno-a-gas/p/MLB19320242?wid=MLB4992081638",
+    resolvedUrl: new URL(
+      "https://www.mercadolivre.com.br/forno-a-gas/p/MLB19320242?wid=MLB4992081638",
+    ),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => "<html><head><title>Mercado Libre</title></head></html>",
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith("/products/MLB19320242")) {
+        return {
+          id: "MLB19320242",
+          name: "Forno a gás GLP Ooni Koda 12",
+          pictures: [{ url: "https://http2.mlstatic.com/D_NQ_NP_ooni-catalog.jpg" }],
+          attributes: [],
+        };
+      }
+      if (url.endsWith("/products/MLB19320242/items")) {
+        return {
+          paging: { total: 2, offset: 0, limit: 100 },
+          results: [
+            {
+              item_id: "MLB4000000000",
+              price: 2599.9,
+              original_price: null,
+              currency_id: "BRL",
+              available_quantity: 8,
+            },
+            {
+              item_id: "MLB4992081638",
+              price: 2499.9,
+              original_price: 2799.9,
+              currency_id: "BRL",
+              available_quantity: 4,
+            },
+          ],
+        };
+      }
+      if (url.endsWith("/items/MLB4992081638/prices")) {
+        throw new Error("price_api_unavailable");
+      }
+      if (url.includes("/items?ids=MLB4992081638")) {
+        return [{
+          code: 200,
+          body: {
+            id: "MLB4992081638",
+            title: "Forno a gás GLP Ooni Koda 12",
+            price: 2499.9,
+            original_price: 2799.9,
+            currency_id: "BRL",
+            available_quantity: 4,
+            pictures: [{ secure_url: "https://http2.mlstatic.com/D_NQ_NP_ooni-item.jpg" }],
+            attributes: [],
+            variations: [],
+          },
+        }];
+      }
+      if (url.endsWith("/items/MLB4992081638/description")) {
+        return {};
+      }
+      if (url.endsWith("/items/MLB4992081638")) {
+        throw new Error("item_api_forbidden");
+      }
+      throw new Error("unexpected_request");
+    },
+  });
+
+  assert.equal(result.externalProductId, "MLB4992081638");
+  assert.equal(result.currentPriceInCents, 249990);
+  assert.equal(result.originalPriceInCents, 279990);
+  assert.equal(result.priceSource, "meli_catalog_items");
+  assert.equal(result.partial, false);
+  assert.ok(requestedUrls.some((url) => url.endsWith("/products/MLB19320242/items")));
+  assert.ok(!requestedUrls.some((url) => url.includes("/items/MLB4992081638")));
 });
 
 test("MercadoLivreProvider keeps auth state in observability", async () => {

@@ -996,9 +996,10 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
     providers.push(new MercadoLivreProvider());
   } else if (workingUrl.pathname.includes("/products/")) {
     providers.push(new ShopifyProvider());
+    providers.push(new StructuredDataProvider(), new OpenGraphProvider(), new GenericHtmlProvider());
+  } else {
+    providers.push(new StructuredDataProvider(), new OpenGraphProvider(), new GenericHtmlProvider());
   }
-
-  providers.push(new StructuredDataProvider(), new OpenGraphProvider(), new GenericHtmlProvider());
 
   for (let index = 0; index < providers.length; index += 1) {
     const elapsedMs = Date.now() - startedAt;
@@ -1053,6 +1054,41 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
   return finalResult;
 }
 
+async function recordProductExtraction(result: ProductExtractionResult) {
+  try {
+    const supabase = createServiceRoleClient();
+    const { error } = await supabase.from("product_extractions").insert({
+      gift_id: null,
+      requested_url: result.originalUrl,
+      canonical_url: result.canonicalUrl,
+      provider: result.provider,
+      raw_payload: {
+        observability: result.observability ?? null,
+        timings: result.timings ?? null,
+      },
+      normalized_payload: result,
+      field_confidence: result.confidence ?? {},
+      extraction_status: result.partial ? "partial" : "success",
+      error_code: result.partial ? result.warnings[0] ?? "partial_extraction" : null,
+      error_message: null,
+      extracted_at: result.extractedAt,
+    });
+
+    if (error) {
+      console.error("product_extraction_audit_failed", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+    }
+  } catch (error) {
+    console.error("product_extraction_audit_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", {
@@ -1076,6 +1112,7 @@ Deno.serve(async (request) => {
 
     requestedUrl = url;
     const result = await extractProduct(url, { authUserId: auth.user?.id ?? null });
+    await recordProductExtraction(result);
     return buildJsonResponse(request, result, 200);
   } catch {
     const fallback = buildEmptyResult(requestedUrl);
