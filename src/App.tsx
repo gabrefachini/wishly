@@ -336,10 +336,10 @@ const localWishesSeed: LocalWish[] = [
 ];
 
 const activity = [
-  "2 itens baixaram de preco na lista Casa nova.",
+  "2 itens baixaram de preço na lista Casa nova.",
   "1 item voltou ao estoque em Setup dos sonhos.",
   "Mariana reservou Poltrona Boucle.",
-  "Voce recebeu 3 visitas na Lista de Gabriel e Ana.",
+  "Você recebeu 3 visitas na lista de Gabriel e Ana.",
 ];
 
 const localListId = "casa-nova";
@@ -471,16 +471,135 @@ function App() {
     if (view === "create_list") return "Criar lista";
     if (view === "list") return currentListTitle(remote, isRemoteMode, localListTitle);
     if (view === "add") return "Adicionar desejo";
-    if (view === "radar") return "Radar de precos";
+    if (view === "radar") return "Radar de preços";
     if (view === "activity") return "Atividade";
-    if (view === "profile") return "Profile";
-    if (view === "profile_settings") return "Configuracoes da conta";
+    if (view === "profile") return "Perfil";
+    if (view === "profile_settings") return "Configurações da conta";
     if (view === "reset_password") return "Redefinir senha";
-    if (view === "pro") return "Upgrade para o Pro";
+    if (view === "pro") return "Wishly Pro";
     if (view === "checkout") return "Finalizar assinatura";
     if (view === "admin") return "Fila de afiliados";
     return "Assinatura confirmada";
   }, [view, remote, isRemoteMode, localListTitle]);
+
+  const seo = useMemo(() => {
+    const siteName = "Wishly";
+    const currentTitle = title || "Lista de desejos online";
+    const publicWishlistTitle = publicState.wishlist?.title?.trim();
+    const baseUrl = typeof window === "undefined" ? "https://wishly.app" : window.location.origin;
+    const canonicalUrl =
+      isPublicMode && publicState.shareId
+        ? buildPublicShareUrl(publicState.shareId)
+        : `${baseUrl}/`;
+
+    if (isPublicMode) {
+      const listTitle = publicWishlistTitle || "lista compartilhada";
+      return {
+        title: `${listTitle} | ${siteName}`,
+        description: `Confira a ${listTitle} no Wishly e veja os desejos organizados em uma lista compartilhada para presentear sem repetir itens.`,
+        canonicalUrl,
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: `${listTitle} | ${siteName}`,
+          description: `Lista de desejos compartilhada no Wishly.`,
+          url: canonicalUrl,
+          isPartOf: {
+            "@type": "WebSite",
+            name: siteName,
+            url: baseUrl,
+          },
+        },
+      };
+    }
+
+    if (isMarketingMode) {
+      return {
+        title: `Wishly | Lista de desejos online`,
+        description:
+          "Crie sua lista de desejos online, adicione produtos por link, acompanhe preços e compartilhe com quem vai presentear.",
+        canonicalUrl,
+        schema: {
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: siteName,
+          applicationCategory: "ShoppingApplication",
+          operatingSystem: "Web",
+          offers: {
+            "@type": "Offer",
+            price: "0",
+            priceCurrency: "BRL",
+          },
+          url: canonicalUrl,
+          description:
+            "Aplicativo de lista de desejos online para organizar produtos, acompanhar preços e compartilhar listas.",
+        },
+      };
+    }
+
+    const descriptions: Record<View, string> = {
+      home: "Wishly | Lista de desejos online",
+      create_list: "Crie uma nova lista de desejos no Wishly e organize produtos por ocasião, prioridade ou categoria.",
+      list: `Veja e compartilhe sua lista de desejos${currentTitle ? `: ${currentTitle}` : ""}.`,
+      add: "Adicione um produto à sua lista de desejos pelo link da loja e revise nome, imagem e preço antes de salvar.",
+      reset_password: "Redefina sua senha no Wishly para continuar acessando suas listas.",
+      radar: "Acompanhe preços de produtos da sua lista de desejos e receba sinais de queda, estoque e revisão.",
+      activity: "Veja as últimas atualizações da sua lista de desejos no Wishly.",
+      profile: "Gerencie seu perfil, privacidade e acesso no Wishly.",
+      profile_settings: "Atualize nome, foto, e-mail, senha e privacidade da sua conta no Wishly.",
+      pro: "Conheça o Wishly Pro com radar de preços, alertas e listas compartilhadas sem anúncios.",
+      checkout: "Finalize sua assinatura do Wishly Pro com segurança.",
+      success: "Assinatura confirmada no Wishly Pro.",
+      admin: "Fila administrativa do Wishly para afiliados e solicitações de exclusão.",
+    };
+
+    return {
+      title: `${currentTitle ? `${currentTitle} | ` : ""}${siteName}`,
+      description: descriptions[view],
+      canonicalUrl,
+      schema: {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: `${currentTitle || siteName} | ${siteName}`,
+        description: descriptions[view],
+        url: canonicalUrl,
+      },
+    };
+  }, [isMarketingMode, isPublicMode, publicState.shareId, publicState.wishlist?.title, title, view]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const upsertMeta = (selector: string, attributes: Record<string, string>) => {
+      const existing = document.head.querySelector(selector) as HTMLMetaElement | HTMLLinkElement | null;
+      const element =
+        existing ??
+        document.createElement(selector.startsWith("link") ? "link" : "meta");
+
+      Object.entries(attributes).forEach(([key, value]) => {
+        element.setAttribute(key, value);
+      });
+
+      if (!existing) document.head.appendChild(element);
+    };
+
+    document.title = seo.title;
+    upsertMeta('meta[name="description"]', { name: "description", content: seo.description });
+    upsertMeta('meta[property="og:title"]', { property: "og:title", content: seo.title });
+    upsertMeta('meta[property="og:description"]', { property: "og:description", content: seo.description });
+    upsertMeta('meta[property="og:type"]', { property: "og:type", content: isPublicMode ? "article" : "website" });
+    upsertMeta('meta[property="og:url"]', { property: "og:url", content: seo.canonicalUrl });
+    upsertMeta('meta[name="twitter:card"]', { name: "twitter:card", content: "summary_large_image" });
+    upsertMeta('link[rel="canonical"]', { rel: "canonical", href: seo.canonicalUrl });
+
+    const scriptId = "wishly-json-ld";
+    const existingScript = document.getElementById(scriptId);
+    const script = existingScript ?? document.createElement("script");
+    script.id = scriptId;
+    script.setAttribute("type", "application/ld+json");
+    script.textContent = JSON.stringify(seo.schema);
+    if (!existingScript) document.head.appendChild(script);
+  }, [isPublicMode, seo]);
 
   const localPendingTasks = useMemo(
     () => localAffiliateTasks.filter((task) => task.status === "pending"),
@@ -622,7 +741,7 @@ function App() {
       setProfileForm((current) => ({ ...current, avatarUrl: preview }));
       setSyncError("");
     } catch {
-      setSyncError("Nao foi possivel carregar a imagem agora.");
+      setSyncError("Não foi possível carregar a imagem agora.");
     }
   }
 
@@ -632,7 +751,7 @@ function App() {
       : localListId;
 
     if (!activeShareId) {
-      setSyncError("Nao foi possivel gerar o link da lista agora.");
+      setSyncError("Não foi possível gerar o link da lista agora.");
       return;
     }
 
@@ -658,7 +777,7 @@ function App() {
       setSyncError("");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
-      setSyncError("Nao foi possivel compartilhar a lista agora.");
+      setSyncError("Não foi possível compartilhar a lista agora.");
     }
   }
 
@@ -897,7 +1016,7 @@ function App() {
       id: nextWishId,
       title,
       store: formState.storeName.trim() || getStoreLabel(linkData.source),
-      price: formState.currentPrice.trim() || "Adicionar preco",
+      price: formState.currentPrice.trim() || "Adicionar preço",
       image: formState.imageUrl.trim() || null,
       priority: selectedPriority,
       originalUrl: linkData.originalUrl,
@@ -1077,7 +1196,7 @@ function App() {
         }
 
         if (password !== authForm.confirmPassword.trim()) {
-          throw new Error("A confirmacao da senha nao confere.");
+          throw new Error("A confirmação da senha não confere.");
         }
 
         const result = await withTimeout(signUpWithPassword({
@@ -1234,7 +1353,7 @@ function App() {
       setSyncError("");
       setAuthMessage("");
       await updateViewerEmail(nextEmail);
-      setAuthMessage(`Pedido de troca enviado para ${nextEmail}. Confirme o novo e-mail para concluir a alteracao.`);
+      setAuthMessage(`Pedido de troca enviado para ${nextEmail}. Confirme o novo e-mail para concluir a alteração.`);
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -1248,7 +1367,7 @@ function App() {
     const confirmNewPassword = accessForm.confirmNewPassword.trim();
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setSyncError("Preencha senha atual, nova senha e confirmacao.");
+      setSyncError("Preencha senha atual, nova senha e confirmação.");
       return;
     }
 
@@ -1258,7 +1377,7 @@ function App() {
     }
 
     if (newPassword !== confirmNewPassword) {
-      setSyncError("A confirmacao da nova senha nao confere.");
+      setSyncError("A confirmação da nova senha não confere.");
       return;
     }
 
@@ -1320,7 +1439,7 @@ function App() {
         }));
       }
 
-      setAuthMessage("Preferencias de privacidade atualizadas.");
+      setAuthMessage("Preferências de privacidade atualizadas.");
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -1330,7 +1449,7 @@ function App() {
 
   async function handleRequestAccountDeletion() {
     if (privacyForm.deleteConfirmText.trim().toUpperCase() !== "EXCLUIR") {
-      setSyncError("Digite EXCLUIR para confirmar a solicitacao.");
+      setSyncError("Digite EXCLUIR para confirmar a solicitação.");
       return;
     }
 
@@ -1352,7 +1471,7 @@ function App() {
       }
 
       setPrivacyForm((current) => ({ ...current, deleteConfirmText: "" }));
-      setAuthMessage("Solicitacao de exclusao registrada. A conta foi marcada para remocao.");
+      setAuthMessage("Solicitação de exclusão registrada. A conta foi marcada para remoção.");
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -1690,13 +1809,13 @@ function App() {
     if (!oauthStatus) return;
 
     if (oauthStatus === "success") {
-      setAuthMessage(oauthCode === "connected" ? "Mercado Livre conectado com sucesso." : "Conexao com Mercado Livre atualizada.");
+      setAuthMessage(oauthCode === "connected" ? "Mercado Livre conectado com sucesso." : "Conexão com Mercado Livre atualizada.");
       setSyncError("");
       if (session) {
         void refreshRemoteState(session);
       }
     } else {
-      setSyncError("Nao foi possivel concluir a conexao com o Mercado Livre.");
+      setSyncError("Não foi possível concluir a conexão com o Mercado Livre.");
       setAuthMessage("");
     }
 
@@ -2172,14 +2291,14 @@ function MarketingHomePage({
                 </div>
                 <div className="marketing-login-actions">
                   <button className="secondary-button" type="button" onClick={onResetAuthFlow}>
-                    Voltar para o formulario
+                    Voltar para o formulário
                   </button>
                   <button
                     className="text-button auth-switch-button"
                     type="button"
                     onClick={authPanelMode === "create" ? openLoginPanel : openCreateAccountPanel}
                   >
-                    {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
+                    {authPanelMode === "create" ? "Já tenho conta" : "Criar conta"}
                   </button>
                 </div>
               </>
@@ -2187,10 +2306,10 @@ function MarketingHomePage({
               <>
                 <div className="marketing-login-copy">
                   <p className="label">{authPanelMode === "create" ? "Criar conta" : "Entrar"}</p>
-                  <h2>{authPanelMode === "create" ? "Crie sua conta para montar a lista" : "Entre para continuar sua lista"}</h2>
+                  <h2>{authPanelMode === "create" ? "Crie sua conta para montar sua lista" : "Entre para continuar sua lista"}</h2>
                   <p>
                     {authPanelMode === "create"
-                      ? "Seu cadastro ja abre o fluxo para criar a primeira lista."
+                      ? "Seu cadastro já abre o fluxo para criar a primeira lista."
                       : "Use seu e-mail e senha para acessar suas listas e continuar de onde parou."}
                   </p>
                 </div>
@@ -2253,7 +2372,7 @@ function MarketingHomePage({
                     onClick={authPanelMode === "create" ? openLoginPanel : openCreateAccountPanel}
                     disabled={authBusy}
                   >
-                    {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
+                    {authPanelMode === "create" ? "Já tenho conta" : "Criar conta"}
                   </button>
                 </form>
               </>
@@ -2265,9 +2384,9 @@ function MarketingHomePage({
       <main className="marketing-main">
         <section className="marketing-hero">
           <div className="hero-copy-block">
-            <h1>Tudo o que você deseja, em um só lugar.</h1>
+            <h1>Organize sua lista de desejos com menos esforço.</h1>
             <p className="hero-support">
-              Crie listas, salve produtos de qualquer loja e compartilhe seus desejos com quem importa.
+              Crie sua lista de desejos, adicione produtos de qualquer loja e compartilhe com quem vai presentear.
             </p>
             <div className="hero-cta-row">
               <button className="primary-button" type="button" onClick={handleCreateList}>
@@ -2305,7 +2424,7 @@ function MarketingHomePage({
                   </article>
                 ))}
                 <div className="marketing-hero-footer">
-                  <span>Tudo organizado para quem cria e para quem vai presentear.</span>
+                  <span>Uma lista clara para quem cria e para quem vai presentear.</span>
                   <button className="secondary-button" type="button" onClick={handleOpenListDemo}>
                     Ver lista
                     <ArrowRight size={16} />
@@ -2345,7 +2464,7 @@ function MarketingHomePage({
           </div>
           <div className="marketing-steps-grid">
             {[
-              { step: "1", title: "Crie uma lista", text: "Escolha um modelo ou comece do zero.", detail: "Modelo ou lista vazia" },
+              { step: "1", title: "Crie sua lista", text: "Escolha um modelo ou comece do zero.", detail: "Modelo ou lista vazia" },
               { step: "2", title: "Adicione seus desejos", text: "Cole o link de qualquer produto.", detail: "Nome, imagem e preço" },
               { step: "3", title: "Compartilhe", text: "Envie por link ou WhatsApp.", detail: "Sem conta para convidados" },
             ].map((item) => (
@@ -2363,7 +2482,7 @@ function MarketingHomePage({
           <div className="marketing-price-copy">
             <div>
               <h2>O preço mudou? O Wishly avisa.</h2>
-              <p>Acompanhe os produtos das suas listas e descubra o melhor momento para comprar.</p>
+              <p>Acompanhe os produtos da sua lista e descubra o melhor momento para comprar.</p>
               <span className="price-inline-copy">Histórico de preços · Alertas personalizados · Produtos de várias lojas</span>
             </div>
           </div>
@@ -2438,7 +2557,7 @@ function MarketingHomePage({
             </div>
             <p className="price-note">
               <TrendingDown size={16} />
-              Avisar quando baixar para R$ 179.
+              Avise quando baixar para R$ 179.
             </p>
           </div>
         </section>
@@ -2446,7 +2565,7 @@ function MarketingHomePage({
         <section className="marketing-section marketing-share-section">
           <div className="section-intro">
             <h2>Compartilhar a lista deve ser tão simples quanto criar.</h2>
-            <p>Quem recebe sua lista pode visualizar os desejos e escolher um presente sem criar uma conta.</p>
+            <p>Quem recebe sua lista pode ver os desejos e escolher um presente sem criar conta.</p>
           </div>
           <div className="marketing-share-layout">
             <div className="marketing-phone-preview">
@@ -2460,7 +2579,7 @@ function MarketingHomePage({
                   <strong>Play gym de madeira</strong>
                   <span>Faixa ideal · R$ 249</span>
                 </div>
-                <small>disponível</small>
+                <small>Disponível</small>
               </article>
               <article className="marketing-item-card compact">
                 <img src={marketingImages.lamp} alt="" />
@@ -2468,7 +2587,7 @@ function MarketingHomePage({
                   <strong>Abajur para leitura</strong>
                   <span>Reservado por Mariana</span>
                 </div>
-                <small>reservado</small>
+                <small>Reservado</small>
               </article>
             </div>
             <div className="marketing-share-actions">
@@ -2647,7 +2766,7 @@ function HomeScreen({
                   </button>
                 )}
                 <button className="text-button auth-switch-button" type="button" onClick={authPanelMode === "create" ? onLogin : onCreateList}>
-                  {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
+                  {authPanelMode === "create" ? "Já tenho conta" : "Criar conta"}
                 </button>
               </form>
             </div>
@@ -2657,7 +2776,7 @@ function HomeScreen({
         <section className="inset-section dashboard-notices">
           <p className="label">Novidades nas suas listas</p>
           <div className="notice-card">
-            <Notice icon={<ArrowDown size={18} />} text="2 itens baixaram de preco na sua lista Casa Nova." />
+            <Notice icon={<ArrowDown size={18} />} text="2 itens baixaram de preço na sua lista Casa Nova." />
             <Notice icon={<Gift size={18} />} text="1 item voltou ao estoque em Setup." />
             <Notice icon={<Heart size={18} />} text="1 item foi reservado por um convidado." />
             <Notice
@@ -2673,15 +2792,15 @@ function HomeScreen({
       </div>
 
       <Shelf title="Suas listas" action="VER TUDO" variant="lists">
-        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 precos cairam" badge="ATUAL" onClick={() => go("list")} />
-        <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritarios" badge="EXEMPLO" onClick={() => go("list")} />
-        <ListCard image={images.travel} title="Proxima viagem" meta="12 desejos • Compartilhada" badge="EXEMPLO" onClick={() => go("list")} />
+        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 preços caíram" badge="ATUAL" onClick={() => go("list")} />
+        <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritários" badge="EXEMPLO" onClick={() => go("list")} />
+        <ListCard image={images.travel} title="Próxima viagem" meta="12 desejos • Compartilhada" badge="EXEMPLO" onClick={() => go("list")} />
       </Shelf>
 
       <section className="idea-band">
-        <Shelf title="Ideias para comecar" tone="tertiary" variant="ideas">
+        <Shelf title="Ideias para começar" tone="tertiary" variant="ideas">
           <Idea image={images.ideaHome} label="Casa nova" />
-          <Idea image={images.baby} label="Cha de bebe" />
+          <Idea image={images.baby} label="Chá de bebê" />
           <Idea image={images.plane} label="Viagem" />
         </Shelf>
       </section>
@@ -2704,7 +2823,7 @@ function ResetPasswordScreen({
     <section className="profile-settings-layout reset-password-layout">
       <article className="profile-settings-card reset-password-card">
         <div>
-          <p className="label">Recuperacao de acesso</p>
+          <p className="label">Recuperação de acesso</p>
           <h2>Crie uma nova senha</h2>
           <p>Use o link do e-mail para definir uma nova senha antes de voltar ao Wishly.</p>
         </div>
@@ -2867,13 +2986,7 @@ function ListScreen({
         <div className="hero-copy">
           <p className="label light">Lista compartilhada</p>
           <h2>{wishlistTitle}</h2>
-          <p>Uma colecao calma de pecas para transformar o primeiro apartamento em casa.</p>
-          {canEditList && (
-            <button className="text-button hero-edit-button" type="button" onClick={onEditList}>
-              <PencilLine size={16} />
-              Editar lista
-            </button>
-          )}
+          <p>Uma coleção calma de peças para transformar o primeiro apartamento em casa.</p>
           <div className="hero-actions">
             <button className="primary-button" type="button" onClick={() => go("add")}>
               <Plus size={18} />
@@ -2883,6 +2996,12 @@ function ListScreen({
               <Share2 size={18} />
               Compartilhar
             </button>
+            {canEditList && (
+              <button className="text-button hero-edit-button" type="button" onClick={onEditList}>
+                <PencilLine size={16} />
+                Editar lista
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -2913,7 +3032,7 @@ function ListScreen({
             </div>
             <div className="stat-grid">
               <Stat value={String(wishes.length)} label="desejos" />
-              <Stat value={String(wishes.filter((wish) => getWishDrop(wish)).length)} label="promocoes" />
+              <Stat value={String(wishes.filter((wish) => getWishDrop(wish)).length)} label="promoções" />
               <Stat value={String(wishes.filter((wish) => getWishStatus(wish) === "Reservado").length)} label="reservados" />
             </div>
           </div>
@@ -2922,7 +3041,7 @@ function ListScreen({
         <div className="list-summary-card list-summary-card-accent">
           <p className="label">Lista pronta para compartilhar</p>
           <h3>Quem receber ve o que importa sem confusao.</h3>
-          <p>Os desejos ficam organizados por prioridade, reservas e sinais de preco. A lista continua simples para quem envia e para quem compra.</p>
+          <p>Os desejos ficam organizados por prioridade, reservas e sinais de preço. A lista continua simples para quem envia e para quem compra.</p>
           <div className="list-summary-notes">
             <div>
               <strong>{tracked.length}</strong>
@@ -3220,7 +3339,7 @@ function PublicWishlistPage({
           <section className="public-empty-state">
             <p className="label">Abrindo lista compartilhada</p>
             <h2>Carregando os desejos...</h2>
-            <p>Estamos preparando a lista para voce visualizar tudo em um so lugar.</p>
+            <p>Estamos preparando a lista para você visualizar tudo em um só lugar.</p>
           </section>
         </main>
       </div>
@@ -3240,9 +3359,9 @@ function PublicWishlistPage({
         </header>
         <main className="public-main">
           <section className="public-empty-state">
-            <p className="label">Link indisponivel</p>
-            <h2>Essa lista nao esta mais acessivel.</h2>
-            <p>Confira se o link foi copiado por completo ou volte para criar sua propria lista no Wishly.</p>
+            <p className="label">Link indisponível</p>
+            <h2>Essa lista não está mais acessível.</h2>
+            <p>Confira se o link foi copiado por completo ou volte para criar sua própria lista no Wishly.</p>
           </section>
         </main>
       </div>
@@ -3336,10 +3455,10 @@ function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracke
       <section className="radar-summary">
         <p className="label">Monitoramento Pro</p>
         <h2>Economia potencial de {formatCurrency(potentialSavings, "BRL")}</h2>
-        <p>O radar prioriza queda real de preco, risco de estoque e confiabilidade dos dados do item.</p>
+        <p>O radar prioriza queda real de preço, risco de estoque e confiabilidade dos dados do item.</p>
         <div className="stat-grid">
           <Stat value={String(opportunityCount)} label="oportunidades" />
-          <Stat value={String(criticalCount)} label="criticos" />
+          <Stat value={String(criticalCount)} label="críticos" />
           <Stat value={String(reviewCount)} label="revisar" />
         </div>
         <button className="primary-button" type="button" onClick={() => go("pro")}>
@@ -3428,7 +3547,7 @@ function ProfileScreen({
             <Settings size={18} />
           </span>
           <div>
-            <strong>Configuracoes da conta</strong>
+            <strong>Configurações da conta</strong>
             <p>Foto, nome, e-mail, senha e privacidade.</p>
           </div>
           <ArrowRight size={18} />
@@ -3440,7 +3559,7 @@ function ProfileScreen({
           </span>
           <div>
             <strong>Wishly Pro</strong>
-            <p>Radar de preco, alertas e experiencia premium.</p>
+            <p>Radar de preço, alertas e experiência premium.</p>
           </div>
           <ArrowRight size={18} />
         </button>
@@ -3508,11 +3627,11 @@ function ProfileSettingsScreen({
       <div className="profile-settings-main">
         <article className="profile-settings-card">
           <div className="profile-settings-header">
-            <div>
-              <p className="label">Perfil</p>
-              <h2>Seus dados principais</h2>
-              <p>Atualize a foto e o nome usados na sua conta.</p>
-            </div>
+          <div>
+            <p className="label">Perfil</p>
+            <h2>Seus dados principais</h2>
+            <p>Atualize a foto e o nome usados na sua conta.</p>
+          </div>
             <div className="profile-avatar-editor">
               <img className="profile-settings-avatar" src={profileForm.avatarUrl || images.avatar} alt={profileForm.fullName} />
               <button className="secondary-button" type="button" onClick={onChoosePhoto}>
@@ -3542,26 +3661,26 @@ function ProfileSettingsScreen({
 
           <div className="field-row">
             <button className="primary-button full" type="button" onClick={onSave} disabled={!profileForm.fullName.trim() || syncing}>
-              {syncing ? "Salvando..." : "Salvar alteracoes"}
+              {syncing ? "Salvando..." : "Salvar alterações"}
             </button>
           </div>
         </article>
 
         {isAdmin ? <article className="profile-settings-card">
           <div>
-            <p className="label">Integracoes</p>
+            <p className="label">Integrações</p>
             <h2>Mercado Livre da plataforma</h2>
             <p>
-              Esta conexao administrativa habilita a extracao oficial para todos os usuarios do Wishly.
+              Esta conexão administrativa habilita a extração oficial para todos os usuários do Wishly.
             </p>
           </div>
 
           {isRemoteMode && meliConnection ? (
             <div className="danger-status">
-              <strong>Conectado como usuario {meliConnection.meli_user_id}</strong>
+              <strong>Conectado como usuário {meliConnection.meli_user_id}</strong>
               <p>
                 Vinculado em {formatDateTime(meliConnection.connected_at)}
-                {meliConnection.last_refreshed_at ? ` · ultimo refresh em ${formatDateTime(meliConnection.last_refreshed_at)}` : ""}
+                {meliConnection.last_refreshed_at ? ` · última atualização em ${formatDateTime(meliConnection.last_refreshed_at)}` : ""}
               </p>
             </div>
           ) : null}
@@ -3573,9 +3692,9 @@ function ProfileSettingsScreen({
           </div>
 
           {!isRemoteMode ? (
-            <p className="field-help">Entre na sua conta antes de iniciar a conexao.</p>
+            <p className="field-help">Entre na sua conta antes de iniciar a conexão.</p>
           ) : (
-            <p className="field-help">O fluxo abre a autorizacao oficial do Mercado Livre e retorna para esta tela.</p>
+            <p className="field-help">O fluxo abre a autorização oficial do Mercado Livre e retorna para esta tela.</p>
           )}
         </article> : null}
 
@@ -3583,7 +3702,7 @@ function ProfileSettingsScreen({
           <div>
             <p className="label">Acesso</p>
             <h2>Trocar e-mail</h2>
-            <p>{isRemoteMode ? "O Supabase pode pedir confirmacao no novo e-mail para concluir a troca." : "No modo local, a mudanca fica salva apenas neste navegador."}</p>
+            <p>{isRemoteMode ? "O Supabase pode pedir confirmação no novo e-mail para concluir a troca." : "No modo local, a mudança fica salva apenas neste navegador."}</p>
           </div>
 
           <div className="profile-settings-fields">
@@ -3605,7 +3724,7 @@ function ProfileSettingsScreen({
 
         <article className="profile-settings-card">
           <div>
-            <p className="label">Seguranca</p>
+            <p className="label">Segurança</p>
             <h2>Trocar senha</h2>
             <p>Confirme sua senha atual antes de definir uma nova.</p>
           </div>
@@ -3675,7 +3794,7 @@ function ProfileSettingsScreen({
                   type="button"
                   onClick={() => onChangePrivacyField("profileVisibility", "public")}
                 >
-                  Publico
+                  Público
                 </button>
               </div>
             </div>
@@ -3698,7 +3817,7 @@ function ProfileSettingsScreen({
                   type="button"
                   onClick={() => onChangePrivacyField("defaultListVisibility", "public")}
                 >
-                  Publicas
+                  Públicas
                 </button>
               </div>
             </div>
@@ -3714,21 +3833,21 @@ function ProfileSettingsScreen({
         <article className="profile-settings-card danger-card">
           <div>
             <p className="label">Zona de perigo</p>
-            <h2>Solicitar exclusao da conta</h2>
+            <h2>Solicitar exclusão da conta</h2>
             <p>
-              Essa solicitacao marca a conta para remocao. Digite <strong>EXCLUIR</strong> para confirmar.
+              Essa solicitação marca a conta para remoção. Digite <strong>EXCLUIR</strong> para confirmar.
             </p>
           </div>
 
           {deletionRequestedAt ? (
             <div className="danger-status">
               <strong>Solicitado em {formatDateTime(deletionRequestedAt)}</strong>
-              <p>A conta ja foi marcada para exclusao e deve seguir o fluxo administrativo.</p>
+              <p>A conta já foi marcada para exclusão e deve seguir o fluxo administrativo.</p>
             </div>
           ) : null}
 
           <Field
-            label="Confirmacao"
+            label="Confirmação"
             placeholder="Digite EXCLUIR"
             value={privacyForm.deleteConfirmText}
             onChange={(value) => onChangePrivacyField("deleteConfirmText", value)}
@@ -3741,7 +3860,7 @@ function ProfileSettingsScreen({
               onClick={onRequestDeletion}
               disabled={syncing || privacyForm.deleteConfirmText.trim().toUpperCase() !== "EXCLUIR"}
             >
-              {syncing ? "Processando..." : "Solicitar exclusao"}
+              {syncing ? "Processando..." : "Solicitar exclusão"}
             </button>
           </div>
         </article>
@@ -3750,18 +3869,18 @@ function ProfileSettingsScreen({
       <aside className="profile-settings-aside">
         <div className="profile-note-card">
           <p className="label">Perfil</p>
-          <h3>Foto e nome ja funcionais</h3>
-          <p>{isRemoteMode ? "As alteracoes sao salvas na sua conta e refletidas no app." : "No modo local, as alteracoes ficam salvas neste navegador."}</p>
+          <h3>Foto e nome já funcionais</h3>
+          <p>{isRemoteMode ? "As alterações são salvas na sua conta e refletidas no app." : "No modo local, as alterações ficam salvas neste navegador."}</p>
         </div>
         <div className="profile-note-card">
           <p className="label">Acesso</p>
           <h3>E-mail e senha agora entram aqui</h3>
-          <p>Os fluxos foram separados para reduzir erro do usuario e manter a tela objetiva.</p>
+          <p>Os fluxos foram separados para reduzir erro do usuário e manter a tela objetiva.</p>
         </div>
         <div className="profile-note-card">
           <p className="label">Conta</p>
-          <h3>Exclusao com trilha clara</h3>
-          <p>A remocao definitiva exige backend privilegiado. Por enquanto a conta fica marcada para exclusao de forma explicita.</p>
+          <h3>Exclusão com trilha clara</h3>
+          <p>A remoção definitiva exige backend privilegiado. Por enquanto a conta fica marcada para exclusão de forma explícita.</p>
         </div>
       </aside>
     </section>
@@ -3805,7 +3924,7 @@ function AdminScreen({
         <div className="empty-admin">
           <ShieldCheck size={24} />
           <strong>Acesso restrito</strong>
-          <p>Essa fila real so aparece para usuarios presentes em `admin_users` no Supabase.</p>
+          <p>Essa fila real só aparece para usuários presentes em `admin_users` no Supabase.</p>
         </div>
       </section>
     );
@@ -3820,12 +3939,12 @@ function AdminScreen({
     return (
       <section className="admin-stack">
         <div className="admin-summary">
-          <p className="label">Operacao real</p>
+          <p className="label">Operação real</p>
           <h2>Fila unica para admins</h2>
-          <p>Essa tela usa RPCs do Supabase para afiliados e exclusao de conta.</p>
+          <p>Essa tela usa RPCs do Supabase para afiliados e exclusão de conta.</p>
           <div className="stat-grid">
             <Stat value={String(pending.length)} label="pendentes" />
-            <Stat value={String(pendingDeletionRequests.length)} label="exclusoes" />
+            <Stat value={String(pendingDeletionRequests.length)} label="exclusões" />
             <Stat value={String(remoteQueue.length + remoteDeletionRequests.length)} label="total" />
           </div>
         </div>
@@ -3904,8 +4023,8 @@ function AdminScreen({
         {pendingDeletionRequests.length === 0 ? (
           <div className="empty-admin">
             <ShieldCheck size={24} />
-            <strong>Nenhuma exclusao aguardando acao</strong>
-            <p>Quando um usuario solicitar remocao da conta, o pedido aparece aqui.</p>
+            <strong>Nenhuma exclusão aguardando ação</strong>
+            <p>Quando um usuário solicitar remoção da conta, o pedido aparece aqui.</p>
           </div>
         ) : (
           pendingDeletionRequests.map((request) => (
@@ -3938,7 +4057,7 @@ function AdminScreen({
         {history.length > 0 && (
           <div className="history-block">
             <div className="section-heading compact-heading">
-              <h2>Historico</h2>
+              <h2>Histórico</h2>
             </div>
             <div className="vertical-list admin-history">
               {history.map((task) => (
@@ -3990,9 +4109,9 @@ function AdminScreen({
   return (
     <section className="admin-stack">
       <div className="admin-summary">
-        <p className="label">Operacao local</p>
+        <p className="label">Operação local</p>
         <h2>Fila demo para admins</h2>
-        <p>Essa fila continua disponivel como fallback enquanto voce nao estiver autenticado no banco real.</p>
+        <p>Essa fila continua disponível como fallback enquanto você não estiver autenticado no banco real.</p>
         <div className="stat-grid">
           <Stat value={String(pending.length)} label="pendentes" />
           <Stat value={String(history.filter((task) => task.status === "completed").length)} label="gerados" />
@@ -4040,7 +4159,7 @@ function AdminScreen({
               <div className="admin-actions">
                 <button className="secondary-button" type="button" onClick={() => onLocalInvalid(key)}>
                   <XCircle size={18} />
-                  Marcar invalido
+                  Marcar inválido
                 </button>
                 <button className="secondary-button" type="button" onClick={() => onLocalUnavailable(key)}>
                   Sem afiliado
@@ -4058,7 +4177,7 @@ function AdminScreen({
       {history.length > 0 && (
         <div className="history-block">
           <div className="section-heading compact-heading">
-            <h2>Historico</h2>
+            <h2>Histórico</h2>
           </div>
           <div className="vertical-list admin-history">
             {history.map((task) => (
@@ -4085,14 +4204,14 @@ function ProScreen({ go }: { go: (view: View) => void }) {
       <section className="pro-hero">
         <Sparkles size={28} />
         <h2>Wishly Pro</h2>
-        <p>Radar de precos, alertas inteligentes e listas compartilhadas com uma experiencia sem anuncios.</p>
-        <strong>R$ 14,90 / mes</strong>
+        <p>Radar de preços, alertas inteligentes e listas compartilhadas com uma experiência sem anúncios.</p>
+        <strong>R$ 14,90 / mês</strong>
         <button className="primary-button full" type="button" onClick={() => go("checkout")}>
           Comecar agora
         </button>
       </section>
       <section className="feature-list">
-        {["Alertas de queda de preco", "Historico por loja", "Reservas privadas", "Temas editoriais premium"].map((item) => (
+        {["Alertas de queda de preço", "Histórico por loja", "Reservas privadas", "Temas editoriais premium"].map((item) => (
           <div className="feature" key={item}>
             <Check size={18} />
             <span>{item}</span>
@@ -4115,7 +4234,7 @@ function CheckoutScreen({ go }: { go: (view: View) => void }) {
       <div className="plan-card">
         <span>Wishly Pro</span>
         <strong>R$ 14,90</strong>
-        <small>Renovacao mensal. Cancele quando quiser.</small>
+        <small>Renovação mensal. Cancele quando quiser.</small>
       </div>
       <Field label="Nome no cartao" placeholder="Gabriel Fachini" value="" onChange={() => undefined} />
       <Field label="Numero do cartao" placeholder="0000 0000 0000 0000" icon={<CreditCard size={18} />} value="" onChange={() => undefined} />
@@ -4137,7 +4256,7 @@ function SuccessScreen({ go }: { go: (view: View) => void }) {
         <Check size={36} />
       </div>
       <h2>Assinatura confirmada</h2>
-      <p>O Radar Pro ja esta ativo nas suas listas. Voce recebera alertas quando o melhor momento de compra chegar.</p>
+      <p>O Radar Pro já está ativo nas suas listas. Você receberá alertas quando o melhor momento de compra chegar.</p>
       <button className="primary-button full" type="button" onClick={() => go("radar")}>
         Abrir radar
       </button>
@@ -4459,7 +4578,7 @@ function readFileAsDataUrl(file: File) {
         resolve(reader.result);
         return;
       }
-      reject(new Error("Preview indisponivel"));
+      reject(new Error("Preview indisponível"));
     };
     reader.onerror = () => reject(reader.error ?? new Error("Leitura da imagem falhou"));
     reader.readAsDataURL(file);
@@ -4485,7 +4604,7 @@ function buildLocalPublicWishlist(shareId: string, wishes: LocalWish[], title = 
     title,
     occasion: "Casa nova",
     event_date: null,
-    message: "Uma selecao de desejos para montar a casa nova com calma.",
+    message: "Uma seleção de desejos para montar a casa nova com calma.",
     cover_image_url: images.home,
     locale: "pt-BR",
     gifts: wishes.map((wish) => ({
@@ -4545,7 +4664,7 @@ function getWishStore(wish: LocalWish | DbWish) {
 function getWishPrice(wish: LocalWish | DbWish) {
   if ("price" in wish) return wish.price;
   const amount = wish.current_price ?? wish.estimated_price;
-  if (amount == null) return "Sem preco";
+  if (amount == null) return "Sem preço";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: getWishCurrency(wish) }).format(amount);
 }
 
@@ -4685,7 +4804,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
       stateTone: "muted" as const,
       stateLabel: "Radar pausado",
       statusLabel: "Monitoramento inativo",
-      supportLabel: "Ative o radar para priorizar preco, estoque e sinais de extração.",
+      supportLabel: "Ative o radar para priorizar preço, estoque e sinais de extração.",
       metricLabel: "Sem regras ativas",
       priorityScore: 0,
       savingsInCurrency: 0,
@@ -4701,7 +4820,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
       stateLabel: "Atencao imediata",
       statusLabel: "Risco de compra",
       supportLabel: "O item está sem estoque e deve ser revisado antes de compartilhar ou comprar.",
-      metricLabel: "Estoque indisponivel",
+      metricLabel: "Estoque indisponível",
       priorityScore: 95,
       savingsInCurrency,
     };
@@ -4715,7 +4834,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
       stateTone: "success" as const,
       stateLabel: "Boa oportunidade",
       statusLabel: "Queda relevante",
-      supportLabel: "A diferenca entre preco atual e anterior ja justifica destaque no radar.",
+      supportLabel: "A diferença entre preço atual e anterior já justifica destaque no radar.",
       metricLabel: `Economia de ${formatCurrency(savingsInCurrency, getWishCurrency(wish))}`,
       priorityScore: 88,
       savingsInCurrency,
@@ -4745,10 +4864,10 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
       isTracked,
       state: "review" as const,
       stateTone: "warning" as const,
-      stateLabel: "Preco ausente",
-      statusLabel: "Sem base de preco",
-      supportLabel: "Sem preco confiável, o radar não consegue medir oportunidade real.",
-      metricLabel: "Adicionar preco",
+      stateLabel: "Preço ausente",
+      statusLabel: "Sem base de preço",
+      supportLabel: "Sem preço confiável, o radar não consegue medir oportunidade real.",
+      metricLabel: "Adicionar preço",
       priorityScore: 62,
       savingsInCurrency,
     };
@@ -4761,7 +4880,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
     stateTone: "neutral" as const,
     stateLabel: "Monitorando",
     statusLabel: "Sinais estaveis",
-    supportLabel: "Item com dados suficientes para acompanhar variacao e disponibilidade.",
+    supportLabel: "Item com dados suficientes para acompanhar variação e disponibilidade.",
     metricLabel: hasRealDrop ? `Economia de ${formatCurrency(savingsInCurrency, getWishCurrency(wish))}` : "Sem queda relevante",
     priorityScore: hasRealDrop ? 58 : 42,
     savingsInCurrency,
@@ -4775,7 +4894,7 @@ function getWishAvailabilityLabel(wish: DbWish) {
     case "out_of_stock":
       return "Sem estoque";
     case "preorder":
-      return "Pre-venda";
+      return "Pré-venda";
     default:
       return "Disponibilidade indefinida";
   }
@@ -4818,14 +4937,14 @@ function getAdminAvailabilityLabel(task: AdminAffiliateQueueItem) {
     case "out_of_stock":
       return "Sem estoque";
     case "preorder":
-      return "Pre-venda";
+      return "Pré-venda";
     default:
       return "Indefinida";
   }
 }
 
 function formatCurrency(value: number | null | undefined, currency: string) {
-  if (value == null) return "Sem preco";
+  if (value == null) return "Sem preço";
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value);
 }
 
@@ -4916,7 +5035,7 @@ function getErrorMessage(error: unknown) {
   }
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "Nao foi possivel concluir a operacao.";
+  return "Não foi possível concluir a operação.";
 }
 
 function isLocalWish(wish: LocalWish | DbWish): wish is LocalWish {

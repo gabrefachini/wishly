@@ -1497,6 +1497,8 @@ button:disabled {
 .hero-actions,
 .field-row {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
@@ -1505,17 +1507,18 @@ button:disabled {
   align-items: center;
   gap: 8px;
   width: fit-content;
-  margin-top: 2px;
-  margin-bottom: 8px;
   padding: 10px 14px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  align-self: start;
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   font-weight: 800;
   backdrop-filter: blur(10px);
+}
+
+.hero-actions .hero-edit-button {
+  margin-left: 4px;
 }
 
 .hero-edit-button:hover {
