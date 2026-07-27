@@ -742,7 +742,7 @@ function App() {
       setProfileForm((current) => ({ ...current, avatarUrl: preview }));
       setSyncError("");
     } catch {
-      setSyncError("Não foi possível carregar a imagem agora.");
+      setSyncError("Não foi possível carregar a imagem agora. Use JPG, PNG, WebP, HEIC ou HEIF.");
     }
   }
 
@@ -1902,7 +1902,7 @@ function App() {
       <input
         ref={avatarInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         className="hidden-file-input"
         onChange={(event) => void handleAvatarSelected(event.target.files)}
       />

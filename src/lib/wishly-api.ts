@@ -5,6 +5,9 @@ import {
   mapAutofillStatusToExtractionStatus,
 } from "./product-autofill";
 
+const SUPPORTED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const CONVERTIBLE_AVATAR_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+
 export type DbWish = {
   id: string;
   wishlist_id: string;
@@ -335,13 +338,14 @@ export async function updateViewerProfile(input: { fullName: string; avatarFile?
   let avatarUrl = typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : null;
 
   if (input.avatarFile) {
-    const extension = input.avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const avatarFile = await normalizeAvatarFile(input.avatarFile);
+    const extension = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
     const bucket = import.meta.env.VITE_SUPABASE_AVATAR_BUCKET || "avatars";
     const path = `${user.id}/avatar.${extension}`;
-    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, input.avatarFile, {
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, avatarFile, {
       cacheControl: "3600",
       upsert: true,
-      contentType: input.avatarFile.type || undefined,
+      contentType: avatarFile.type || undefined,
     });
 
     if (uploadError) throw uploadError;
@@ -363,6 +367,67 @@ export async function updateViewerProfile(input: { fullName: string; avatarFile?
   if (error) throw error;
 
   return data.user;
+}
+
+async function normalizeAvatarFile(file: File) {
+  if (SUPPORTED_AVATAR_MIME_TYPES.has(file.type)) {
+    return file;
+  }
+
+  if (!CONVERTIBLE_AVATAR_MIME_TYPES.has(file.type)) {
+    throw new Error("Formato de imagem nao suportado. Use JPG, PNG, WebP, HEIC ou HEIF.");
+  }
+
+  const rasterized = await rasterizeAvatarToJpeg(file);
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "avatar";
+  return new File([rasterized], `${baseName}.jpg`, {
+    type: "image/jpeg",
+    lastModified: file.lastModified,
+  });
+}
+
+function rasterizeAvatarToJpeg(file: File) {
+  return new Promise<Blob>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth || image.width;
+      canvas.height = image.naturalHeight || image.height;
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Nao foi possivel processar a foto de perfil."));
+        return;
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0);
+
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) {
+            reject(new Error("Nao foi possivel converter a foto de perfil."));
+            return;
+          }
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.92,
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Nao foi possivel carregar a foto de perfil."));
+    };
+
+    image.src = objectUrl;
+  });
 }
 
 export async function updateViewerEmail(email: string) {
