@@ -197,6 +197,17 @@ export async function signInWithPassword(email: string, password: string) {
   return data;
 }
 
+export async function resetPasswordForEmail(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+
+  if (error) throw error;
+}
+
 export async function signUpWithPassword(input: { email: string; password: string; fullName?: string }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");

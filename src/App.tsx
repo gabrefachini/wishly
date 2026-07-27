@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   CreditCard,
   ExternalLink,
+  Eye,
+  EyeOff,
   Gift,
   Heart,
   Home,
@@ -48,6 +50,7 @@ import {
   loadWishlistGifts,
   getMercadoLivreAuthorizationUrl,
   signInWithPassword,
+  resetPasswordForEmail,
   signUpWithPassword,
   signOut,
   supabaseEnabled,
@@ -92,6 +95,7 @@ type View =
   | "admin";
 type Priority = "Alta" | "Media" | "Baixa";
 type AuthPanelMode = "create" | "login";
+type AuthSubmitState = "idle" | "submitting" | "success" | "error";
 type LocalSource = "mercado_livre" | "amazon" | "shopee" | "magalu" | "unknown";
 type LocalAffiliateStatus = "not_generated" | "generated" | "invalid" | "unavailable";
 type LocalAffiliateTaskStatus = "pending" | "completed" | "invalid" | "unavailable";
@@ -210,6 +214,29 @@ type PrivacyFormState = {
   defaultListVisibility: "public" | "private";
   deleteConfirmText: string;
 };
+
+const AUTH_REQUEST_TIMEOUT_MS = 15_000;
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function trackAuthEvent(event: "login_started" | "login_success" | "login_failed" | "login_timeout" | "password_recovery_requested") {
+  window.dispatchEvent(new CustomEvent("wishly:auth", { detail: { event } }));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error("A solicitação demorou mais que o esperado. Verifique sua conexão e tente novamente.")), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
 
 const images = {
   avatar:
@@ -333,6 +360,7 @@ function App() {
   const [view, setView] = useState<View>("home");
   const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
   const [tracked, setTracked] = useState<number[]>(() => readLocalState("wishly-tracked", [1, 3]));
+  const [localListTitle, setLocalListTitle] = useState(localListName);
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "light";
     return window.localStorage.getItem("wishly-theme") === "dark" ? "dark" : "light";
@@ -380,6 +408,7 @@ function App() {
     confirmPassword: "",
   });
   const [authMessage, setAuthMessage] = useState("");
+  const [authSubmitState, setAuthSubmitState] = useState<AuthSubmitState>("idle");
   const [authPanelMode, setAuthPanelMode] = useState<AuthPanelMode>("login");
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -414,7 +443,7 @@ function App() {
   const title = useMemo(() => {
     if (view === "home") return "";
     if (view === "create_list") return "Criar lista";
-    if (view === "list") return currentListTitle(remote, isRemoteMode);
+    if (view === "list") return currentListTitle(remote, isRemoteMode, localListTitle);
     if (view === "add") return "Adicionar desejo";
     if (view === "radar") return "Radar de precos";
     if (view === "activity") return "Atividade";
@@ -424,7 +453,7 @@ function App() {
     if (view === "checkout") return "Finalizar assinatura";
     if (view === "admin") return "Fila de afiliados";
     return "Assinatura confirmada";
-  }, [view, remote, isRemoteMode]);
+  }, [view, remote, isRemoteMode, localListTitle]);
 
   const localPendingTasks = useMemo(
     () => localAffiliateTasks.filter((task) => task.status === "pending"),
@@ -445,6 +474,7 @@ function App() {
     setAuthPanelMode("create");
     setAuthMessage("");
     setSyncError("");
+    setAuthSubmitState("idle");
     window.localStorage.setItem(POST_AUTH_VIEW_KEY, "create_list");
   }
 
@@ -452,12 +482,14 @@ function App() {
     setAuthPanelMode("login");
     setAuthMessage("");
     setSyncError("");
+    setAuthSubmitState("idle");
     window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
   }
 
   function resetAuthFlow() {
     setAuthMessage("");
     setSyncError("");
+    setAuthSubmitState("idle");
     setAuthForm({
       fullName: "",
       email: "",
@@ -467,6 +499,8 @@ function App() {
   }
 
   function updateAuthField<K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) {
+    setSyncError("");
+    setAuthSubmitState("idle");
     setAuthForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -550,8 +584,8 @@ function App() {
 
     const shareUrl = buildPublicShareUrl(activeShareId);
     const shareTitle = isRemoteMode
-      ? currentListTitle(remote, isRemoteMode)
-      : localListName;
+      ? currentListTitle(remote, isRemoteMode, localListTitle)
+      : localListTitle;
 
     try {
       if (navigator.share) {
@@ -866,14 +900,22 @@ function App() {
           gifts,
         }));
         setCreateListForm({ title: "" });
+        setAuthMessage("");
         go("add");
         return;
       } catch (error) {
-        setSyncError(getErrorMessage(error));
+        console.warn("[Wishly] remote list creation failed, falling back to local flow", error);
       } finally {
         setSyncing(false);
       }
     }
+
+    setLocalListTitle(fallbackTitle);
+    setCreateListForm({ title: "" });
+    setAuthMessage("");
+    setSyncError("");
+    window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+    go("add");
   }
 
   async function handleRemoteAdminUpdate(giftId: string, status: "generated" | "failed" | "fallback") {
@@ -948,16 +990,25 @@ function App() {
   }
 
   async function handleSubmitAuth() {
+    if (syncing) return;
+
     try {
+      setSyncing(true);
       setAuthMessage("");
       setSyncError("");
+      setAuthSubmitState("submitting");
+      trackAuthEvent("login_started");
 
       const email = authForm.email.trim();
-      const password = authForm.password.trim();
+      const password = authForm.password;
       const fullName = authForm.fullName.trim();
 
       if (!email || !password) {
         throw new Error("Preencha e-mail e senha para continuar.");
+      }
+
+      if (!isValidEmail(email)) {
+        throw new Error("Digite um e-mail válido para continuar.");
       }
 
       if (authPanelMode === "create") {
@@ -973,21 +1024,54 @@ function App() {
           throw new Error("A confirmacao da senha nao confere.");
         }
 
-        const result = await signUpWithPassword({
+        const result = await withTimeout(signUpWithPassword({
           email,
           password,
           fullName,
-        });
+        }), AUTH_REQUEST_TIMEOUT_MS);
 
         if (!result.session) {
           setAuthMessage(`Conta criada para ${email}. Confirme seu e-mail para entrar e criar sua lista.`);
         }
+        trackAuthEvent("login_success");
+        setAuthSubmitState("success");
         return;
       }
 
-      await signInWithPassword(email, password);
+      await withTimeout(signInWithPassword(email, password), AUTH_REQUEST_TIMEOUT_MS);
+      trackAuthEvent("login_success");
+      setAuthSubmitState("success");
+    } catch (error) {
+      trackAuthEvent(error instanceof Error && error.message.includes("demorou") ? "login_timeout" : "login_failed");
+      setSyncError(getErrorMessage(error));
+      setAuthSubmitState("error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (syncing) return;
+
+    try {
+      setSyncing(true);
+      setAuthMessage("");
+      setSyncError("");
+      const email = authForm.email.trim();
+
+      if (!isValidEmail(email)) {
+        throw new Error("Digite seu e-mail para receber o link de recuperação.");
+      }
+
+      await withTimeout(resetPasswordForEmail(email), AUTH_REQUEST_TIMEOUT_MS);
+      trackAuthEvent("password_recovery_requested");
+      setAuthMessage("Se esse e-mail estiver cadastrado, enviaremos um link para criar uma nova senha.");
+      setAuthSubmitState("success");
     } catch (error) {
       setSyncError(getErrorMessage(error));
+      setAuthSubmitState("error");
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -1537,16 +1621,19 @@ function App() {
   return (
     <div className={`app-shell ${isMarketingMode ? "marketing-shell" : ""} ${isDesktopFlowMode ? "desktop-flow-shell" : ""}`} data-theme={theme}>
       {isMarketingMode ? (
-        <MarketingHomePage
-          authForm={authForm}
-          authMessage={authMessage}
+          <MarketingHomePage
+            authForm={authForm}
+            authMessage={authMessage}
+            authError={isMarketingMode ? syncError : ""}
+            authSubmitState={authSubmitState}
           authPanelMode={authPanelMode}
           marketingMenuOpen={marketingMenuOpen}
           onCreateList={beginCreateListFlow}
           onLogin={beginLoginFlow}
           onOpenListDemo={() => go("list")}
           onResetAuthFlow={resetAuthFlow}
-          onSubmitAuth={() => void handleSubmitAuth()}
+            onSubmitAuth={() => void handleSubmitAuth()}
+            onForgotPassword={() => void handleForgotPassword()}
           onSetAuthField={updateAuthField}
           onToggleMenu={() => setMarketingMenuOpen((current) => !current)}
           syncing={syncing}
@@ -1621,6 +1708,7 @@ function App() {
             onLogin={beginLoginFlow}
             authPanelMode={authPanelMode}
             onSubmitAuth={handleSubmitAuth}
+            onForgotPassword={() => void handleForgotPassword()}
             syncing={syncing}
           />
         )}
@@ -1639,7 +1727,7 @@ function App() {
             tracked={tracked}
             setTracked={setTracked}
             wishes={currentWishes}
-            wishlistTitle={currentListTitle(remote, isRemoteMode)}
+            wishlistTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
             wishlists={remote.wishlists}
             selectedWishlistId={remote.selectedWishlistId}
             isRemoteMode={isRemoteMode}
@@ -1719,7 +1807,7 @@ function App() {
       </main>
 
       {showFab && (
-        <button className="fab" type="button" onClick={() => go(view === "home" ? "list" : "add")}>
+        <button className="fab" type="button" onClick={() => go(view === "home" ? "create_list" : "add")}>
           <Plus size={19} />
           <span>{view === "home" ? "CRIAR NOVA LISTA" : "ADICIONAR DESEJO"}</span>
         </button>
@@ -1740,6 +1828,8 @@ function App() {
 function MarketingHomePage({
   authForm,
   authMessage,
+  authError,
+  authSubmitState,
   authPanelMode,
   marketingMenuOpen,
   onCreateList,
@@ -1748,11 +1838,14 @@ function MarketingHomePage({
   onResetAuthFlow,
   onSetAuthField,
   onSubmitAuth,
+  onForgotPassword,
   onToggleMenu,
   syncing,
 }: {
   authForm: AuthFormState;
   authMessage: string;
+  authError: string;
+  authSubmitState: AuthSubmitState;
   authPanelMode: AuthPanelMode;
   marketingMenuOpen: boolean;
   onCreateList: () => void;
@@ -1761,10 +1854,12 @@ function MarketingHomePage({
   onResetAuthFlow: () => void;
   onSetAuthField: <K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) => void;
   onSubmitAuth: () => void;
+  onForgotPassword: () => void;
   onToggleMenu: () => void;
   syncing: boolean;
 }) {
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
+  const authBusy = syncing || authSubmitState === "submitting";
   const marketingImages = {
     heroCover:
       "https://media.architecturaldigest.com/photos/6879507ebb0032785eb73ee6/4%3A3/w_1600%2Cc_limit/41.%2520Hamptons%2520Modern%2520by%2520Chango%2520%26%2520Co.%2520-%2520Nursery%2520with%2520Glider%2520Detail.jpg",
@@ -1934,6 +2029,7 @@ function MarketingHomePage({
       {authPanelOpen ? (
         <div className="marketing-login-band" id="login-panel">
         <div className="marketing-login-card">
+            {authError && <div className="auth-feedback error" role="alert" aria-live="polite">{authError}</div>}
             {authMessage ? (
               <>
                 <div className="marketing-login-copy">
@@ -1965,7 +2061,13 @@ function MarketingHomePage({
                       : "Use seu e-mail e senha para acessar suas listas e continuar de onde parou."}
                   </p>
                 </div>
-                <div className="marketing-login-form">
+                <form
+                  className="marketing-login-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    onSubmitAuth();
+                  }}
+                >
                   {authPanelMode === "create" && (
                     <Field
                       label="Nome"
@@ -2002,20 +2104,25 @@ function MarketingHomePage({
                   )}
                   <button
                     className="primary-button full"
-                    type="button"
-                    onClick={onSubmitAuth}
-                    disabled={!authForm.email.trim() || !authForm.password.trim() || syncing}
+                    type="submit"
+                    disabled={!authForm.email.trim() || !authForm.password || authBusy}
                   >
-                    {syncing ? "Enviando..." : authPanelMode === "create" ? "Criar conta" : "Entrar"}
+                    {authBusy ? "Entrando..." : authPanelMode === "create" ? "Criar conta" : "Entrar"}
                   </button>
+                  {authPanelMode === "login" && (
+                    <button className="text-button auth-switch-button" type="button" onClick={onForgotPassword} disabled={authBusy}>
+                      Esqueci minha senha
+                    </button>
+                  )}
                   <button
                     className="text-button auth-switch-button"
                     type="button"
                     onClick={authPanelMode === "create" ? openLoginPanel : openCreateAccountPanel}
+                    disabled={authBusy}
                   >
                     {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
                   </button>
-                </div>
+                </form>
               </>
             )}
           </div>
@@ -2305,6 +2412,7 @@ function HomeScreen({
   onLogin,
   authPanelMode,
   onSubmitAuth,
+  onForgotPassword,
   syncing,
 }: {
   go: (view: View) => void;
@@ -2316,6 +2424,7 @@ function HomeScreen({
   onLogin: () => void;
   authPanelMode: AuthPanelMode;
   onSubmitAuth: () => void;
+  onForgotPassword: () => void;
   syncing: boolean;
 }) {
   return (
@@ -2351,7 +2460,13 @@ function HomeScreen({
                   ? "Cadastre seus dados para criar a primeira lista."
                   : "Use seu e-mail e senha para voltar para suas listas."}
               </p>
-              <div className="auth-inline">
+              <form
+                className="auth-inline"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSubmitAuth();
+                }}
+              >
                 {authPanelMode === "create" && (
                   <Field
                     label="Nome"
@@ -2388,16 +2503,20 @@ function HomeScreen({
                 )}
                 <button
                   className="primary-button full"
-                  type="button"
-                  onClick={onSubmitAuth}
-                  disabled={!authForm.email.trim() || !authForm.password.trim() || syncing}
+                  type="submit"
+                  disabled={!authForm.email.trim() || !authForm.password || syncing}
                 >
                   {syncing ? "Enviando..." : authPanelMode === "create" ? "Criar conta" : "Entrar"}
                 </button>
+                {authPanelMode === "login" && (
+                  <button className="text-button auth-switch-button" type="button" onClick={onForgotPassword} disabled={syncing}>
+                    Esqueci minha senha
+                  </button>
+                )}
                 <button className="text-button auth-switch-button" type="button" onClick={authPanelMode === "create" ? onLogin : onCreateList}>
                   {authPanelMode === "create" ? "Ja tenho conta" : "Criar conta"}
                 </button>
-              </div>
+              </form>
             </div>
           </section>
         )}
@@ -3877,9 +3996,13 @@ function WishCard({
   onTrack: () => void;
   onBuy: () => void;
 }) {
+  const isMercadoLivre = getWishProvider(wish) === "mercado_livre";
+
   return (
-    <article className="wish-card">
-      <img src={getWishImage(wish)} alt="" />
+    <article className={`wish-card${isMercadoLivre ? " wish-card--marketplace" : ""}`}>
+      <div className="wish-card-media">
+        <img src={getWishImage(wish)} alt="" className={isMercadoLivre ? "wish-card-marketplace-image" : ""} />
+      </div>
       <div className="wish-copy">
         <div>
           <h3>{getWishTitle(wish)}</h3>
@@ -3951,6 +4074,9 @@ function Field({
   inputType?: string;
   autoComplete?: string;
 }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPassword = inputType === "password";
+
   return (
     <label className="field">
       <span className="field-label">{label}</span>
@@ -3960,13 +4086,24 @@ function Field({
           <textarea placeholder={placeholder} rows={4} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
         ) : (
           <input
-            type={inputType ?? "text"}
+            type={isPassword && passwordVisible ? "text" : inputType ?? "text"}
             placeholder={placeholder}
             value={value}
             onChange={(event) => onChange(event.target.value)}
             disabled={disabled}
             autoComplete={autoComplete}
           />
+        )}
+        {isPassword && (
+          <button
+            className="password-toggle"
+            type="button"
+            onClick={() => setPasswordVisible((current) => !current)}
+            aria-label={passwordVisible ? "Ocultar senha" : "Mostrar senha"}
+            aria-pressed={passwordVisible}
+          >
+            {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         )}
       </span>
     </label>
@@ -4130,13 +4267,13 @@ function mapPriorityToDb(priority: Priority): DbWish["priority"] {
   return "surprise_me";
 }
 
-function buildLocalPublicWishlist(shareId: string, wishes: LocalWish[]): PublicWishlist | null {
+function buildLocalPublicWishlist(shareId: string, wishes: LocalWish[], title = localListName): PublicWishlist | null {
   if (shareId !== localListId) return null;
 
   return {
     id: localListId,
     share_id: localListId,
-    title: localListName,
+    title,
     occasion: "Casa nova",
     event_date: null,
     message: "Uma selecao de desejos para montar a casa nova com calma.",
@@ -4172,8 +4309,8 @@ function parsePriceValue(price: string) {
   return Number.isFinite(value) ? value : null;
 }
 
-function currentListTitle(remote: ViewerState, isRemoteMode: boolean) {
-  if (!isRemoteMode) return localListName;
+function currentListTitle(remote: ViewerState, isRemoteMode: boolean, localTitle: string) {
+  if (!isRemoteMode) return localTitle;
   return remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.title ?? "Sua lista";
 }
 
@@ -4205,6 +4342,16 @@ function getWishPrice(wish: LocalWish | DbWish) {
 
 function getWishCurrency(wish: LocalWish | DbWish) {
   return "currency" in wish ? wish.currency || "BRL" : "BRL";
+}
+
+function getWishProvider(wish: LocalWish | DbWish) {
+  if ("source" in wish && wish.source) {
+    return wish.source;
+  }
+  if ("provider" in wish) {
+    return wish.provider ?? null;
+  }
+  return null;
 }
 
 function getWishImage(wish: LocalWish | DbWish) {
@@ -4527,13 +4674,36 @@ function detectMarketplace(hostname: string, pathname: string): LocalSource {
 function getErrorMessage(error: unknown) {
   if (typeof error === "object" && error && "message" in error && typeof error.message === "string") {
     const supabaseError = error as { message: string; code?: string; details?: string | null; hint?: string | null };
-    console.error("[Wishly] UI error", {
+    const normalized = `${supabaseError.code ?? ""} ${supabaseError.message}`.toLowerCase();
+    const expectedAuthFailure =
+      normalized.includes("invalid login credentials") ||
+      normalized.includes("invalid_credentials") ||
+      normalized.includes("email not confirmed") ||
+      normalized.includes("email_not_confirmed") ||
+      normalized.includes("too many requests") ||
+      normalized.includes("rate limit") ||
+      normalized.includes("over_email_send_rate_limit");
+    const logPayload = {
       code: supabaseError.code ?? null,
       message: supabaseError.message,
       details: supabaseError.details ?? null,
       hint: supabaseError.hint ?? null,
-    });
-    return supabaseError.message;
+    };
+    if (expectedAuthFailure) console.warn("[Wishly] Auth flow rejected", logPayload);
+    else console.error("[Wishly] UI error", logPayload);
+    if (normalized.includes("invalid login credentials") || normalized.includes("invalid_credentials")) {
+      return "E-mail ou senha incorretos. Confira os dados e tente novamente.";
+    }
+    if (normalized.includes("email not confirmed") || normalized.includes("email_not_confirmed")) {
+      return "Confirme seu e-mail antes de entrar. Se precisar, solicite um novo link de confirmação.";
+    }
+    if (normalized.includes("too many requests") || normalized.includes("rate limit") || normalized.includes("over_email_send_rate_limit")) {
+      return "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+    }
+    if (normalized.includes("network") || normalized.includes("fetch")) {
+      return "Não conseguimos conectar agora. Verifique sua internet e tente novamente.";
+    }
+    return "Não foi possível concluir o acesso. Tente novamente.";
   }
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
