@@ -1,6 +1,7 @@
 export const MERCADO_LIVRE_WARNING_CODES = [
   "meli_item_id_not_found",
   "meli_user_product_detected",
+  "meli_user_product_api_failed",
   "meli_catalog_product_detected",
   "meli_catalog_api_failed",
   "meli_catalog_items_api_failed",
@@ -9,6 +10,7 @@ export const MERCADO_LIVRE_WARNING_CODES = [
   "meli_price_not_found",
   "meli_variation_not_found",
   "meli_description_failed",
+  "meli_title_from_url",
 ];
 
 const USER_PRODUCT_PATTERN = /\b(MLBU\d{6,})\b/i;
@@ -221,6 +223,33 @@ function parseMoneyToCents(value) {
   const decimal = normalized.includes(",") ? normalized.replace(/\./g, "").replace(",", ".") : normalized;
   const amount = Number(decimal);
   return Number.isFinite(amount) ? Math.round(amount * 100) : null;
+}
+
+function getTitleFromProductSlug(url) {
+  const markerIndex = url.pathname.search(/\/(?:up|p)\//i);
+  const rawSlug = markerIndex > 0
+    ? url.pathname.slice(0, markerIndex).split("/").filter(Boolean).at(-1)
+    : null;
+
+  if (!rawSlug) return null;
+
+  const decoded = decodeURIComponent(rawSlug)
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!decoded || isGenericMarketplaceTitle(decoded)) return null;
+
+  return decoded
+    .split(" ")
+    .map((word, index) => {
+      if (/^\d/.test(word) || /^[A-Z0-9]{2,}$/.test(word)) return word;
+      if (index > 0 && /^(a|as|com|da|das|de|do|dos|e|em|para|por)$/i.test(word)) {
+        return word.toLowerCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
 }
 
 function toAvailability(value) {
@@ -461,6 +490,19 @@ function pickPriceFromPricesApi(pricesPayload, variationId) {
   };
 }
 
+function pickPriceFromSalePriceApi(salePricePayload) {
+  if (!salePricePayload || salePricePayload.amount == null) {
+    return null;
+  }
+
+  return {
+    currentPriceInCents: parseMoneyToCents(salePricePayload.amount),
+    originalPriceInCents: parseMoneyToCents(salePricePayload.regular_amount ?? null),
+    currency: salePricePayload.currency_id ?? null,
+    priceSource: "meli_sale_price_api",
+  };
+}
+
 function selectVariation(itemPayload, variationId) {
   if (!variationId || !Array.isArray(itemPayload?.variations) || itemPayload.variations.length === 0) {
     return null;
@@ -607,6 +649,64 @@ function getEssentialFieldsFromCatalogItems(itemsPayload, preferredItemId, signa
   };
 }
 
+function getUserProductPictureUrls(userProductPayload) {
+  const pictures = Array.isArray(userProductPayload?.pictures)
+    ? userProductPayload.pictures
+    : Array.isArray(userProductPayload?.images)
+      ? userProductPayload.images
+      : [];
+
+  return pictures
+    .map((picture) => (
+      typeof picture === "string"
+        ? picture
+        : picture?.secure_url ?? picture?.url ?? picture?.src
+    ))
+    .filter(Boolean)
+    .filter((pictureUrl) => !isBrandImageUrl(pictureUrl));
+}
+
+function getEssentialFieldsFromUserProduct(userProductPayload, signals) {
+  const itemCandidates = [
+    ...(Array.isArray(userProductPayload?.items) ? userProductPayload.items : []),
+    ...(Array.isArray(userProductPayload?.conditions) ? userProductPayload.conditions : []),
+  ];
+  const preferredItem =
+    itemCandidates.find((entry) => normalizeMercadoLivreItemId(entry?.id ?? entry?.item_id) === signals.itemId) ??
+    itemCandidates.find((entry) => entry?.price != null) ??
+    null;
+  const currentPriceInCents = parseMoneyToCents(
+    preferredItem?.price ??
+    userProductPayload?.price ??
+    null,
+  );
+
+  return {
+    itemId: normalizeMercadoLivreItemId(preferredItem?.id ?? preferredItem?.item_id) ?? signals.itemId,
+    title:
+      userProductPayload?.name ??
+      userProductPayload?.family_name ??
+      signals.title ??
+      null,
+    imageUrls: getUserProductPictureUrls(userProductPayload),
+    currentPriceInCents,
+    originalPriceInCents: parseMoneyToCents(
+      preferredItem?.original_price ??
+      userProductPayload?.original_price ??
+      null,
+    ),
+    currency: preferredItem?.currency_id ?? userProductPayload?.currency_id ?? signals.currency ?? "BRL",
+    availability:
+      preferredItem?.available_quantity != null
+        ? preferredItem.available_quantity > 0
+          ? "in_stock"
+          : "out_of_stock"
+        : signals.availability,
+    selectedVariant: mapItemAttributes(userProductPayload),
+    priceSource: currentPriceInCents != null ? "meli_user_product" : null,
+  };
+}
+
 function withMercadoLivreProvider(result) {
   return {
     ...result,
@@ -623,6 +723,7 @@ function buildObservability(signals, steps, state) {
     itemId: signals.itemId,
     variationId: signals.variationId,
     providerMatched: "mercado_livre",
+    userProductApiStatus: state.userProductApiStatus,
     itemApiStatus: state.itemApiStatus,
     catalogApiStatus: state.catalogApiStatus,
     catalogItemsApiStatus: state.catalogItemsApiStatus,
@@ -751,6 +852,7 @@ export async function extractMercadoLivreProduct({
   });
 
   const state = {
+    userProductApiStatus: "skipped",
     catalogApiStatus: "skipped",
     catalogItemsApiStatus: "skipped",
     itemApiStatus: "skipped",
@@ -782,6 +884,42 @@ export async function extractMercadoLivreProduct({
         html: htmlBody,
       });
       applySignalsToResult(result, signals, state);
+    }
+  }
+
+  if (signals.resourceType === "user_product" && signals.userProductId) {
+    try {
+      const userProductPayload = await withStepTiming(steps, "mercado_livre_user_product_api", () =>
+        fetchJson(`https://api.mercadolibre.com/user-products/${signals.userProductId}`, timeoutMs),
+      );
+      const userProductFields = getEssentialFieldsFromUserProduct(userProductPayload, signals);
+      state.userProductApiStatus = "success";
+      signals = {
+        ...signals,
+        itemId: userProductFields.itemId ?? signals.itemId,
+        title: userProductFields.title ?? signals.title,
+        imageUrls: userProductFields.imageUrls.length > 0
+          ? userProductFields.imageUrls
+          : signals.imageUrls,
+        currentPriceInCents: userProductFields.currentPriceInCents ?? signals.currentPriceInCents,
+        originalPriceInCents: userProductFields.originalPriceInCents ?? signals.originalPriceInCents,
+        currency: userProductFields.currency ?? signals.currency,
+        availability: userProductFields.availability ?? signals.availability,
+      };
+      applySignalsToResult(result, signals, state);
+      result.externalProductId = signals.itemId ?? signals.userProductId ?? result.externalProductId;
+      result.selectedVariant = userProductFields.selectedVariant;
+      result.confidence = {
+        ...result.confidence,
+        title: result.title ? 0.98 : result.confidence.title,
+        image: result.imageUrl ? 0.98 : result.confidence.image,
+        price: result.currentPriceInCents != null ? 0.9 : result.confidence.price,
+        variant: result.selectedVariant.length > 0 ? 0.8 : result.confidence.variant,
+      };
+      state.priceSource = userProductFields.priceSource ?? state.priceSource;
+    } catch (error) {
+      state.userProductApiStatus = getErrorStatus(error);
+      warnings.push("meli_user_product_api_failed");
     }
   }
 
@@ -881,9 +1019,27 @@ export async function extractMercadoLivreProduct({
   const itemPromise = withStepTiming(steps, "mercado_livre_item_api", () =>
     fetchJson(`https://api.mercadolibre.com/items/${signals.itemId}`, timeoutMs),
   );
-  const pricePromise = withStepTiming(steps, "mercado_livre_price_api", () =>
-    fetchJson(`https://api.mercadolibre.com/items/${signals.itemId}/prices`, timeoutMs),
-  );
+  const pricePromise = withStepTiming(steps, "mercado_livre_price_api", async () => {
+    try {
+      const salePricePayload = await fetchJson(
+        `https://api.mercadolibre.com/items/${signals.itemId}/sale_price?context=channel_marketplace`,
+        timeoutMs,
+      );
+      return {
+        kind: "sale_price",
+        payload: salePricePayload,
+      };
+    } catch {
+      const legacyPricesPayload = await fetchJson(
+        `https://api.mercadolibre.com/items/${signals.itemId}/prices`,
+        timeoutMs,
+      );
+      return {
+        kind: "prices",
+        payload: legacyPricesPayload,
+      };
+    }
+  });
 
   const [itemSettled, priceSettled, htmlSettled] = await Promise.allSettled([itemPromise, pricePromise, htmlPromise]);
   let itemPayload = itemSettled.status === "fulfilled" ? itemSettled.value : null;
@@ -945,6 +1101,19 @@ export async function extractMercadoLivreProduct({
     warnings.push("meli_price_api_failed");
   }
 
+  const priceFields =
+    pricePayload?.kind === "sale_price"
+      ? pickPriceFromSalePriceApi(pricePayload.payload)
+      : pickPriceFromPricesApi(pricePayload?.payload, signals.variationId);
+
+  if (priceFields?.currentPriceInCents != null) {
+    result.currentPriceInCents = priceFields.currentPriceInCents;
+    result.originalPriceInCents = priceFields.originalPriceInCents;
+    result.currency = priceFields.currency ?? result.currency;
+    result.confidence.price = 0.99;
+    state.priceSource = priceFields.priceSource;
+  }
+
   if (!itemPayload && signals.itemId) {
     const itemPageSignals = await resolveMercadoLivreItemPageFallback({
       ensureHtml,
@@ -978,7 +1147,6 @@ export async function extractMercadoLivreProduct({
 
   if (itemPayload) {
     const itemFields = getEssentialFieldsFromItem(itemPayload, selectedVariation, signals);
-    const priceFields = pickPriceFromPricesApi(pricePayload, signals.variationId);
     const htmlPriceFields =
       signals.currentPriceInCents != null
         ? {
@@ -1015,6 +1183,15 @@ export async function extractMercadoLivreProduct({
 
   if (result.currentPriceInCents == null) {
     warnings.push("meli_price_not_found");
+  }
+
+  if (!result.title && signals.resourceType === "user_product") {
+    const slugTitle = getTitleFromProductSlug(requestUrl);
+    if (slugTitle) {
+      result.title = slugTitle;
+      result.confidence.title = 0.45;
+      warnings.push("meli_title_from_url");
+    }
   }
 
   const descriptionBudgetMs = Math.min(400, Math.max(0, timeoutMs - Object.values(steps).reduce((sum, value) => sum + value, 0)));

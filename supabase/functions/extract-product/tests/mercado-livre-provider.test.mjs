@@ -40,6 +40,21 @@ function createHarness(entry) {
       return fixture.descriptionResponse ?? {};
     }
 
+    if (url.includes("/sale_price?")) {
+      await sleep(entry.delays.price);
+      if (!fixture.pricesResponse) {
+        throw new Error("price_api_failed");
+      }
+      const promotion = fixture.pricesResponse.prices?.find((price) => price.type === "promotion");
+      const standard = fixture.pricesResponse.prices?.find((price) => price.type === "standard");
+      const selected = promotion ?? standard;
+      return {
+        amount: selected?.amount,
+        regular_amount: selected?.regular_amount ?? standard?.amount ?? null,
+        currency_id: selected?.currency_id ?? fixture.pricesResponse.currency_id ?? "BRL",
+      };
+    }
+
     if (url.endsWith("/prices")) {
       await sleep(entry.delays.price);
       if (!fixture.pricesResponse) {
@@ -242,6 +257,102 @@ test("MercadoLivreProvider preserves provider mercado_livre on catalog and user 
   assert.ok(userProductResult.result.warnings.includes("meli_user_product_detected"));
 });
 
+test("MercadoLivreProvider reads essential fields from the official User Product endpoint", async () => {
+  const requestedUrls = [];
+  const result = await extractMercadoLivreProduct({
+    originalUrl:
+      "https://www.mercadolivre.com.br/molinete-sougayilang-drag-de-carbono-6-rolamentos-verde/up/MLBU4209526596?pdp_filters=item_id:MLB7209635486",
+    resolvedUrl: new URL(
+      "https://www.mercadolivre.com.br/molinete-sougayilang-drag-de-carbono-6-rolamentos-verde/up/MLBU4209526596?pdp_filters=item_id:MLB7209635486",
+    ),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => "<html><head><title>Mercado Libre</title></head></html>",
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith("/user-products/MLBU4209526596")) {
+        return {
+          id: "MLBU4209526596",
+          name: "Molinete Sougayilang Drag de Carbono 6 Rolamentos Verde",
+          pictures: [
+            {
+              secure_url: "https://http2.mlstatic.com/D_NQ_NP_molinete.jpg",
+            },
+          ],
+          attributes: [
+            { name: "Cor", value_name: "Verde" },
+          ],
+          items: [
+            {
+              id: "MLB7209635486",
+              currency_id: "BRL",
+              available_quantity: 4,
+            },
+          ],
+        };
+      }
+      if (url.includes("/sale_price?context=channel_marketplace")) {
+        return {
+          amount: 329.9,
+          regular_amount: 399.9,
+          currency_id: "BRL",
+        };
+      }
+      if (url.endsWith("/prices")) {
+        throw new Error("http_403");
+      }
+      if (url.endsWith("/description")) {
+        return {};
+      }
+      throw new Error("http_403");
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.externalProductId, "MLB7209635486");
+  assert.equal(result.title, "Molinete Sougayilang Drag de Carbono 6 Rolamentos Verde");
+  assert.equal(result.imageUrl, "https://http2.mlstatic.com/D_NQ_NP_molinete.jpg");
+  assert.equal(result.currentPriceInCents, 32990);
+  assert.equal(result.originalPriceInCents, 39990);
+  assert.equal(result.partial, false);
+  assert.equal(result.priceSource, "meli_sale_price_api");
+  assert.equal(result.observability?.userProductApiStatus, "success");
+  assert.ok(requestedUrls.some((url) => url.endsWith("/user-products/MLBU4209526596")));
+});
+
+test("MercadoLivreProvider derives a reviewable title from a User Product URL when APIs are forbidden", async () => {
+  const result = await extractMercadoLivreProduct({
+    originalUrl:
+      "https://www.mercadolivre.com.br/molinete-sougayilang-drag-de-carbono-6-rolamentos-verde/up/MLBU4209526596?pdp_filters=item_id:MLB7209635486",
+    resolvedUrl: new URL(
+      "https://www.mercadolivre.com.br/molinete-sougayilang-drag-de-carbono-6-rolamentos-verde/up/MLBU4209526596?pdp_filters=item_id:MLB7209635486",
+    ),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => "<html><head><title>Mercado Libre</title></head></html>",
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      if (url.endsWith("/description")) return {};
+      throw new Error("http_403");
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.title, "Molinete Sougayilang Drag de Carbono 6 Rolamentos Verde");
+  assert.equal(result.imageUrl, null);
+  assert.equal(result.currentPriceInCents, null);
+  assert.equal(result.partial, true);
+  assert.ok(result.warnings.includes("meli_user_product_api_failed"));
+  assert.ok(result.warnings.includes("meli_title_from_url"));
+  assert.equal(result.confidence.title, 0.45);
+  assert.equal(result.observability?.userProductApiStatus, "http_403");
+});
+
 test("MercadoLivreProvider resolves catalog links from HTML before calling item API", async () => {
   const html = `
     <html>
@@ -283,17 +394,11 @@ test("MercadoLivreProvider resolves catalog links from HTML before calling item 
         throw new Error("catalog_api_unavailable");
       }
 
-      if (url.endsWith("/prices")) {
+      if (url.includes("/sale_price?")) {
         return {
-          prices: [
-            {
-              type: "promotion",
-              amount: 2199.9,
-              regular_amount: 2499.9,
-              currency_id: "BRL",
-              conditions: { context_restrictions: [] },
-            },
-          ],
+          amount: 2199.9,
+          regular_amount: 2499.9,
+          currency_id: "BRL",
         };
       }
 
@@ -499,17 +604,11 @@ test("MercadoLivreProvider keeps auth state in observability", async () => {
     `,
     withStepTiming: async (_steps, _label, task) => await task(),
     fetchJson: async (url) => {
-      if (url.endsWith("/prices")) {
+      if (url.includes("/sale_price?")) {
         return {
-          prices: [
-            {
-              type: "promotion",
-              amount: 189.9,
-              regular_amount: 229.9,
-              currency_id: "BRL",
-              conditions: { context_restrictions: [] },
-            },
-          ],
+          amount: 189.9,
+          regular_amount: 229.9,
+          currency_id: "BRL",
         };
       }
 
