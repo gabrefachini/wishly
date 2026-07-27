@@ -51,7 +51,7 @@ returns text
 language sql
 set search_path = public, pg_temp
 as $$
-  select lower(substr(encode(gen_random_bytes(9), 'hex'), 1, 14));
+  select lower(substr(encode(extensions.gen_random_bytes(9), 'hex'), 1, 14));
 $$;
 
 create or replace function public.set_updated_at()

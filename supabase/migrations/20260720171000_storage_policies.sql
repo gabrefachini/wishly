@@ -83,11 +83,15 @@ create policy "avatars_owner_delete"
   );
 
 drop policy if exists "wishlist_covers_public_read" on storage.objects;
-create policy "wishlist_covers_public_read"
+drop policy if exists "wishlist_covers_owner_select" on storage.objects;
+create policy "wishlist_covers_owner_select"
   on storage.objects
   for select
-  to public
-  using (bucket_id = 'wishlist-covers');
+  to authenticated
+  using (
+    bucket_id = 'wishlist-covers'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 drop policy if exists "wishlist_covers_owner_insert" on storage.objects;
 create policy "wishlist_covers_owner_insert"

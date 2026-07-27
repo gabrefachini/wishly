@@ -7,6 +7,7 @@ import {
 
 const SUPPORTED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const CONVERTIBLE_AVATAR_MIME_TYPES = new Set(["image/heic", "image/heif"]);
+const SUPPORTED_WISHLIST_COVER_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export type DbWish = {
   id: string;
@@ -229,41 +230,124 @@ export async function signUpWithPassword(input: { email: string; password: strin
   return data;
 }
 
-export async function createWishlist(input: { title: string; coverImageUrl?: string | null }) {
+export async function createWishlist(input: { title: string; coverFile: File }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) throw new Error("Sua sessão expirou. Entre novamente para criar a lista.");
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (profileError) throw profileError;
+  if (!profile) throw new Error("Não foi possível localizar o perfil da sua conta.");
+
+  const wishlistId = crypto.randomUUID();
+  const uploadedCover = await uploadWishlistCover({
+    userId: user.id,
+    wishlistId,
+    file: input.coverFile,
+  });
 
   const { data, error } = await supabase
     .from("wishlists")
     .insert({
+      id: wishlistId,
+      owner_id: profile.id,
       title: input.title,
+      occasion: "Lista de desejos",
+      type: "wishlist",
+      locale: "pt-BR",
       share_id: `${slugify(input.title)}-${Math.random().toString(36).slice(2, 8)}`,
-      cover_image_url: input.coverImageUrl ?? null,
+      cover_image_url: uploadedCover.publicUrl,
     })
     .select("id, title, share_id, cover_image_url")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    await supabase.storage.from(uploadedCover.bucket).remove([uploadedCover.path]);
+    throw error;
+  }
 
   return data as DbWishlist;
 }
 
-export async function updateWishlistTitle(input: { wishlistId: string; title: string }) {
+export async function updateWishlistDetails(input: { wishlistId: string; title: string; coverFile?: File | null }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
+
+  let uploadedCover: Awaited<ReturnType<typeof uploadWishlistCover>> | null = null;
+
+  if (input.coverFile) {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) throw userError;
+    if (!user) throw new Error("Sua sessão expirou. Entre novamente para editar a lista.");
+
+    uploadedCover = await uploadWishlistCover({
+      userId: user.id,
+      wishlistId: input.wishlistId,
+      file: input.coverFile,
+    });
+  }
 
   const { data, error } = await supabase
     .from("wishlists")
     .update({
       title: input.title,
+      ...(uploadedCover ? { cover_image_url: uploadedCover.publicUrl } : {}),
     })
     .eq("id", input.wishlistId)
     .select("id, title, share_id, cover_image_url")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (uploadedCover) {
+      await supabase.storage.from(uploadedCover.bucket).remove([uploadedCover.path]);
+    }
+    throw error;
+  }
 
   return data as DbWishlist;
+}
+
+async function uploadWishlistCover(input: { userId: string; wishlistId: string; file: File }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  if (!SUPPORTED_WISHLIST_COVER_MIME_TYPES.has(input.file.type)) {
+    throw new Error("A capa precisa estar em JPG, PNG ou WebP.");
+  }
+
+  if (input.file.size > 6 * 1024 * 1024) {
+    throw new Error("A capa deve ter no máximo 6 MB.");
+  }
+
+  const extension = input.file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const bucket = import.meta.env.VITE_SUPABASE_WISHLIST_COVER_BUCKET || "wishlist-covers";
+  const path = `${input.userId}/${input.wishlistId}/cover-${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, input.file, {
+    cacheControl: "3600",
+    contentType: input.file.type,
+    upsert: false,
+  });
+
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return { bucket, path, publicUrl: data.publicUrl };
 }
 
 export async function signOut() {
@@ -655,7 +739,7 @@ export async function createGift(input: {
     description: input.description || null,
     store_url: input.storeUrl || null,
     image_url: input.imageUrl ?? null,
-    estimated_price: input.estimatedPriceInCents ?? null,
+    estimated_price: centsToCurrencyUnits(input.estimatedPriceInCents),
     priority: input.priority,
     currency: input.currency ?? "BRL",
     funding_currency: input.currency ?? "BRL",
@@ -672,8 +756,8 @@ export async function createGift(input: {
         availability: input.autofill.availability ?? "unknown",
         selected_variant: input.autofill.selectedVariant ?? [],
         image_urls: input.autofill.imageUrls ?? [],
-        current_price: input.autofill.currentPriceInCents ?? input.estimatedPriceInCents ?? null,
-        original_price: input.autofill.originalPriceInCents ?? null,
+        current_price: centsToCurrencyUnits(input.autofill.currentPriceInCents ?? input.estimatedPriceInCents),
+        original_price: centsToCurrencyUnits(input.autofill.originalPriceInCents),
         extracted_at: input.autofill.extractedAt ?? null,
         extraction_confidence: input.autofill.confidence ?? {},
         extraction_warnings: input.autofill.warnings ?? [],
@@ -730,12 +814,15 @@ export async function createGift(input: {
 
       if (extractionError && !isSchemaCompatibilityInsertError(extractionError)) {
         logSupabaseError("product_extractions.insert", extractionError, extractionInsert);
-        throw extractionError;
       }
     }
   }
 
   return data;
+}
+
+function centsToCurrencyUnits(value: number | null | undefined) {
+  return value == null ? null : value / 100;
 }
 
 export async function loadAdminAffiliateQueue() {

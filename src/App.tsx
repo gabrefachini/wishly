@@ -60,7 +60,7 @@ import {
   updateViewerPassword,
   updateViewerPreferences,
   updateViewerProfile,
-  updateWishlistTitle,
+  updateWishlistDetails,
   requestViewerAccountDeletion,
   updateRecoveredPassword,
   type AdminAccountDeletionRequest,
@@ -170,6 +170,8 @@ type ProductExtractionState = {
 
 type CreateListFormState = {
   title: string;
+  coverFile: File | null;
+  coverPreview: string | null;
 };
 
 type AuthFormState = {
@@ -382,6 +384,7 @@ function App() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
   const [tracked, setTracked] = useState<number[]>(() => readLocalState("wishly-tracked", [1, 3]));
   const [localListTitle, setLocalListTitle] = useState(localListName);
+  const [localListCoverUrl, setLocalListCoverUrl] = useState(images.home);
   const [createListMode, setCreateListMode] = useState<CreateListMode>("create");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "light";
@@ -403,7 +406,11 @@ function App() {
   });
   const addWishSubmissionLock = useRef(new WishSubmissionLock());
   const extractionRequestIdRef = useRef(0);
-  const [createListForm, setCreateListForm] = useState<CreateListFormState>({ title: "" });
+  const [createListForm, setCreateListForm] = useState<CreateListFormState>({
+    title: "",
+    coverFile: null,
+    coverPreview: null,
+  });
   const [profileForm, setProfileForm] = useState<ProfileFormState>(localProfileSeed);
   const [accessForm, setAccessForm] = useState<AccessFormState>({
     nextEmail: localProfileSeed.email,
@@ -624,7 +631,7 @@ function App() {
     setAuthMessage("");
     setSyncError("");
     setAuthSubmitState("idle");
-    setCreateListForm({ title: "" });
+    setCreateListForm({ title: "", coverFile: null, coverPreview: null });
     window.localStorage.setItem(POST_AUTH_VIEW_KEY, "create_list");
   }
 
@@ -640,11 +647,42 @@ function App() {
 
   function beginEditListFlow() {
     setCreateListMode("edit");
-    setCreateListForm({ title: isRemoteMode ? currentListTitle(remote, isRemoteMode, localListTitle) : localListTitle });
+    setCreateListForm({
+      title: isRemoteMode ? currentListTitle(remote, isRemoteMode, localListTitle) : localListTitle,
+      coverFile: null,
+      coverPreview: isRemoteMode ? currentListCover(remote, localListCoverUrl) : localListCoverUrl,
+    });
     setSyncError("");
     setAuthMessage("");
     setAuthSubmitState("idle");
     go("create_list");
+  }
+
+  async function handleListCoverSelected(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setSyncError("A capa precisa estar em JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (file.size > 6 * 1024 * 1024) {
+      setSyncError("A capa deve ter no máximo 6 MB.");
+      return;
+    }
+
+    try {
+      const preview = await readFileAsDataUrl(file);
+      setCreateListForm((current) => ({
+        ...current,
+        coverFile: file,
+        coverPreview: preview,
+      }));
+      setSyncError("");
+    } catch {
+      setSyncError("Não foi possível abrir essa imagem. Tente outra capa.");
+    }
   }
 
   function resetAuthFlow() {
@@ -996,11 +1034,18 @@ function App() {
               : undefined,
         });
 
-        await refreshRemoteState(session);
+        addWishSubmissionLock.current.finish(true);
+
+        try {
+          await refreshRemoteState(session);
+        } catch (refreshError) {
+          console.warn("[Wishly] gift saved but list refresh failed", refreshError);
+          setSyncError("O item foi salvo, mas a lista não atualizou agora. Recarregue a página para vê-lo.");
+        }
+
         setFormState(initialAddWishFormState);
         setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
         setSelectedPriority("Alta");
-        addWishSubmissionLock.current.finish(true);
         go("list");
         return;
       } catch (error) {
@@ -1059,16 +1104,27 @@ function App() {
   }
 
   async function handleCreateWishlist() {
-    const fallbackTitle = createListForm.title.trim() || "Minha lista";
+    const title = createListForm.title.trim();
+
+    if (!title) {
+      setSyncError("Escreva o nome da lista antes de salvar.");
+      return;
+    }
+
+    if (createListMode === "create" && !createListForm.coverFile) {
+      setSyncError("Envie uma imagem de capa para criar a lista.");
+      return;
+    }
 
     if (isRemoteMode) {
       if (createListMode === "edit" && remote.selectedWishlistId) {
         try {
           setSyncing(true);
           setSyncError("");
-          const updatedWishlist = await updateWishlistTitle({
+          const updatedWishlist = await updateWishlistDetails({
             wishlistId: remote.selectedWishlistId,
-            title: fallbackTitle,
+            title,
+            coverFile: createListForm.coverFile,
           });
           setRemote((current) => ({
             ...current,
@@ -1076,7 +1132,7 @@ function App() {
               wishlist.id === updatedWishlist.id ? updatedWishlist : wishlist,
             ),
           }));
-          setCreateListForm({ title: "" });
+          setCreateListForm({ title: "", coverFile: null, coverPreview: null });
           setAuthMessage("Lista atualizada.");
           setCreateListMode("create");
           go("list");
@@ -1092,7 +1148,10 @@ function App() {
       try {
         setSyncing(true);
         setSyncError("");
-        const wishlist = await createWishlist({ title: fallbackTitle });
+        const wishlist = await createWishlist({
+          title,
+          coverFile: createListForm.coverFile!,
+        });
         const gifts = await loadWishlistGifts(wishlist.id);
         setRemote((current) => ({
           ...current,
@@ -1100,20 +1159,24 @@ function App() {
           selectedWishlistId: wishlist.id,
           gifts,
         }));
-        setCreateListForm({ title: "" });
+        setCreateListForm({ title: "", coverFile: null, coverPreview: null });
         setAuthMessage("");
         setCreateListMode("create");
         go("add");
         return;
       } catch (error) {
-        console.warn("[Wishly] remote list creation failed, falling back to local flow", error);
+        setSyncError(getErrorMessage(error));
+        return;
       } finally {
         setSyncing(false);
       }
     }
 
-    setLocalListTitle(fallbackTitle);
-    setCreateListForm({ title: "" });
+    setLocalListTitle(title);
+    if (createListForm.coverPreview) {
+      setLocalListCoverUrl(createListForm.coverPreview);
+    }
+    setCreateListForm({ title: "", coverFile: null, coverPreview: null });
     setAuthMessage("");
     setSyncError("");
     setCreateListMode("create");
@@ -1991,7 +2054,8 @@ function App() {
           <CreateListScreen
             formState={createListForm}
             onBack={() => go(createListMode === "edit" ? "list" : "home")}
-            onChange={(title) => setCreateListForm({ title })}
+            onChange={(title) => setCreateListForm((current) => ({ ...current, title }))}
+            onSelectCover={(files) => void handleListCoverSelected(files)}
             onSubmit={() => void handleCreateWishlist()}
             syncing={syncing}
             mode={createListMode}
@@ -2004,6 +2068,7 @@ function App() {
             setTracked={setTracked}
             wishes={currentWishes}
             wishlistTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
+            wishlistCoverUrl={isRemoteMode ? currentListCover(remote, localListCoverUrl) : localListCoverUrl}
             wishlists={remote.wishlists}
             selectedWishlistId={remote.selectedWishlistId}
             isRemoteMode={isRemoteMode}
@@ -2894,6 +2959,7 @@ function CreateListScreen({
   formState,
   onBack,
   onChange,
+  onSelectCover,
   onSubmit,
   syncing,
   mode,
@@ -2901,6 +2967,7 @@ function CreateListScreen({
   formState: CreateListFormState;
   onBack: () => void;
   onChange: (title: string) => void;
+  onSelectCover: (files: FileList | null) => void;
   onSubmit: () => void;
   syncing: boolean;
   mode: CreateListMode;
@@ -2931,15 +2998,50 @@ function CreateListScreen({
           placeholder="Chá de bebê da Ana"
           value={formState.title}
           onChange={onChange}
+          maxLength={80}
         />
+
+        <label className={`cover-upload ${formState.coverPreview ? "has-preview" : ""}`}>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => onSelectCover(event.target.files)}
+            disabled={syncing}
+          />
+          {formState.coverPreview ? (
+            <>
+              <img src={formState.coverPreview} alt="Prévia da capa da lista" />
+              <span className="cover-upload-overlay">
+                <Upload size={20} />
+                Trocar imagem
+              </span>
+            </>
+          ) : (
+            <span className="cover-upload-empty">
+              <Upload size={24} />
+              <strong>Enviar imagem de capa</strong>
+              <small>JPG, PNG ou WebP · até 6 MB</small>
+            </span>
+          )}
+        </label>
 
         <div className="field-row">
           <button className="secondary-button" type="button" onClick={onBack}>
             <ArrowLeft size={18} />
             Voltar
           </button>
-          <button className="primary-button full" type="submit" disabled={!formState.title.trim() || syncing}>
-            {syncing ? (isEditing ? "Salvando..." : "Criando...") : isEditing ? "Salvar alterações" : "Continuar"}
+          <button
+            className="primary-button full"
+            type="submit"
+            disabled={!formState.title.trim() || (!isEditing && !formState.coverFile) || syncing}
+          >
+            {syncing
+              ? isEditing
+                ? "Salvando..."
+                : "Criando..."
+              : isEditing
+                ? "Salvar alterações"
+                : "Criar lista e adicionar itens"}
           </button>
         </div>
       </form>
@@ -2979,6 +3081,7 @@ function ListScreen({
   setTracked,
   wishes,
   wishlistTitle,
+  wishlistCoverUrl,
   wishlists,
   selectedWishlistId,
   isRemoteMode,
@@ -2993,6 +3096,7 @@ function ListScreen({
   setTracked: (ids: number[]) => void;
   wishes: Array<LocalWish | DbWish>;
   wishlistTitle: string;
+  wishlistCoverUrl: string;
   wishlists: DbWishlist[];
   selectedWishlistId: string | null;
   isRemoteMode: boolean;
@@ -3009,7 +3113,7 @@ function ListScreen({
   return (
     <>
       <section className="hero-list">
-        <img src={images.home} alt="Sala de estar moderna" />
+        <img src={wishlistCoverUrl} alt={`Capa da lista ${wishlistTitle}`} />
         <div className="hero-gradient" />
         <div className="hero-copy">
           <p className="label light">Lista compartilhada</p>
@@ -3088,15 +3192,29 @@ function ListScreen({
       </section>
 
       <Shelf title="Destaques" action="FILTRAR" variant="wishes">
-        {wishes.map((wish, index) => (
-          <WishCard
-            key={getWishId(wish)}
-            wish={wish}
-            tracked={tracked.includes(index + 1)}
-            onTrack={() => toggle(index + 1)}
-            onBuy={() => onBuyWish(wish)}
-          />
-        ))}
+        {wishes.length === 0 ? (
+          <div className="wishlist-empty">
+            <Gift size={28} />
+            <div>
+              <strong>Sua lista está pronta.</strong>
+              <p>Adicione o primeiro item para começar a organizar seus desejos.</p>
+            </div>
+            <button className="primary-button" type="button" onClick={() => go("add")}>
+              <Plus size={18} />
+              Adicionar primeiro item
+            </button>
+          </div>
+        ) : (
+          wishes.map((wish, index) => (
+            <WishCard
+              key={getWishId(wish)}
+              wish={wish}
+              tracked={tracked.includes(index + 1)}
+              onTrack={() => toggle(index + 1)}
+              onBuy={() => onBuyWish(wish)}
+            />
+          ))
+        )}
       </Shelf>
     </>
   );
@@ -4419,6 +4537,7 @@ function Field({
   disabled,
   inputType,
   autoComplete,
+  maxLength,
 }: {
   label: string;
   placeholder: string;
@@ -4429,6 +4548,7 @@ function Field({
   disabled?: boolean;
   inputType?: string;
   autoComplete?: string;
+  maxLength?: number;
 }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const isPassword = inputType === "password";
@@ -4448,6 +4568,7 @@ function Field({
             onChange={(event) => onChange(event.target.value)}
             disabled={disabled}
             autoComplete={autoComplete}
+            maxLength={maxLength}
           />
         )}
         {isPassword && (
@@ -4668,6 +4789,13 @@ function parsePriceValue(price: string) {
 function currentListTitle(remote: ViewerState, isRemoteMode: boolean, localTitle: string) {
   if (!isRemoteMode) return localTitle;
   return remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.title ?? "Sua lista";
+}
+
+function currentListCover(remote: ViewerState, fallback: string) {
+  return (
+    remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.cover_image_url ||
+    fallback
+  );
 }
 
 function getWishId(wish: LocalWish | DbWish) {
