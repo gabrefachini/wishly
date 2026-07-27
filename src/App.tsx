@@ -6,7 +6,7 @@ import {
   Clock3,
   Check,
   ChevronLeft,
-  CreditCard,
+  Copy,
   ExternalLink,
   Eye,
   EyeOff,
@@ -20,7 +20,6 @@ import {
   Menu,
   Moon,
   Plus,
-  QrCode,
   Search,
   Share2,
   PencilLine,
@@ -46,6 +45,7 @@ import {
   loadAdminAccountDeletionRequests,
   extractProductFromUrl,
   processAdminAccountDeletionRequest,
+  reservePublicGift,
   resolvePublicGiftRedirect,
   loadViewerContext,
   loadWishlistGifts,
@@ -82,6 +82,28 @@ import {
   isAutofillResultCurrent,
   sanitizeMercadoLivrePreview,
 } from "./lib/product-autofill";
+import { buildDefaultListCover, resolveListCover } from "./lib/listCover";
+
+/**
+ * Alerta de preço por desejo. `targetAmount` nulo = acompanhar sem preço-alvo.
+ */
+type PriceAlert = {
+  targetAmount: number | null;
+};
+
+type HomeListSummary = {
+  id: string;
+  title: string;
+  coverUrl: string;
+  meta: string;
+  isSelected: boolean;
+};
+
+type ReserveDetails = {
+  name: string;
+  email: string;
+  message: string;
+};
 
 type View =
   | "home"
@@ -280,6 +302,12 @@ const images = {
     "https://lh3.googleusercontent.com/aida-public/AB6AXuBQyeaafjqr6CtJaSTHF0KE2OAcyEeqZQBsgiDY-iWknpn0jHz0q14Z5-Xn2bzsCiFFiaQA_AEIrpeh-KLEcR35UeqC9T2tpswaXIquSGawQ1E4gz0cDANhUzHvy9LXqQqFKJGbVWXFcPL727gBsvOFgegT1yQLi2D65j34J03lDKFJqUrHNgGpQgOSfik7UO7wOOsXlDB4IVDug1W5P5o4StYlvDjc3iXwnF8GAL3-oSs6M3rkMcGN1g",
 };
 
+// Demonstração: dois itens já monitorados, um deles com preço-alvo definido.
+const priceAlertsSeed: Record<string, PriceAlert> = {
+  "1": { targetAmount: null },
+  "3": { targetAmount: 620 },
+};
+
 const localWishesSeed: LocalWish[] = [
   {
     id: 1,
@@ -382,7 +410,9 @@ const initialAddWishFormState: AddWishFormState = {
 function App() {
   const [view, setView] = useState<View>("home");
   const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
-  const [tracked, setTracked] = useState<number[]>(() => readLocalState("wishly-tracked", [1, 3]));
+  const [priceAlerts, setPriceAlerts] = useState<Record<string, PriceAlert>>(() =>
+    readLocalState("wishly-price-alerts", priceAlertsSeed),
+  );
   const [localListTitle, setLocalListTitle] = useState(localListName);
   const [localListCoverUrl, setLocalListCoverUrl] = useState(images.home);
   const [createListMode, setCreateListMode] = useState<CreateListMode>("create");
@@ -457,6 +487,10 @@ function App() {
   });
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
   const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
+  const [reserving, setReserving] = useState(false);
+  const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
+  const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [publicState, setPublicState] = useState<PublicState>({
     shareId: readPublicShareId(),
     wishlist: null,
@@ -617,6 +651,69 @@ function App() {
   const pendingCount = isRemoteMode
     ? adminQueue.filter((item) => item.affiliate_status !== "generated").length
     : localPendingTasks.length;
+
+  // Listas reais da pessoa: as remotas quando há sessão, a lista local caso contrário.
+  const homeLists = useMemo<HomeListSummary[]>(() => {
+    if (isRemoteMode) {
+      return remote.wishlists.map((wishlist) => {
+        const isSelected = wishlist.id === remote.selectedWishlistId;
+        return {
+          id: wishlist.id,
+          title: wishlist.title,
+          coverUrl: resolveListCover(wishlist.cover_image_url, wishlist.title),
+          // Só a lista aberta tem os desejos carregados, então evitamos números inventados.
+          meta: isSelected ? formatWishCount(remote.gifts.length) : "Abrir lista",
+          isSelected,
+        };
+      });
+    }
+
+    return [
+      {
+        id: localListId,
+        title: localListTitle,
+        coverUrl: localListCoverUrl,
+        meta: formatWishCount(localWishes.length),
+        isSelected: true,
+      },
+    ];
+  }, [isRemoteMode, remote.wishlists, remote.selectedWishlistId, remote.gifts.length, localListTitle, localListCoverUrl, localWishes.length]);
+
+  // Avisos derivados dos desejos reais, em vez de texto fixo.
+  const homeNotices = useMemo(() => {
+    const notices: string[] = [];
+    const dropCount = currentWishes.filter((wish) => getWishDrop(wish)).length;
+    const reservedCount = currentWishes.filter((wish) => getWishStatus(wish) === "Reservado").length;
+
+    if (dropCount > 0) {
+      notices.push(
+        dropCount === 1
+          ? "1 item baixou de preço na sua lista."
+          : `${dropCount} itens baixaram de preço na sua lista.`,
+      );
+    }
+    if (reservedCount > 0) {
+      notices.push(
+        reservedCount === 1
+          ? "1 item foi reservado por um convidado."
+          : `${reservedCount} itens foram reservados por convidados.`,
+      );
+    }
+
+    return notices;
+  }, [currentWishes]);
+
+  function savePriceAlert(wishId: string, targetAmount: number | null) {
+    setPriceAlerts((current) => ({ ...current, [wishId]: { targetAmount } }));
+  }
+
+  function removePriceAlert(wishId: string) {
+    setPriceAlerts((current) => {
+      const next = { ...current };
+      delete next[wishId];
+      return next;
+    });
+  }
 
   function go(viewName: View) {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -784,7 +881,7 @@ function App() {
     }
   }
 
-  async function handleShareCurrentList() {
+  function handleShareCurrentList() {
     const activeShareId = isRemoteMode
       ? remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.share_id ?? null
       : localListId;
@@ -794,29 +891,86 @@ function App() {
       return;
     }
 
-    const shareUrl = buildPublicShareUrl(activeShareId);
     const shareTitle = isRemoteMode
       ? currentListTitle(remote, isRemoteMode, localListTitle)
       : localListTitle;
 
+    setSyncError("");
+    setShareSheet({ url: buildPublicShareUrl(activeShareId), title: shareTitle });
+  }
+
+  async function handleNativeShare() {
+    if (!shareSheet) return;
+
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `Wishly · ${shareTitle}`,
-          text: `Veja a lista ${shareTitle} no Wishly.`,
-          url: shareUrl,
+          title: `Wishly · ${shareSheet.title}`,
+          text: `Veja a lista ${shareSheet.title} no Wishly.`,
+          url: shareSheet.url,
         });
       } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
+        await navigator.clipboard.writeText(shareSheet.url);
       } else {
-        window.prompt("Copie o link da lista:", shareUrl);
+        window.prompt("Copie o link da lista:", shareSheet.url);
       }
 
       setAuthMessage("Link da lista pronto para compartilhar.");
       setSyncError("");
+      setShareSheet(null);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setSyncError("Não foi possível compartilhar a lista agora.");
+    }
+  }
+
+  async function handleCopyShareLink() {
+    if (!shareSheet) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareSheet.url);
+        setShareCopied(true);
+        window.setTimeout(() => setShareCopied(false), 2400);
+      } else {
+        window.prompt("Copie o link da lista:", shareSheet.url);
+      }
+      setSyncError("");
+    } catch {
+      setSyncError("Não foi possível copiar o link agora.");
+    }
+  }
+
+  async function handleReservePublicWish(wish: DbWish, details: ReserveDetails) {
+    if (!publicState.shareId) throw new Error("Não foi possível identificar a lista compartilhada.");
+
+    try {
+      setReserving(true);
+      setSyncError("");
+      await reservePublicGift({
+        shareId: publicState.shareId,
+        giftId: wish.id,
+        reserverName: details.name,
+        reserverEmail: details.email,
+        reserverMessage: details.message,
+      });
+
+      // Reflete a reserva na hora para o item sair da lista de disponíveis.
+      setPublicState((current) =>
+        current.wishlist
+          ? {
+              ...current,
+              wishlist: {
+                ...current.wishlist,
+                gifts: current.wishlist.gifts.map((gift) =>
+                  gift.id === wish.id ? { ...gift, status: "reserved" as const } : gift,
+                ),
+              },
+            }
+          : current,
+      );
+    } finally {
+      setReserving(false);
     }
   }
 
@@ -1111,11 +1265,6 @@ function App() {
       return;
     }
 
-    if (createListMode === "create" && !createListForm.coverFile) {
-      setSyncError("Envie uma imagem de capa para criar a lista.");
-      return;
-    }
-
     if (isRemoteMode) {
       if (createListMode === "edit" && remote.selectedWishlistId) {
         try {
@@ -1150,7 +1299,7 @@ function App() {
         setSyncError("");
         const wishlist = await createWishlist({
           title,
-          coverFile: createListForm.coverFile!,
+          coverFile: createListForm.coverFile,
         });
         const gifts = await loadWishlistGifts(wishlist.id);
         setRemote((current) => ({
@@ -1175,6 +1324,8 @@ function App() {
     setLocalListTitle(title);
     if (createListForm.coverPreview) {
       setLocalListCoverUrl(createListForm.coverPreview);
+    } else if (createListMode === "create") {
+      setLocalListCoverUrl(buildDefaultListCover(title));
     }
     setCreateListForm({ title: "", coverFile: null, coverPreview: null });
     setAuthMessage("");
@@ -1594,8 +1745,8 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    window.localStorage.setItem("wishly-tracked", JSON.stringify(tracked));
-  }, [tracked]);
+    window.localStorage.setItem("wishly-price-alerts", JSON.stringify(priceAlerts));
+  }, [priceAlerts]);
 
   useEffect(() => {
     window.localStorage.setItem("wishly-wishes", JSON.stringify(localWishes));
@@ -1931,6 +2082,8 @@ function App() {
           notFound={publicState.notFound}
           onBackHome={exitPublicMode}
           onBuyWish={(wish) => void handleBuyPublicWish(wish)}
+          onReserveWish={handleReservePublicWish}
+          reserving={reserving}
           onCreateList={() => {
             exitPublicMode();
             beginCreateListFlow();
@@ -2009,7 +2162,7 @@ function App() {
               <LogOut size={20} />
             </button>
           ) : (
-            <button className="icon-button primary" type="button" onClick={() => go("activity")} aria-label="Notificacoes">
+            <button className="icon-button primary" type="button" onClick={() => go("activity")} aria-label="Notificações">
               <Bell size={23} />
             </button>
           )}
@@ -2040,6 +2193,12 @@ function App() {
             onSubmitAuth={handleSubmitAuth}
             onForgotPassword={() => void handleForgotPassword()}
             syncing={syncing}
+            lists={homeLists}
+            notices={homeNotices}
+            onOpenList={(listId) => {
+              if (isRemoteMode) void handleSelectRemoteWishlist(listId);
+              go("list");
+            }}
           />
         )}
         {view === "reset_password" && (
@@ -2064,8 +2223,8 @@ function App() {
         {view === "list" && (
           <ListScreen
             go={go}
-            tracked={tracked}
-            setTracked={setTracked}
+            priceAlerts={priceAlerts}
+            onEditAlert={setAlertTarget}
             wishes={currentWishes}
             wishlistTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
             wishlistCoverUrl={isRemoteMode ? currentListCover(remote, localListCoverUrl) : localListCoverUrl}
@@ -2074,7 +2233,7 @@ function App() {
             isRemoteMode={isRemoteMode}
             onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
             onBuyWish={(wish) => void handleBuyWish(wish)}
-            onShare={() => void handleShareCurrentList()}
+            onShare={handleShareCurrentList}
             onEditList={beginEditListFlow}
             canEditList
           />
@@ -2092,7 +2251,9 @@ function App() {
             isRemoteMode={isRemoteMode}
           />
         )}
-        {view === "radar" && <RadarScreen go={go} tracked={tracked} wishes={currentWishes} />}
+        {view === "radar" && (
+          <RadarScreen go={go} priceAlerts={priceAlerts} wishes={currentWishes} onEditAlert={setAlertTarget} />
+        )}
         {view === "activity" && <ActivityScreen />}
         {view === "admin" && (
           <AdminScreen
@@ -2157,7 +2318,7 @@ function App() {
       )}
 
       {view !== "reset_password" && (
-        <nav className="bottom-nav" aria-label="Navegacao principal">
+        <nav className="bottom-nav" aria-label="Navegação principal">
           <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
           <NavItem active={view === "radar"} icon={<LineChart size={22} />} label="Radar" onClick={() => go("radar")} />
           <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
@@ -2166,6 +2327,205 @@ function App() {
       )}
         </>
       )}
+
+      {alertTarget && (
+        <PriceAlertDialog
+          wish={alertTarget}
+          alert={priceAlerts[getWishId(alertTarget)]}
+          onSave={(targetAmount) => {
+            savePriceAlert(getWishId(alertTarget), targetAmount);
+            setAlertTarget(null);
+          }}
+          onRemove={() => {
+            removePriceAlert(getWishId(alertTarget));
+            setAlertTarget(null);
+          }}
+          onClose={() => setAlertTarget(null)}
+        />
+      )}
+
+      {shareSheet && (
+        <ShareSheet
+          listTitle={shareSheet.title}
+          shareUrl={shareSheet.url}
+          copied={shareCopied}
+          canUseNativeShare={typeof navigator !== "undefined" && Boolean(navigator.share)}
+          onCopy={() => void handleCopyShareLink()}
+          onNativeShare={() => void handleNativeShare()}
+          onClose={() => {
+            setShareSheet(null);
+            setShareCopied(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PriceAlertDialog({
+  wish,
+  alert,
+  onSave,
+  onRemove,
+  onClose,
+}: {
+  wish: LocalWish | DbWish;
+  alert: PriceAlert | undefined;
+  onSave: (targetAmount: number | null) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const currency = getWishCurrency(wish);
+  const currentAmount = getWishAmount(wish);
+  const [targetInput, setTargetInput] = useState(
+    alert?.targetAmount != null ? String(alert.targetAmount).replace(".", ",") : "",
+  );
+  const [error, setError] = useState("");
+
+  function submit() {
+    const trimmed = targetInput.trim();
+    if (!trimmed) {
+      // Sem valor, o alerta segue ativo acompanhando qualquer queda.
+      onSave(null);
+      return;
+    }
+
+    const cents = parsePriceInputToCents(trimmed);
+    if (cents == null || cents <= 0) {
+      setError("Informe um preço-alvo válido, como 179,90.");
+      return;
+    }
+
+    onSave(cents / 100);
+  }
+
+  return (
+    <div className="reserve-dialog-backdrop" onClick={onClose}>
+      <div
+        className="reserve-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Alerta de preço para ${getWishTitle(wish)}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="reserve-dialog-header">
+          <div>
+            <p className="label">Alerta de preço</p>
+            <h2>{getWishTitle(wish)}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="reserve-dialog-intro">
+          {currentAmount != null
+            ? `Hoje está ${formatCurrency(currentAmount, currency)}. Avisamos quando chegar ao seu alvo.`
+            : "Esse item ainda não tem preço para comparar. O radar avisa quando houver."}
+        </p>
+
+        {error && (
+          <div className="auth-feedback error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <form
+          className="reserve-dialog-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <Field
+            label="Preço-alvo (opcional)"
+            placeholder="179,90"
+            value={targetInput}
+            onChange={(value) => {
+              setTargetInput(value);
+              setError("");
+            }}
+          />
+          <div className="field-row">
+            {alert ? (
+              <button className="secondary-button" type="button" onClick={onRemove}>
+                Desativar radar
+              </button>
+            ) : (
+              <button className="secondary-button" type="button" onClick={onClose}>
+                Cancelar
+              </button>
+            )}
+            <button className="primary-button full" type="submit">
+              {alert ? "Salvar alerta" : "Ativar radar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ShareSheet({
+  listTitle,
+  shareUrl,
+  copied,
+  canUseNativeShare,
+  onCopy,
+  onNativeShare,
+  onClose,
+}: {
+  listTitle: string;
+  shareUrl: string;
+  copied: boolean;
+  canUseNativeShare: boolean;
+  onCopy: () => void;
+  onNativeShare: () => void;
+  onClose: () => void;
+}) {
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Veja a lista ${listTitle} no Wishly: ${shareUrl}`)}`;
+
+  return (
+    <div className="reserve-dialog-backdrop" onClick={onClose}>
+      <div
+        className="reserve-dialog share-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compartilhar lista"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="reserve-dialog-header">
+          <div>
+            <p className="label">Compartilhar lista</p>
+            <h2>{listTitle}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="reserve-dialog-intro">
+          Quem recebe o link vê os desejos e reserva um presente sem criar conta.
+        </p>
+
+        <div className="share-sheet-actions">
+          <a className="primary-button full share-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">
+            <Share2 size={18} />
+            Enviar no WhatsApp
+          </a>
+          <button className="secondary-button full" type="button" onClick={onCopy}>
+            {copied ? <Check size={18} /> : <Copy size={18} />}
+            {copied ? "Link copiado" : "Copiar link"}
+          </button>
+          {canUseNativeShare && (
+            <button className="text-button" type="button" onClick={onNativeShare}>
+              Mais opções de compartilhamento
+            </button>
+          )}
+        </div>
+
+        <p className="share-sheet-url">{shareUrl}</p>
+      </div>
     </div>
   );
 }
@@ -2477,9 +2837,10 @@ function MarketingHomePage({
       <main className="marketing-main">
         <section className="marketing-hero">
           <div className="hero-copy-block">
-            <h1>Organize sua lista de desejos com menos esforço.</h1>
+            <h1>Guarde seus desejos e acompanhe os preços.</h1>
             <p className="hero-support">
-              Crie sua lista de desejos, adicione produtos de qualquer loja e compartilhe com quem vai presentear.
+              Salve produtos de qualquer loja, defina o preço que você quer pagar e compartilhe a lista quando for
+              presente — quem recebe reserva sem criar conta.
             </p>
             <div className="hero-cta-row">
               <button className="primary-button" type="button" onClick={handleCreateList}>
@@ -2575,8 +2936,8 @@ function MarketingHomePage({
           <div className="marketing-price-copy">
             <div>
               <h2>O preço mudou? O Wishly avisa.</h2>
-              <p>Acompanhe os produtos da sua lista e descubra o melhor momento para comprar.</p>
-              <span className="price-inline-copy">Histórico de preços · Alertas personalizados · Produtos de várias lojas</span>
+              <p>Defina o preço que faz sentido para você e acompanhe os produtos da sua lista até chegar lá.</p>
+              <span className="price-inline-copy">Preço-alvo por item · Histórico de preços · Produtos de várias lojas</span>
             </div>
           </div>
           <div className="marketing-price-card">
@@ -2702,13 +3063,13 @@ function MarketingHomePage({
                   <p>Um único link com capa, título e desejos.</p>
                 </div>
               </div>
-              <div className="marketing-share-action qr">
-                <div className="marketing-qr-box" aria-hidden="true">
-                  <QrCode size={34} />
-                </div>
+              <div className="marketing-share-action">
+                <span>
+                  <Heart size={18} />
+                </span>
                 <div>
-                  <strong>QR Code discreto</strong>
-                  <p>Menos dúvidas. Nenhum presente repetido.</p>
+                  <strong>Reserva sem conta</strong>
+                  <p>Quem escolhe um presente marca a reserva. Nenhum presente repetido.</p>
                 </div>
               </div>
             </div>
@@ -2759,6 +3120,9 @@ function HomeScreen({
   onSubmitAuth,
   onForgotPassword,
   syncing,
+  lists,
+  onOpenList,
+  notices,
 }: {
   go: (view: View) => void;
   pendingCount: number;
@@ -2771,6 +3135,9 @@ function HomeScreen({
   onSubmitAuth: () => void;
   onForgotPassword: () => void;
   syncing: boolean;
+  lists: HomeListSummary[];
+  onOpenList: (listId: string) => void;
+  notices: string[];
 }) {
   return (
     <>
@@ -2778,7 +3145,7 @@ function HomeScreen({
         {supabaseEnabled && !session && (
           <section className="inset-section dashboard-auth">
             <div className="auth-card">
-              <div className="auth-mode-row" role="tablist" aria-label="Fluxo de autenticacao">
+              <div className="auth-mode-row" role="tablist" aria-label="Fluxo de autenticação">
                 <button
                   className={authPanelMode === "create" ? "active" : ""}
                   type="button"
@@ -2866,29 +3233,53 @@ function HomeScreen({
           </section>
         )}
 
-        <section className="inset-section dashboard-notices">
-          <p className="label">Novidades nas suas listas</p>
-          <div className="notice-card">
-            <Notice icon={<ArrowDown size={18} />} text="2 itens baixaram de preço na sua lista Casa Nova." />
-            <Notice icon={<Gift size={18} />} text="1 item voltou ao estoque em Setup." />
-            <Notice icon={<Heart size={18} />} text="1 item foi reservado por um convidado." />
-            <Notice
-              icon={<ShieldCheck size={18} />}
-              text={
-                pendingCount > 0
-                  ? `${pendingCount} link${pendingCount > 1 ? "s" : ""} aguardando tratamento de afiliado.`
-                  : "Novos links manuais entram automaticamente na fila interna de afiliados."
-              }
-            />
-          </div>
-        </section>
+        {notices.length > 0 && (
+          <section className="inset-section dashboard-notices">
+            <p className="label">Novidades nas suas listas</p>
+            <div className="notice-card">
+              {notices.map((notice) => (
+                <Notice icon={<ArrowDown size={18} />} text={notice} key={notice} />
+              ))}
+              {pendingCount > 0 && (
+                <Notice
+                  icon={<ShieldCheck size={18} />}
+                  text={`${pendingCount} link${pendingCount > 1 ? "s" : ""} aguardando tratamento de afiliado.`}
+                />
+              )}
+            </div>
+          </section>
+        )}
       </div>
 
-      <Shelf title="Suas listas" action="VER TUDO" variant="lists">
-        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 preços caíram" badge="ATUAL" onClick={() => go("list")} />
-        <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritários" badge="EXEMPLO" onClick={() => go("list")} />
-        <ListCard image={images.travel} title="Próxima viagem" meta="12 desejos • Compartilhada" badge="EXEMPLO" onClick={() => go("list")} />
-      </Shelf>
+      {lists.length > 0 ? (
+        <Shelf title="Suas listas" variant="lists">
+          {lists.map((list) => (
+            <ListCard
+              key={list.id}
+              image={list.coverUrl}
+              title={list.title}
+              meta={list.meta}
+              badge={list.isSelected ? "ATUAL" : "LISTA"}
+              onClick={() => onOpenList(list.id)}
+            />
+          ))}
+        </Shelf>
+      ) : (
+        <section className="shelf">
+          <div className="section-heading">
+            <h2>Suas listas</h2>
+          </div>
+          <div className="empty-state">
+            <Gift size={26} />
+            <h3>Você ainda não tem listas.</h3>
+            <p>Crie a primeira para guardar desejos, acompanhar preços e compartilhar quando for presente.</p>
+            <button className="primary-button" type="button" onClick={() => go("create_list")}>
+              <Plus size={18} />
+              Criar minha primeira lista
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="idea-band">
         <Shelf title="Ideias para começar" tone="tertiary" variant="ideas">
@@ -2973,6 +3364,9 @@ function CreateListScreen({
   mode: CreateListMode;
 }) {
   const isEditing = mode === "edit";
+  // Sem upload, mostramos desde já a capa gerada a partir do nome da lista.
+  const coverPreviewSrc =
+    formState.coverPreview || (formState.title.trim() ? buildDefaultListCover(formState.title) : null);
 
   return (
     <section className="desktop-flow-layout">
@@ -3001,29 +3395,32 @@ function CreateListScreen({
           maxLength={80}
         />
 
-        <label className={`cover-upload ${formState.coverPreview ? "has-preview" : ""}`}>
+        <label className={`cover-upload ${coverPreviewSrc ? "has-preview" : ""}`}>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={(event) => onSelectCover(event.target.files)}
             disabled={syncing}
           />
-          {formState.coverPreview ? (
+          {coverPreviewSrc ? (
             <>
-              <img src={formState.coverPreview} alt="Prévia da capa da lista" />
+              <img src={coverPreviewSrc} alt="Prévia da capa da lista" />
               <span className="cover-upload-overlay">
                 <Upload size={20} />
-                Trocar imagem
+                {formState.coverPreview ? "Trocar imagem" : "Enviar sua imagem"}
               </span>
             </>
           ) : (
             <span className="cover-upload-empty">
               <Upload size={24} />
               <strong>Enviar imagem de capa</strong>
-              <small>JPG, PNG ou WebP · até 6 MB</small>
+              <small>Opcional · JPG, PNG ou WebP · até 6 MB</small>
             </span>
           )}
         </label>
+        {!formState.coverPreview && coverPreviewSrc && (
+          <p className="cover-upload-hint">Sem imagem, a lista usa esta capa. Você pode trocar quando quiser.</p>
+        )}
 
         <div className="field-row">
           <button className="secondary-button" type="button" onClick={onBack}>
@@ -3033,7 +3430,7 @@ function CreateListScreen({
           <button
             className="primary-button full"
             type="submit"
-            disabled={!formState.title.trim() || (!isEditing && !formState.coverFile) || syncing}
+            disabled={!formState.title.trim() || syncing}
           >
             {syncing
               ? isEditing
@@ -3077,8 +3474,8 @@ function CreateListScreen({
 
 function ListScreen({
   go,
-  tracked,
-  setTracked,
+  priceAlerts,
+  onEditAlert,
   wishes,
   wishlistTitle,
   wishlistCoverUrl,
@@ -3092,8 +3489,8 @@ function ListScreen({
   canEditList,
 }: {
   go: (view: View) => void;
-  tracked: number[];
-  setTracked: (ids: number[]) => void;
+  priceAlerts: Record<string, PriceAlert>;
+  onEditAlert: (wish: LocalWish | DbWish) => void;
   wishes: Array<LocalWish | DbWish>;
   wishlistTitle: string;
   wishlistCoverUrl: string;
@@ -3106,19 +3503,15 @@ function ListScreen({
   onEditList: () => void;
   canEditList: boolean;
 }) {
-  function toggle(id: number) {
-    setTracked(tracked.includes(id) ? tracked.filter((item) => item !== id) : [...tracked, id]);
-  }
-
   return (
     <>
       <section className="hero-list">
         <img src={wishlistCoverUrl} alt={`Capa da lista ${wishlistTitle}`} />
         <div className="hero-gradient" />
         <div className="hero-copy">
-          <p className="label light">Lista compartilhada</p>
+          <p className="label light">Sua lista</p>
           <h2>{wishlistTitle}</h2>
-          <p>Uma coleção calma de peças para transformar o primeiro apartamento em casa.</p>
+          <p>{formatWishCount(wishes.length)} · compartilhe quando estiver pronta para circular.</p>
           <div className="hero-actions">
             <button className="primary-button" type="button" onClick={() => go("add")}>
               <Plus size={18} />
@@ -3172,11 +3565,11 @@ function ListScreen({
 
         <div className="list-summary-card list-summary-card-accent">
           <p className="label">Lista pronta para compartilhar</p>
-          <h3>Quem receber ve o que importa sem confusao.</h3>
+          <h3>Quem recebe vê o que importa, sem confusão.</h3>
           <p>Os desejos ficam organizados por prioridade, reservas e sinais de preço. A lista continua simples para quem envia e para quem compra.</p>
           <div className="list-summary-notes">
             <div>
-              <strong>{tracked.length}</strong>
+              <strong>{wishes.filter((wish) => priceAlerts[getWishId(wish)]).length}</strong>
               <span>itens com radar ativo</span>
             </div>
             <div>
@@ -3205,12 +3598,12 @@ function ListScreen({
             </button>
           </div>
         ) : (
-          wishes.map((wish, index) => (
+          wishes.map((wish) => (
             <WishCard
               key={getWishId(wish)}
               wish={wish}
-              tracked={tracked.includes(index + 1)}
-              onTrack={() => toggle(index + 1)}
+              alert={priceAlerts[getWishId(wish)]}
+              onTrack={() => onEditAlert(wish)}
               onBuy={() => onBuyWish(wish)}
             />
           ))
@@ -3335,68 +3728,6 @@ function AddWishScreen({
             onChange={(value) => setFormState({ ...formState, originalPrice: value })}
           />
         </div>
-        <div className="field-row split-row">
-          <Field
-            label="Moeda"
-            placeholder="BRL"
-            value={formState.currency}
-            onChange={(value) => setFormState({ ...formState, currency: value.toUpperCase() })}
-          />
-          <label className="field">
-            <span className="field-label">Disponibilidade</span>
-            <span className="input-wrap">
-              <select
-                value={formState.availability}
-                onChange={(event) => setFormState({ ...formState, availability: event.target.value as AddWishFormState["availability"] })}
-              >
-                <option value="unknown">Desconhecida</option>
-                <option value="in_stock">Em estoque</option>
-                <option value="out_of_stock">Sem estoque</option>
-                <option value="preorder">Pré-venda</option>
-              </select>
-            </span>
-          </label>
-        </div>
-        <Field
-          label="Imagem principal"
-          placeholder="https://..."
-          value={formState.imageUrl}
-          onChange={(value) => setFormState({ ...formState, imageUrl: value })}
-        />
-        <Field
-          label="Imagens adicionais"
-          placeholder={"Uma URL por linha"}
-          textarea
-          value={formState.imageUrlsText}
-          onChange={(value) => setFormState({ ...formState, imageUrlsText: value })}
-        />
-        <div className="field-row split-row">
-          <Field
-            label="Produto externo"
-            placeholder="MLB123456"
-            value={formState.externalProductId}
-            onChange={(value) => setFormState({ ...formState, externalProductId: value })}
-          />
-          <Field
-            label="Variante externa"
-            placeholder="987654321"
-            value={formState.externalVariantId}
-            onChange={(value) => setFormState({ ...formState, externalVariantId: value })}
-          />
-        </div>
-        <Field
-          label="Variação selecionada"
-          placeholder={"Cor: Preta\nVoltagem: 110V"}
-          textarea
-          value={formState.selectedVariantText}
-          onChange={(value) => setFormState({ ...formState, selectedVariantText: value })}
-        />
-        <Field
-          label="URL canônica"
-          placeholder="https://..."
-          value={formState.canonicalUrl}
-          onChange={(value) => setFormState({ ...formState, canonicalUrl: value })}
-        />
         <div>
           <p className="field-label">Prioridade</p>
           <div className="segmented">
@@ -3464,6 +3795,8 @@ function PublicWishlistPage({
   notFound,
   onBackHome,
   onBuyWish,
+  onReserveWish,
+  reserving,
   onCreateList,
 }: {
   loading: boolean;
@@ -3471,8 +3804,41 @@ function PublicWishlistPage({
   notFound: boolean;
   onBackHome: () => void;
   onBuyWish: (wish: DbWish) => void;
+  onReserveWish: (wish: DbWish, details: ReserveDetails) => Promise<void>;
+  reserving: boolean;
   onCreateList: () => void;
 }) {
+  const [reserveTarget, setReserveTarget] = useState<DbWish | null>(null);
+  const [reserveForm, setReserveForm] = useState<ReserveDetails>({ name: "", email: "", message: "" });
+  const [reserveError, setReserveError] = useState("");
+  const [reservedName, setReservedName] = useState("");
+
+  function closeReserveDialog() {
+    setReserveTarget(null);
+    setReserveError("");
+  }
+
+  async function submitReservation() {
+    if (!reserveTarget) return;
+    const name = reserveForm.name.trim();
+    const email = reserveForm.email.trim();
+
+    if (!name || !email) {
+      setReserveError("Preencha seu nome e e-mail para reservar.");
+      return;
+    }
+
+    try {
+      setReserveError("");
+      await onReserveWish(reserveTarget, { name, email, message: reserveForm.message });
+      setReservedName(name);
+      setReserveTarget(null);
+      setReserveForm({ name, email, message: "" });
+    } catch (error) {
+      setReserveError(getErrorMessage(error));
+    }
+  }
+
   if (loading) {
     return (
       <div className="public-page">
@@ -3533,7 +3899,7 @@ function PublicWishlistPage({
       <main className="public-main">
         <section className="public-hero">
           <div className="public-hero-media">
-            <img src={wishlist.cover_image_url || images.home} alt="" />
+            <img src={resolveListCover(wishlist.cover_image_url, wishlist.title)} alt="" />
           </div>
           <div className="public-hero-copy">
             <p className="label">Lista compartilhada</p>
@@ -3556,60 +3922,201 @@ function PublicWishlistPage({
         </section>
 
         <section className="public-wishes-section">
-          <div className="section-heading">
+          <div className="section-heading section-heading-stacked">
             <h2>Desejos da lista</h2>
+            <p>Reserve o que você vai dar para ninguém repetir o presente. Não precisa criar conta.</p>
           </div>
           <div className="public-wishes-grid">
-            {wishlist.gifts.map((wish) => (
-              <article className="public-wish-card" key={wish.id}>
-                <img src={getWishImage(wish)} alt="" />
-                <div className="public-wish-copy">
-                  <div>
-                    <div className="public-wish-head">
-                      <h3>{wish.name}</h3>
-                      {getWishStatus(wish) && <span className="status-pill">{getWishStatus(wish)}</span>}
+            {wishlist.gifts.map((wish) => {
+              const isReserved = wish.status !== "available";
+              return (
+                <article className={`public-wish-card ${isReserved ? "is-reserved" : ""}`} key={wish.id}>
+                  <img src={getWishImage(wish)} alt="" />
+                  <div className="public-wish-copy">
+                    <div>
+                      <div className="public-wish-head">
+                        <h3>{wish.name}</h3>
+                        {getWishStatus(wish) && <span className="status-pill">{getWishStatus(wish)}</span>}
+                      </div>
+                      <p>{getWishStore(wish)}</p>
+                      {wish.description && <small>{wish.description}</small>}
+                      <strong>{getWishPrice(wish)}</strong>
                     </div>
-                    <p>{getWishStore(wish)}</p>
-                    {wish.description && <small>{wish.description}</small>}
-                    <strong>{getWishPrice(wish)}</strong>
+                    <div className="public-wish-actions">
+                      {isReserved ? (
+                        <p className="public-wish-reserved-note">Já reservado por outra pessoa.</p>
+                      ) : (
+                        <button
+                          className="primary-button"
+                          type="button"
+                          onClick={() => {
+                            setReserveTarget(wish);
+                            setReserveError("");
+                          }}
+                        >
+                          <Heart size={16} />
+                          Reservar presente
+                        </button>
+                      )}
+                      <button className="secondary-button buy-button" type="button" onClick={() => onBuyWish(wish)}>
+                        <ExternalLink size={16} />
+                        Ver presente
+                      </button>
+                    </div>
                   </div>
-                  <button className="secondary-button buy-button" type="button" onClick={() => onBuyWish(wish)}>
-                    <ExternalLink size={16} />
-                    Ver presente
-                  </button>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </section>
       </main>
+
+      {reservedName && (
+        <div className="public-reserve-toast" role="status" aria-live="polite">
+          <ShieldCheck size={18} />
+          <div>
+            <strong>Presente reservado.</strong>
+            <span>Avisamos {reservedName} por e-mail e o item já aparece como reservado na lista.</span>
+          </div>
+          <button className="icon-button" type="button" onClick={() => setReservedName("")} aria-label="Fechar aviso">
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {reserveTarget && (
+        <div className="reserve-dialog-backdrop" onClick={reserving ? undefined : closeReserveDialog}>
+          <div
+            className="reserve-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Reservar ${reserveTarget.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="reserve-dialog-header">
+              <div>
+                <p className="label">Reservar presente</p>
+                <h2>{reserveTarget.name}</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={closeReserveDialog} aria-label="Fechar">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="reserve-dialog-intro">
+              A reserva avisa quem criou a lista e esconde o item para os outros convidados. Sem criar conta.
+            </p>
+
+            {reserveError && (
+              <div className="auth-feedback error" role="alert">
+                {reserveError}
+              </div>
+            )}
+
+            <form
+              className="reserve-dialog-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitReservation();
+              }}
+            >
+              <Field
+                label="Seu nome"
+                placeholder="Como você quer aparecer"
+                value={reserveForm.name}
+                onChange={(value) => setReserveForm((current) => ({ ...current, name: value }))}
+              />
+              <Field
+                label="Seu e-mail"
+                placeholder="voce@exemplo.com"
+                value={reserveForm.email}
+                onChange={(value) => setReserveForm((current) => ({ ...current, email: value }))}
+                inputType="email"
+              />
+              <Field
+                label="Mensagem (opcional)"
+                placeholder="Escreva um recado para quem recebe"
+                textarea
+                value={reserveForm.message}
+                onChange={(value) => setReserveForm((current) => ({ ...current, message: value }))}
+              />
+              <div className="field-row">
+                <button className="secondary-button" type="button" onClick={closeReserveDialog} disabled={reserving}>
+                  Cancelar
+                </button>
+                <button className="primary-button full" type="submit" disabled={reserving}>
+                  {reserving ? "Reservando..." : "Confirmar reserva"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracked: number[]; wishes: Array<LocalWish | DbWish> }) {
+function RadarScreen({
+  go,
+  priceAlerts,
+  wishes,
+  onEditAlert,
+}: {
+  go: (view: View) => void;
+  priceAlerts: Record<string, PriceAlert>;
+  wishes: Array<LocalWish | DbWish>;
+  onEditAlert: (wish: LocalWish | DbWish) => void;
+}) {
   const radarItems = wishes
-    .map((wish, index) => buildRadarItem(wish, tracked.includes(index + 1)))
+    .map((wish) => {
+      const alert = priceAlerts[getWishId(wish)];
+      return { ...buildRadarItem(wish, Boolean(alert)), alert, alertStatus: getPriceAlertStatus(wish, alert) };
+    })
     .sort((left, right) => right.priorityScore - left.priorityScore);
   const potentialSavings = radarItems.reduce((sum, item) => sum + item.savingsInCurrency, 0);
   const criticalCount = radarItems.filter((item) => item.state === "critical").length;
   const opportunityCount = radarItems.filter((item) => item.state === "opportunity").length;
-  const reviewCount = radarItems.filter((item) => item.state === "review").length;
+  const targetsReached = radarItems.filter((item) => item.alertStatus?.reached).length;
+  const trackedCount = radarItems.filter((item) => item.alert).length;
+
+  if (trackedCount === 0) {
+    return (
+      <section className="radar-summary">
+        <p className="label">Radar de preços</p>
+        <h2>Nenhum item monitorado ainda.</h2>
+        <p>
+          Abra sua lista, toque em <strong>Ativar radar</strong> em um desejo e defina o preço que faz sentido para
+          você. Avisamos quando ele chegar lá.
+        </p>
+        <button className="primary-button" type="button" onClick={() => go("list")}>
+          <ArrowRight size={18} />
+          Escolher itens na lista
+        </button>
+      </section>
+    );
+  }
 
   return (
     <>
       <section className="radar-summary">
-        <p className="label">Monitoramento Pro</p>
-        <h2>Economia potencial de {formatCurrency(potentialSavings, "BRL")}</h2>
-        <p>O radar prioriza queda real de preço, risco de estoque e confiabilidade dos dados do item.</p>
+        <p className="label">Radar de preços</p>
+        {/* A manchete segue o sinal mais forte que existe hoje, para não anunciar economia de R$ 0,00. */}
+        <h2>
+          {targetsReached > 0
+            ? `${targetsReached} ${targetsReached === 1 ? "item chegou" : "itens chegaram"} ao seu preço-alvo`
+            : potentialSavings > 0
+              ? `Economia potencial de ${formatCurrency(potentialSavings, "BRL")}`
+              : `Acompanhando ${formatWishCount(trackedCount)}`}
+        </h2>
+        <p>O radar prioriza preço-alvo atingido, queda real de preço e risco de estoque.</p>
         <div className="stat-grid">
+          <Stat value={String(targetsReached)} label="no preço-alvo" />
           <Stat value={String(opportunityCount)} label="oportunidades" />
           <Stat value={String(criticalCount)} label="críticos" />
-          <Stat value={String(reviewCount)} label="revisar" />
         </div>
-        <button className="primary-button" type="button" onClick={() => go("pro")}>
+        <button className="text-button" type="button" onClick={() => go("pro")}>
           <Lock size={18} />
-          Ver recursos Pro
+          Receber alertas automáticos com o Pro
         </button>
       </section>
       <section className="vertical-list">
@@ -3631,10 +4138,16 @@ function RadarScreen({ go, tracked, wishes }: { go: (view: View) => void; tracke
                 <span />
               </div>
               <div className="radar-row-detail">
-                <span className={`radar-pill radar-pill-${item.stateTone}`}>{item.stateLabel}</span>
+                <span className={`radar-pill radar-pill-${item.stateTone}`}>
+                  {item.alertStatus?.reached ? "No preço-alvo" : item.stateLabel}
+                </span>
                 <span className="row-meta">{item.metricLabel}</span>
               </div>
-              <p className="row-meta">{item.supportLabel}</p>
+              <p className="row-meta">{item.alertStatus?.label ?? item.supportLabel}</p>
+              <button className="text-button radar-row-edit" type="button" onClick={() => onEditAlert(item.wish)}>
+                <Tag size={14} />
+                {item.alert ? "Editar alerta" : "Ativar radar"}
+              </button>
             </div>
             <div className="radar-score">
               <strong>{getWishDrop(item.wish) ?? "0%"}</strong>
@@ -4086,7 +4599,7 @@ function AdminScreen({
       <section className="admin-stack">
         <div className="admin-summary">
           <p className="label">Operação real</p>
-          <h2>Fila unica para admins</h2>
+          <h2>Fila única para admins</h2>
           <p>Essa tela usa RPCs do Supabase para afiliados e exclusão de conta.</p>
           <div className="stat-grid">
             <Stat value={String(pending.length)} label="pendentes" />
@@ -4098,7 +4611,7 @@ function AdminScreen({
         {pending.length === 0 ? (
           <div className="empty-admin">
             <ShieldCheck size={24} />
-            <strong>Nenhuma pendencia aberta</strong>
+            <strong>Nenhuma pendência aberta</strong>
             <p>Se um gift entrar com merchant manual e link fallback, ele aparece aqui automaticamente.</p>
           </div>
         ) : (
@@ -4268,7 +4781,7 @@ function AdminScreen({
       {pending.length === 0 ? (
         <div className="empty-admin">
           <ShieldCheck size={24} />
-          <strong>Nenhuma pendencia aberta</strong>
+          <strong>Nenhuma pendência aberta</strong>
           <p>Ao adicionar um item do Mercado Livre no modo local, a plataforma cria uma task simulada para todos os admins.</p>
         </div>
       ) : (
@@ -4344,25 +4857,54 @@ function AdminScreen({
   );
 }
 
+const PRO_FREE_FEATURES = [
+  "Listas e desejos ilimitados",
+  "Preencher item colando o link",
+  "Compartilhar e receber reservas",
+];
+
+const PRO_PAID_FEATURES = [
+  "Alertas automáticos de preço-alvo",
+  "Histórico de preço por loja",
+  "Radar sem limite de itens",
+  "Temas editoriais premium",
+];
+
 function ProScreen({ go }: { go: (view: View) => void }) {
   return (
     <>
       <section className="pro-hero">
         <Sparkles size={28} />
         <h2>Wishly Pro</h2>
-        <p>Radar de preços, alertas inteligentes e listas compartilhadas com uma experiência sem anúncios.</p>
+        <p>Guardar desejos e compartilhar é grátis. O Pro cuida do preço no seu lugar.</p>
         <strong>R$ 14,90 / mês</strong>
         <button className="primary-button full" type="button" onClick={() => go("checkout")}>
-          Comecar agora
+          Começar agora
         </button>
       </section>
-      <section className="feature-list">
-        {["Alertas de queda de preço", "Histórico por loja", "Reservas privadas", "Temas editoriais premium"].map((item) => (
-          <div className="feature" key={item}>
-            <Check size={18} />
-            <span>{item}</span>
+      <section className="plan-compare">
+        <article>
+          <p className="label">Sempre grátis</p>
+          <div className="feature-list">
+            {PRO_FREE_FEATURES.map((item) => (
+              <div className="feature" key={item}>
+                <Check size={18} />
+                <span>{item}</span>
+              </div>
+            ))}
           </div>
-        ))}
+        </article>
+        <article>
+          <p className="label">No Pro</p>
+          <div className="feature-list">
+            {PRO_PAID_FEATURES.map((item) => (
+              <div className="feature" key={item}>
+                <Check size={18} />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </article>
       </section>
     </>
   );
@@ -4370,28 +4912,25 @@ function ProScreen({ go }: { go: (view: View) => void }) {
 
 function CheckoutScreen({ go }: { go: (view: View) => void }) {
   return (
-    <form
-      className="form-stack"
-      onSubmit={(event) => {
-        event.preventDefault();
-        go("success");
-      }}
-    >
+    <section className="form-stack">
       <div className="plan-card">
         <span>Wishly Pro</span>
         <strong>R$ 14,90</strong>
         <small>Renovação mensal. Cancele quando quiser.</small>
       </div>
-      <Field label="Nome no cartao" placeholder="Gabriel Fachini" value="" onChange={() => undefined} />
-      <Field label="Numero do cartao" placeholder="0000 0000 0000 0000" icon={<CreditCard size={18} />} value="" onChange={() => undefined} />
-      <div className="field-row">
-        <Field label="Validade" placeholder="MM/AA" value="" onChange={() => undefined} />
-        <Field label="CVV" placeholder="123" value="" onChange={() => undefined} />
+      <div className="empty-state">
+        <Clock3 size={26} />
+        <h3>O pagamento ainda não está aberto.</h3>
+        <p>
+          Estamos finalizando a cobrança do Pro. Enquanto isso, o radar com preço-alvo continua disponível nas suas
+          listas e avisamos aqui quando a assinatura abrir.
+        </p>
+        <button className="primary-button" type="button" onClick={() => go("radar")}>
+          <ArrowRight size={18} />
+          Voltar ao radar
+        </button>
       </div>
-      <button className="primary-button full" type="submit">
-        Confirmar assinatura
-      </button>
-    </form>
+    </section>
   );
 }
 
@@ -4401,8 +4940,8 @@ function SuccessScreen({ go }: { go: (view: View) => void }) {
       <div className="success-icon">
         <Check size={36} />
       </div>
-      <h2>Assinatura confirmada</h2>
-      <p>O Radar Pro já está ativo nas suas listas. Você receberá alertas quando o melhor momento de compra chegar.</p>
+      <h2>Tudo pronto</h2>
+      <p>Seus alertas de preço estão ativos nas listas. Avisamos quando um item chegar ao preço-alvo.</p>
       <button className="primary-button full" type="button" onClick={() => go("radar")}>
         Abrir radar
       </button>
@@ -4461,16 +5000,18 @@ function ListCard({
 
 function WishCard({
   wish,
-  tracked,
+  alert,
   onTrack,
   onBuy,
 }: {
   wish: LocalWish | DbWish;
-  tracked: boolean;
+  alert: PriceAlert | undefined;
   onTrack: () => void;
   onBuy: () => void;
 }) {
   const isMercadoLivre = getWishProvider(wish) === "mercado_livre";
+  const tracked = Boolean(alert);
+  const alertStatus = getPriceAlertStatus(wish, alert);
 
   return (
     <article className={`wish-card${isMercadoLivre ? " wish-card--marketplace" : ""}`}>
@@ -4482,6 +5023,12 @@ function WishCard({
           <h3>{getWishTitle(wish)}</h3>
           <p>{getWishStore(wish)}</p>
           <span>{getWishPrice(wish)}</span>
+          {alertStatus && (
+            <p className={`wish-alert-note ${alertStatus.reached ? "is-reached" : ""}`}>
+              {alertStatus.reached ? <Check size={14} /> : <TrendingDown size={14} />}
+              {alertStatus.label}
+            </p>
+          )}
         </div>
         <div className="wish-actions">
           <button className={tracked ? "tracked" : ""} type="button" onClick={onTrack}>
@@ -4664,12 +5211,62 @@ function formatPriceInput(amountInCents: number, currency: string | null) {
   }).format(amountInCents / 100);
 }
 
+/**
+ * Traduz o alerta de preço em texto para a interface: sem alerta devolve null,
+ * com preço-alvo informa se já foi atingido ou quanto falta.
+ */
+function getPriceAlertStatus(wish: LocalWish | DbWish, alert: PriceAlert | undefined) {
+  if (!alert) return null;
+
+  const currency = getWishCurrency(wish);
+  if (alert.targetAmount == null) {
+    return { reached: false, label: "Acompanhando qualquer queda de preço." };
+  }
+
+  const target = alert.targetAmount;
+  const current = getWishAmount(wish);
+
+  if (current == null) {
+    return { reached: false, label: `Alvo de ${formatCurrency(target, currency)} · sem preço para comparar.` };
+  }
+
+  if (current <= target) {
+    return { reached: true, label: `Atingiu o alvo de ${formatCurrency(target, currency)}.` };
+  }
+
+  return {
+    reached: false,
+    label: `Faltam ${formatCurrency(current - target, currency)} para o alvo de ${formatCurrency(target, currency)}.`,
+  };
+}
+
+/**
+ * Valor monetário do desejo, já normalizado — os itens locais guardam o preço
+ * como texto ("R$ 1.899") e os remotos como número.
+ */
+function getWishAmount(wish: LocalWish | DbWish): number | null {
+  if ("price" in wish) {
+    const cents = parsePriceInputToCents(wish.price);
+    return cents == null ? null : cents / 100;
+  }
+  return wish.current_price ?? wish.estimated_price ?? null;
+}
+
 function parsePriceInputToCents(value: string) {
   const normalized = value.replace(/[^\d,.-]/g, "").trim();
   if (!normalized) return null;
-  const withDotDecimal = normalized.includes(",")
-    ? normalized.replace(/\./g, "").replace(",", ".")
-    : normalized;
+
+  let withDotDecimal: string;
+  if (normalized.includes(",")) {
+    // Formato pt-BR: ponto é separador de milhar e vírgula é decimal ("2.340,50").
+    withDotDecimal = normalized.replace(/\./g, "").replace(",", ".");
+  } else if (/\.\d{3}(?:\D|$)/.test(normalized)) {
+    // Só pontos com grupos de 3 dígitos ("2.340") também são milhar, não decimal.
+    withDotDecimal = normalized.replace(/\./g, "");
+  } else {
+    withDotDecimal = normalized;
+  }
+
   const numeric = Number(withDotDecimal);
   if (Number.isNaN(numeric)) return null;
   return Math.round(numeric * 100);
@@ -4791,11 +5388,14 @@ function currentListTitle(remote: ViewerState, isRemoteMode: boolean, localTitle
   return remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.title ?? "Sua lista";
 }
 
+function formatWishCount(total: number) {
+  return total === 1 ? "1 desejo" : `${total} desejos`;
+}
+
 function currentListCover(remote: ViewerState, fallback: string) {
-  return (
-    remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.cover_image_url ||
-    fallback
-  );
+  const selected = remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId);
+  if (!selected) return fallback;
+  return resolveListCover(selected.cover_image_url, selected.title);
 }
 
 function getWishId(wish: LocalWish | DbWish) {
@@ -4973,7 +5573,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
       isTracked,
       state: "critical" as const,
       stateTone: "danger" as const,
-      stateLabel: "Atencao imediata",
+      stateLabel: "Atenção imediata",
       statusLabel: "Risco de compra",
       supportLabel: "O item está sem estoque e deve ser revisado antes de compartilhar ou comprar.",
       metricLabel: "Estoque indisponível",
@@ -5035,7 +5635,7 @@ function buildRadarItem(wish: LocalWish | DbWish, isTracked: boolean) {
     state: "stable" as const,
     stateTone: "neutral" as const,
     stateLabel: "Monitorando",
-    statusLabel: "Sinais estaveis",
+    statusLabel: "Sinais estáveis",
     supportLabel: "Item com dados suficientes para acompanhar variação e disponibilidade.",
     metricLabel: hasRealDrop ? `Economia de ${formatCurrency(savingsInCurrency, getWishCurrency(wish))}` : "Sem queda relevante",
     priorityScore: hasRealDrop ? 58 : 42,

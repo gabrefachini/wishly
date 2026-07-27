@@ -1090,6 +1090,34 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
+.empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--surface-low);
+  box-shadow: var(--shadow);
+}
+
+.empty-state h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.empty-state p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.empty-state .primary-button {
+  margin-top: 6px;
+}
+
 .public-hero {
   display: grid;
   gap: 18px;
@@ -1189,6 +1217,165 @@ button:disabled {
   display: grid;
   gap: 14px;
   padding: 18px;
+}
+
+.public-wish-card.is-reserved img {
+  filter: saturate(0.45);
+  opacity: 0.7;
+}
+
+.public-wish-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.public-wish-reserved-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reserve-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+.reserve-dialog {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.reserve-dialog-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reserve-dialog-header h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  line-height: 26px;
+}
+
+.reserve-dialog-intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.reserve-dialog-form {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-compare {
+  display: grid;
+  gap: 14px;
+  padding: 0 20px;
+}
+
+.plan-compare article {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--surface-low);
+  box-shadow: var(--shadow);
+}
+
+.plan-compare .label {
+  margin-bottom: 10px;
+}
+
+@media (min-width: 720px) {
+  .plan-compare {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.wish-alert-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 600;
+}
+
+.wish-alert-note.is-reached {
+  color: var(--primary);
+}
+
+.radar-row-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.share-sheet-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: stretch;
+}
+
+.share-sheet-actions .share-whatsapp {
+  text-decoration: none;
+}
+
+.share-sheet-url {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-low);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+  word-break: break-all;
+}
+
+.public-reserve-toast {
+  position: fixed;
+  z-index: 70;
+  right: 20px;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  max-width: 420px;
+  margin-left: auto;
+  padding: 16px;
+  border-radius: 14px;
+  color: #fff;
+  background: var(--espresso, #2A2521);
+  box-shadow: var(--shadow);
+}
+
+.public-reserve-toast div {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.public-reserve-toast .icon-button {
+  color: #fff;
 }
 
 .public-wish-head {
@@ -1321,6 +1508,20 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px 8px;
+}
+
+.section-heading-stacked {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.section-heading-stacked p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .section-heading h2 {
@@ -1928,6 +2129,12 @@ button:disabled {
 }
 
 .cover-upload-empty small {
+  font-size: 12px;
+}
+
+.cover-upload-hint {
+  margin: -4px 0 0;
+  color: var(--text-muted);
   font-size: 12px;
 }
 

@@ -230,7 +230,7 @@ export async function signUpWithPassword(input: { email: string; password: strin
   return data;
 }
 
-export async function createWishlist(input: { title: string; coverFile: File }) {
+export async function createWishlist(input: { title: string; coverFile?: File | null }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
@@ -252,11 +252,14 @@ export async function createWishlist(input: { title: string; coverFile: File }) 
   if (!profile) throw new Error("Não foi possível localizar o perfil da sua conta.");
 
   const wishlistId = crypto.randomUUID();
-  const uploadedCover = await uploadWishlistCover({
-    userId: user.id,
-    wishlistId,
-    file: input.coverFile,
-  });
+  // A capa é opcional: sem upload a lista nasce sem imagem e a interface usa a capa gerada.
+  const uploadedCover = input.coverFile
+    ? await uploadWishlistCover({
+        userId: user.id,
+        wishlistId,
+        file: input.coverFile,
+      })
+    : null;
 
   const { data, error } = await supabase
     .from("wishlists")
@@ -268,13 +271,15 @@ export async function createWishlist(input: { title: string; coverFile: File }) 
       type: "wishlist",
       locale: "pt-BR",
       share_id: `${slugify(input.title)}-${Math.random().toString(36).slice(2, 8)}`,
-      cover_image_url: uploadedCover.publicUrl,
+      cover_image_url: uploadedCover?.publicUrl ?? null,
     })
     .select("id, title, share_id, cover_image_url")
     .single();
 
   if (error) {
-    await supabase.storage.from(uploadedCover.bucket).remove([uploadedCover.path]);
+    if (uploadedCover) {
+      await supabase.storage.from(uploadedCover.bucket).remove([uploadedCover.path]);
+    }
     throw error;
   }
 
@@ -949,6 +954,36 @@ export async function resolvePublicGiftRedirect(input: {
   }
 
   return data as { url: string; gift_id: string; wishlist_id: string };
+}
+
+export async function reservePublicGift(input: {
+  shareId: string;
+  giftId: string;
+  reserverName: string;
+  reserverEmail: string;
+  reserverMessage?: string | null;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.rpc("reserve_public_gift", {
+    p_share_id: input.shareId,
+    p_gift_id: input.giftId,
+    p_reserver_name: input.reserverName,
+    p_reserver_email: input.reserverEmail,
+    p_reserver_message: input.reserverMessage?.trim() ? input.reserverMessage.trim() : null,
+  });
+
+  if (error) {
+    logSupabaseError("reserve_public_gift", error, { shareId: input.shareId, giftId: input.giftId });
+    // A RPC sinaliza corrida de reserva; traduzimos para uma mensagem acionável.
+    if (typeof error.message === "string" && error.message.includes("gift_unavailable")) {
+      throw new Error("Esse presente acabou de ser reservado por outra pessoa.");
+    }
+    throw error;
+  }
+
+  return data as { reservation_id: string; gift_id: string; status: "reserved" };
 }
 
 export async function loadPublicWishlist(shareId: string) {
