@@ -328,6 +328,41 @@ export async function updateWishlistDetails(input: { wishlistId: string; title: 
   return data as DbWishlist;
 }
 
+/**
+ * Exclui a lista para quem é dono dela.
+ *
+ * Usa `archived_at` em vez de remover a linha: é o mesmo sinal que
+ * `loadViewerContext` e `get_public_wishlist` já filtram, então a lista
+ * desaparece do app e do link compartilhado sem apagar o histórico de
+ * reservas de quem já havia escolhido um presente.
+ *
+ * A garantia de que só o dono exclui vem da policy `wishlists_owner_all`:
+ * para quem não é dono o update não encontra a linha e devolve nada.
+ */
+export async function deleteWishlist(wishlistId: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase
+    .from("wishlists")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", wishlistId)
+    .is("archived_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("deleteWishlist", error, { wishlistId });
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Não foi possível excluir esta lista. Confirme se ela é sua e tente novamente.");
+  }
+
+  return data.id as string;
+}
+
 async function uploadWishlistCover(input: { userId: string; wishlistId: string; file: File }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
