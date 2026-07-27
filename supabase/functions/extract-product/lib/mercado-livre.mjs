@@ -728,6 +728,9 @@ function buildObservability(signals, steps, state) {
     catalogApiStatus: state.catalogApiStatus,
     catalogItemsApiStatus: state.catalogItemsApiStatus,
     priceApiStatus: state.priceApiStatus,
+    salePriceApiStatus: state.salePriceApiStatus,
+    salePriceApiError: state.salePriceApiError,
+    legacyPricesApiStatus: state.legacyPricesApiStatus,
     descriptionApiStatus: state.descriptionApiStatus,
     priceSource: state.priceSource,
     authState: state.authState,
@@ -743,6 +746,17 @@ function dedupeWarnings(warnings) {
 
 function getErrorStatus(error) {
   return error instanceof Error && error.message ? error.message : "failed";
+}
+
+function getUpstreamErrorDetails(error) {
+  if (!error || typeof error !== "object") return null;
+  const upstreamCode = typeof error.upstreamCode === "string" ? error.upstreamCode : null;
+  const upstreamMessage = typeof error.upstreamMessage === "string" ? error.upstreamMessage : null;
+  if (!upstreamCode && !upstreamMessage) return null;
+  return {
+    code: upstreamCode,
+    message: upstreamMessage,
+  };
 }
 
 function applySignalsToResult(result, signals, state) {
@@ -857,6 +871,9 @@ export async function extractMercadoLivreProduct({
     catalogItemsApiStatus: "skipped",
     itemApiStatus: "skipped",
     priceApiStatus: "skipped",
+    salePriceApiStatus: "skipped",
+    salePriceApiError: null,
+    legacyPricesApiStatus: "skipped",
     descriptionApiStatus: "skipped",
     priceSource: signals.currentPriceInCents != null ? "meli_structured_data" : "none",
     authState: meliAuthState,
@@ -1028,16 +1045,31 @@ export async function extractMercadoLivreProduct({
       return {
         kind: "sale_price",
         payload: salePricePayload,
+        salePriceApiStatus: "success",
+        salePriceApiError: null,
+        legacyPricesApiStatus: "skipped",
       };
-    } catch {
-      const legacyPricesPayload = await fetchJson(
-        `https://api.mercadolibre.com/items/${signals.itemId}/prices`,
-        timeoutMs,
-      );
-      return {
-        kind: "prices",
-        payload: legacyPricesPayload,
-      };
+    } catch (salePriceError) {
+      try {
+        const legacyPricesPayload = await fetchJson(
+          `https://api.mercadolibre.com/items/${signals.itemId}/prices`,
+          timeoutMs,
+        );
+        return {
+          kind: "prices",
+          payload: legacyPricesPayload,
+          salePriceApiStatus: getErrorStatus(salePriceError),
+          salePriceApiError: getUpstreamErrorDetails(salePriceError),
+          legacyPricesApiStatus: "success",
+        };
+      } catch (legacyPricesError) {
+        if (legacyPricesError && typeof legacyPricesError === "object") {
+          legacyPricesError.salePriceApiStatus = getErrorStatus(salePriceError);
+          legacyPricesError.salePriceApiError = getUpstreamErrorDetails(salePriceError);
+          legacyPricesError.legacyPricesApiStatus = getErrorStatus(legacyPricesError);
+        }
+        throw legacyPricesError;
+      }
     }
   });
 
@@ -1096,8 +1128,24 @@ export async function extractMercadoLivreProduct({
 
   if (pricePayload) {
     state.priceApiStatus = "success";
+    state.salePriceApiStatus = pricePayload.salePriceApiStatus;
+    state.salePriceApiError = pricePayload.salePriceApiError;
+    state.legacyPricesApiStatus = pricePayload.legacyPricesApiStatus;
   } else {
     state.priceApiStatus = priceSettled.status === "rejected" ? getErrorStatus(priceSettled.reason) : "failed";
+    if (priceSettled.status === "rejected") {
+      state.salePriceApiStatus =
+        typeof priceSettled.reason?.salePriceApiStatus === "string"
+          ? priceSettled.reason.salePriceApiStatus
+          : state.priceApiStatus;
+      state.salePriceApiError =
+        priceSettled.reason?.salePriceApiError ??
+        getUpstreamErrorDetails(priceSettled.reason);
+      state.legacyPricesApiStatus =
+        typeof priceSettled.reason?.legacyPricesApiStatus === "string"
+          ? priceSettled.reason.legacyPricesApiStatus
+          : "failed";
+    }
     warnings.push("meli_price_api_failed");
   }
 

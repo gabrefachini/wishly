@@ -474,10 +474,46 @@ async function fetchJson(url: string, timeoutMs: number, init: RequestInit = {})
       },
       signal: timeout.signal,
     });
+    const responseText = await response.text();
     if (!response.ok) {
-      throw new Error(`http_${response.status}`);
+      let upstreamBody: Record<string, unknown> = {};
+      try {
+        const parsed = JSON.parse(responseText);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          upstreamBody = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Non-JSON upstream responses still retain their HTTP status.
+      }
+
+      const upstreamError = new Error(`http_${response.status}`) as Error & {
+        status?: number;
+        upstreamCode?: string | null;
+        upstreamMessage?: string | null;
+      };
+      upstreamError.status = response.status;
+      upstreamError.upstreamCode =
+        typeof upstreamBody.error === "string"
+          ? upstreamBody.error
+          : typeof upstreamBody.code === "string"
+            ? upstreamBody.code
+            : null;
+      upstreamError.upstreamMessage =
+        typeof upstreamBody.message === "string"
+          ? upstreamBody.message.slice(0, 500)
+          : null;
+
+      const parsedUrl = new URL(url);
+      console.error("upstream_json_request_failed", {
+        host: parsedUrl.hostname,
+        path: parsedUrl.pathname,
+        status: response.status,
+        upstreamCode: upstreamError.upstreamCode,
+        upstreamMessage: upstreamError.upstreamMessage,
+      });
+      throw upstreamError;
     }
-    return await response.json();
+    return JSON.parse(responseText);
   } finally {
     timeout.clear();
   }

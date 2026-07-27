@@ -641,6 +641,108 @@ test("MercadoLivreProvider keeps auth state in observability", async () => {
   assert.equal(result.observability?.authState, "connected");
 });
 
+test("MercadoLivreProvider uses sale_price for a traditional MLB item without changing item extraction", async () => {
+  const requestedUrls = [];
+  const result = await extractMercadoLivreProduct({
+    originalUrl: "https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM",
+    resolvedUrl: new URL("https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM"),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => "",
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      requestedUrls.push(url);
+      if (url.endsWith("/sale_price?context=channel_marketplace")) {
+        return {
+          amount: 2199.9,
+          regular_amount: 2499.9,
+          currency_id: "BRL",
+        };
+      }
+      if (url.endsWith("/description")) return {};
+      if (url.endsWith("/prices")) throw new Error("legacy_prices_must_not_run");
+      return {
+        id: "MLB4577516683",
+        title: "Placa de video Palit RTX 5060 8GB",
+        permalink: "https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM",
+        currency_id: "BRL",
+        available_quantity: 3,
+        pictures: [
+          {
+            secure_url: "https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp",
+          },
+        ],
+        attributes: [],
+        variations: [],
+      };
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.externalProductId, "MLB4577516683");
+  assert.equal(result.currentPriceInCents, 219990);
+  assert.equal(result.originalPriceInCents, 249990);
+  assert.equal(result.priceSource, "meli_sale_price_api");
+  assert.equal(result.observability?.salePriceApiStatus, "success");
+  assert.equal(result.observability?.legacyPricesApiStatus, "skipped");
+  assert.ok(requestedUrls.some((url) => url.endsWith("/sale_price?context=channel_marketplace")));
+  assert.ok(!requestedUrls.some((url) => url.endsWith("/prices")));
+});
+
+test("MercadoLivreProvider preserves sanitized sale_price error details when both price endpoints fail", async () => {
+  const result = await extractMercadoLivreProduct({
+    originalUrl: "https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM",
+    resolvedUrl: new URL("https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM"),
+    html: null,
+    timeoutMs: 3000,
+    steps: {},
+    meliAuthState: "platform_connected",
+    ensureHtml: async () => "",
+    withStepTiming: async (_steps, _label, task) => await task(),
+    fetchJson: async (url) => {
+      if (url.endsWith("/sale_price?context=channel_marketplace")) {
+        const error = new Error("http_403");
+        error.upstreamCode = "FORBIDDEN";
+        error.upstreamMessage = "Caller ID must match item owner";
+        throw error;
+      }
+      if (url.endsWith("/prices")) {
+        const error = new Error("http_403");
+        error.upstreamCode = "FORBIDDEN";
+        error.upstreamMessage = "Caller ID does not have rights to access this endpoint";
+        throw error;
+      }
+      if (url.endsWith("/description")) return {};
+      return {
+        id: "MLB4577516683",
+        title: "Placa de video Palit RTX 5060 8GB",
+        permalink: "https://produto.mercadolivre.com.br/MLB-4577516683-placa-de-video-_JM",
+        currency_id: "BRL",
+        available_quantity: 3,
+        pictures: [
+          {
+            secure_url: "https://http2.mlstatic.com/D_Q_NP_2X_98765-MLB4577516683-F.webp",
+          },
+        ],
+        attributes: [],
+        variations: [],
+      };
+    },
+  });
+
+  assert.equal(result.provider, "mercado_livre");
+  assert.equal(result.currentPriceInCents, null);
+  assert.equal(result.observability?.salePriceApiStatus, "http_403");
+  assert.deepEqual(result.observability?.salePriceApiError, {
+    code: "FORBIDDEN",
+    message: "Caller ID must match item owner",
+  });
+  assert.equal(result.observability?.legacyPricesApiStatus, "http_403");
+  assert.ok(result.warnings.includes("meli_price_api_failed"));
+});
+
 test("MercadoLivreProvider falls back to item page HTML when item API fails after resolving wid", async () => {
   const catalogHtml = `
     <html>
