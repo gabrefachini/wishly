@@ -60,6 +60,7 @@ import {
   updateViewerPassword,
   updateViewerPreferences,
   updateViewerProfile,
+  updateWishlistTitle,
   requestViewerAccountDeletion,
   updateRecoveredPassword,
   type AdminAccountDeletionRequest,
@@ -639,7 +640,7 @@ function App() {
 
   function beginEditListFlow() {
     setCreateListMode("edit");
-    setCreateListForm({ title: localListTitle });
+    setCreateListForm({ title: isRemoteMode ? currentListTitle(remote, isRemoteMode, localListTitle) : localListTitle });
     setSyncError("");
     setAuthMessage("");
     setAuthSubmitState("idle");
@@ -1061,6 +1062,33 @@ function App() {
     const fallbackTitle = createListForm.title.trim() || "Minha lista";
 
     if (isRemoteMode) {
+      if (createListMode === "edit" && remote.selectedWishlistId) {
+        try {
+          setSyncing(true);
+          setSyncError("");
+          const updatedWishlist = await updateWishlistTitle({
+            wishlistId: remote.selectedWishlistId,
+            title: fallbackTitle,
+          });
+          setRemote((current) => ({
+            ...current,
+            wishlists: current.wishlists.map((wishlist) =>
+              wishlist.id === updatedWishlist.id ? updatedWishlist : wishlist,
+            ),
+          }));
+          setCreateListForm({ title: "" });
+          setAuthMessage("Lista atualizada.");
+          setCreateListMode("create");
+          go("list");
+          return;
+        } catch (error) {
+          setSyncError(getErrorMessage(error));
+          return;
+        } finally {
+          setSyncing(false);
+        }
+      }
+
       try {
         setSyncing(true);
         setSyncError("");
@@ -1983,7 +2011,7 @@ function App() {
             onBuyWish={(wish) => void handleBuyWish(wish)}
             onShare={() => void handleShareCurrentList()}
             onEditList={beginEditListFlow}
-            canEditList={!isRemoteMode}
+            canEditList
           />
         )}
         {view === "add" && (

@@ -245,6 +245,24 @@ export async function createWishlist(input: { title: string; coverImageUrl?: str
   return data as DbWishlist;
 }
 
+export async function updateWishlistTitle(input: { wishlistId: string; title: string }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase
+    .from("wishlists")
+    .update({
+      title: input.title,
+    })
+    .eq("id", input.wishlistId)
+    .select("id, title, share_id, cover_image_url")
+    .single();
+
+  if (error) throw error;
+
+  return data as DbWishlist;
+}
+
 export async function signOut() {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return;
