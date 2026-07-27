@@ -172,13 +172,13 @@ export async function getInitialSession(): Promise<Session | null> {
   return data.session;
 }
 
-export function listenToAuthChanges(callback: (session: Session | null) => void) {
+export function listenToAuthChanges(callback: (event: string, session: Session | null) => void) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return () => undefined;
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => callback(session));
+  } = supabase.auth.onAuthStateChange((event, session) => callback(event, session));
 
   return () => subscription.unsubscribe();
 }
@@ -367,6 +367,19 @@ export async function updateViewerPassword(input: { currentPassword: string; nex
   const { data, error } = await supabase.auth.updateUser({
     password: input.nextPassword,
     current_password: input.currentPassword,
+  });
+
+  if (error) throw error;
+
+  return data.user;
+}
+
+export async function updateRecoveredPassword(nextPassword: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: nextPassword,
   });
 
   if (error) throw error;

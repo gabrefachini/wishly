@@ -916,6 +916,20 @@ button:disabled {
   white-space: nowrap;
 }
 
+.top-title-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.top-title-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -1486,6 +1500,32 @@ button:disabled {
   gap: 10px;
 }
 
+.hero-edit-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  margin-top: 2px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  align-self: start;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 800;
+  backdrop-filter: blur(10px);
+}
+
+.hero-edit-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-edit-button svg {
+  flex: 0 0 auto;
+}
+
 .split-row {
   flex-direction: column;
 }
@@ -1901,6 +1941,16 @@ button:disabled {
   display: grid;
   gap: 16px;
   padding: 18px 20px;
+}
+
+.reset-password-layout {
+  min-height: calc(100vh - 160px);
+  align-content: start;
+  justify-items: center;
+}
+
+.reset-password-card {
+  width: min(100%, 560px);
 }
 
 .profile-settings-card {

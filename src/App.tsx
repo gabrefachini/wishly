@@ -23,6 +23,7 @@ import {
   QrCode,
   Search,
   Share2,
+  PencilLine,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -60,6 +61,7 @@ import {
   updateViewerPreferences,
   updateViewerProfile,
   requestViewerAccountDeletion,
+  updateRecoveredPassword,
   type AdminAccountDeletionRequest,
   type AdminAffiliateQueueItem,
   type DbWish,
@@ -85,6 +87,7 @@ type View =
   | "create_list"
   | "list"
   | "add"
+  | "reset_password"
   | "radar"
   | "activity"
   | "profile"
@@ -95,7 +98,12 @@ type View =
   | "admin";
 type Priority = "Alta" | "Media" | "Baixa";
 type AuthPanelMode = "create" | "login";
+type CreateListMode = "create" | "edit";
 type AuthSubmitState = "idle" | "submitting" | "success" | "error";
+type PasswordResetFormState = {
+  newPassword: string;
+  confirmNewPassword: string;
+};
 type LocalSource = "mercado_livre" | "amazon" | "shopee" | "magalu" | "unknown";
 type LocalAffiliateStatus = "not_generated" | "generated" | "invalid" | "unavailable";
 type LocalAffiliateTaskStatus = "pending" | "completed" | "invalid" | "unavailable";
@@ -223,6 +231,18 @@ function isValidEmail(email: string) {
 
 function trackAuthEvent(event: "login_started" | "login_success" | "login_failed" | "login_timeout" | "password_recovery_requested") {
   window.dispatchEvent(new CustomEvent("wishly:auth", { detail: { event } }));
+}
+
+function hasPasswordRecoveryParams() {
+  if (typeof window === "undefined") return false;
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("type") === "recovery") return true;
+
+  if (!url.hash) return false;
+
+  const hashParams = new URLSearchParams(url.hash.slice(1));
+  return hashParams.get("type") === "recovery";
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
@@ -361,6 +381,7 @@ function App() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>("Alta");
   const [tracked, setTracked] = useState<number[]>(() => readLocalState("wishly-tracked", [1, 3]));
   const [localListTitle, setLocalListTitle] = useState(localListName);
+  const [createListMode, setCreateListMode] = useState<CreateListMode>("create");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "light";
     return window.localStorage.getItem("wishly-theme") === "dark" ? "dark" : "light";
@@ -407,9 +428,14 @@ function App() {
     password: "",
     confirmPassword: "",
   });
+  const [passwordResetForm, setPasswordResetForm] = useState<PasswordResetFormState>({
+    newPassword: "",
+    confirmNewPassword: "",
+  });
   const [authMessage, setAuthMessage] = useState("");
   const [authSubmitState, setAuthSubmitState] = useState<AuthSubmitState>("idle");
   const [authPanelMode, setAuthPanelMode] = useState<AuthPanelMode>("login");
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(hasPasswordRecoveryParams());
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [meliConnecting, setMeliConnecting] = useState(false);
@@ -438,7 +464,7 @@ function App() {
     () => (isRemoteMode && session?.user ? getRemoteProfile(session.user) : localProfile),
     [isRemoteMode, localProfile, session],
   );
-  const showFab = !["admin", "create_list", "profile", "profile_settings", "pro", "checkout", "success"].includes(view);
+  const showFab = !["admin", "create_list", "profile", "profile_settings", "reset_password", "pro", "checkout", "success"].includes(view);
 
   const title = useMemo(() => {
     if (view === "home") return "";
@@ -449,6 +475,7 @@ function App() {
     if (view === "activity") return "Atividade";
     if (view === "profile") return "Profile";
     if (view === "profile_settings") return "Configuracoes da conta";
+    if (view === "reset_password") return "Redefinir senha";
     if (view === "pro") return "Upgrade para o Pro";
     if (view === "checkout") return "Finalizar assinatura";
     if (view === "admin") return "Fila de afiliados";
@@ -471,19 +498,33 @@ function App() {
   }
 
   function beginCreateListFlow() {
+    setPasswordRecoveryMode(false);
+    setCreateListMode("create");
     setAuthPanelMode("create");
     setAuthMessage("");
     setSyncError("");
     setAuthSubmitState("idle");
+    setCreateListForm({ title: "" });
     window.localStorage.setItem(POST_AUTH_VIEW_KEY, "create_list");
   }
 
   function beginLoginFlow() {
+    setPasswordRecoveryMode(false);
+    setCreateListMode("create");
     setAuthPanelMode("login");
     setAuthMessage("");
     setSyncError("");
     setAuthSubmitState("idle");
     window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+  }
+
+  function beginEditListFlow() {
+    setCreateListMode("edit");
+    setCreateListForm({ title: localListTitle });
+    setSyncError("");
+    setAuthMessage("");
+    setAuthSubmitState("idle");
+    go("create_list");
   }
 
   function resetAuthFlow() {
@@ -496,6 +537,12 @@ function App() {
       password: "",
       confirmPassword: "",
     });
+  }
+
+  function resetPasswordField<K extends keyof PasswordResetFormState>(field: K, value: PasswordResetFormState[K]) {
+    setSyncError("");
+    setAuthMessage("");
+    setPasswordResetForm((current) => ({ ...current, [field]: value }));
   }
 
   function updateAuthField<K extends keyof AuthFormState>(field: K, value: AuthFormState[K]) {
@@ -517,6 +564,13 @@ function App() {
   }
 
   function handleBack() {
+    if (view === "reset_password") {
+      window.history.replaceState({}, "", window.location.pathname);
+      setPasswordRecoveryMode(false);
+      go("home");
+      return;
+    }
+
     if (view === "checkout") {
       go("pro");
       return;
@@ -901,6 +955,7 @@ function App() {
         }));
         setCreateListForm({ title: "" });
         setAuthMessage("");
+        setCreateListMode("create");
         go("add");
         return;
       } catch (error) {
@@ -914,8 +969,9 @@ function App() {
     setCreateListForm({ title: "" });
     setAuthMessage("");
     setSyncError("");
+    setCreateListMode("create");
     window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
-    go("add");
+    go(createListMode === "edit" ? "list" : "add");
   }
 
   async function handleRemoteAdminUpdate(giftId: string, status: "generated" | "failed" | "fallback") {
@@ -1070,6 +1126,44 @@ function App() {
     } catch (error) {
       setSyncError(getErrorMessage(error));
       setAuthSubmitState("error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleUpdateRecoveredPassword() {
+    if (syncing) return;
+
+    const newPassword = passwordResetForm.newPassword.trim();
+    const confirmNewPassword = passwordResetForm.confirmNewPassword.trim();
+
+    if (!newPassword || !confirmNewPassword) {
+      setSyncError("Preencha a nova senha e a confirmação.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setSyncError("Use uma nova senha com pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setSyncError("A confirmação da nova senha não confere.");
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setSyncError("");
+      setAuthMessage("");
+      await updateRecoveredPassword(newPassword);
+      setPasswordRecoveryMode(false);
+      setPasswordResetForm({ newPassword: "", confirmNewPassword: "" });
+      window.history.replaceState({}, "", window.location.pathname);
+      setAuthMessage("Senha atualizada com sucesso. Você já pode continuar usando sua conta.");
+      setView("home");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
     } finally {
       setSyncing(false);
     }
@@ -1452,7 +1546,16 @@ function App() {
       void refreshRemoteState(nextSession);
     });
 
-    const unsubscribe = listenToAuthChanges((nextSession) => {
+    const unsubscribe = listenToAuthChanges((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecoveryMode(true);
+        setView("reset_password");
+        setSyncError("");
+        setAuthMessage("");
+      } else if (event === "SIGNED_OUT") {
+        setPasswordRecoveryMode(false);
+      }
+
       setSession(nextSession);
       void refreshRemoteState(nextSession);
     });
@@ -1486,6 +1589,15 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasPasswordRecoveryParams()) return;
+
+    setPasswordRecoveryMode(true);
+    setView("reset_password");
+    setSyncError("");
+    setAuthMessage("");
+  }, []);
+
+  useEffect(() => {
     if (!publicState.shareId || session) {
       if (publicState.wishlist || publicState.loading || publicState.notFound) {
         setPublicState((current) => ({
@@ -1510,7 +1622,7 @@ function App() {
       try {
         const wishlist = supabaseEnabled
           ? await loadPublicWishlist(publicState.shareId!)
-          : buildLocalPublicWishlist(publicState.shareId!, localWishes);
+          : buildLocalPublicWishlist(publicState.shareId!, localWishes, localListTitle);
 
         if (!active) return;
 
@@ -1525,9 +1637,9 @@ function App() {
 
         setPublicState((current) => ({
           ...current,
-          wishlist: buildLocalPublicWishlist(publicState.shareId!, localWishes),
+          wishlist: buildLocalPublicWishlist(publicState.shareId!, localWishes, localListTitle),
           loading: false,
-          notFound: !buildLocalPublicWishlist(publicState.shareId!, localWishes),
+          notFound: !buildLocalPublicWishlist(publicState.shareId!, localWishes, localListTitle),
         }));
         setSyncError(getErrorMessage(error));
       }
@@ -1538,10 +1650,10 @@ function App() {
     return () => {
       active = false;
     };
-  }, [publicState.shareId, session, localWishes]);
+  }, [publicState.shareId, session, localWishes, localListTitle]);
 
   useEffect(() => {
-    if (!session || !remoteReady) return;
+    if (!session || !remoteReady || passwordRecoveryMode) return;
 
     const pendingView = window.localStorage.getItem(POST_AUTH_VIEW_KEY) as View | null;
     if (pendingView === "create_list") {
@@ -1554,7 +1666,7 @@ function App() {
     if (view === "home" && remote.wishlists.length === 0) {
       setView("create_list");
     }
-  }, [session, remoteReady, remote.wishlists.length, view]);
+  }, [passwordRecoveryMode, session, remoteReady, remote.wishlists.length, view]);
 
   useEffect(() => {
     document.body.classList.toggle("marketing-body", isMarketingMode);
@@ -1658,7 +1770,15 @@ function App() {
             <ChevronLeft size={24} />
           </button>
         )}
-        {title && <h1 className="top-title">{title}</h1>}
+        {title &&
+          (view === "list" ? (
+            <div className="top-title-wrap">
+              <span className="top-title-kicker">Lista ativa</span>
+              <h1 className="top-title">{title}</h1>
+            </div>
+          ) : (
+            <h1 className="top-title">{title}</h1>
+          ))}
         <div className="top-actions">
           {(!supabaseEnabled || remote.isAdmin || localPendingTasks.length > 0) && (
             <button className="icon-button" type="button" onClick={() => go("admin")} aria-label="Abrir fila de afiliados" title="Fila de afiliados">
@@ -1712,13 +1832,22 @@ function App() {
             syncing={syncing}
           />
         )}
+        {view === "reset_password" && (
+          <ResetPasswordScreen
+            passwordResetForm={passwordResetForm}
+            onChangeField={resetPasswordField}
+            onSubmit={() => void handleUpdateRecoveredPassword()}
+            syncing={syncing}
+          />
+        )}
         {view === "create_list" && (
           <CreateListScreen
             formState={createListForm}
-            onBack={() => go("home")}
+            onBack={() => go(createListMode === "edit" ? "list" : "home")}
             onChange={(title) => setCreateListForm({ title })}
             onSubmit={() => void handleCreateWishlist()}
             syncing={syncing}
+            mode={createListMode}
           />
         )}
         {view === "list" && (
@@ -1734,6 +1863,8 @@ function App() {
             onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
             onBuyWish={(wish) => void handleBuyWish(wish)}
             onShare={() => void handleShareCurrentList()}
+            onEditList={beginEditListFlow}
+            canEditList={!isRemoteMode}
           />
         )}
         {view === "add" && (
@@ -1813,12 +1944,14 @@ function App() {
         </button>
       )}
 
-      <nav className="bottom-nav" aria-label="Navegacao principal">
-        <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
-        <NavItem active={view === "radar"} icon={<LineChart size={22} />} label="Radar" onClick={() => go("radar")} />
-        <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
-        <NavItem active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"} icon={<User size={22} />} label="Profile" onClick={() => go("profile")} />
-      </nav>
+      {view !== "reset_password" && (
+        <nav className="bottom-nav" aria-label="Navegacao principal">
+          <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
+          <NavItem active={view === "radar"} icon={<LineChart size={22} />} label="Radar" onClick={() => go("radar")} />
+          <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
+          <NavItem active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"} icon={<User size={22} />} label="Profile" onClick={() => go("profile")} />
+        </nav>
+      )}
         </>
       )}
     </div>
@@ -2540,9 +2673,9 @@ function HomeScreen({
       </div>
 
       <Shelf title="Suas listas" action="VER TUDO" variant="lists">
-        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 precos cairam" badge="3 PROMOS" onClick={() => go("list")} />
-        <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritarios" badge="9 ITENS" />
-        <ListCard image={images.travel} title="Proxima viagem" meta="12 desejos • Compartilhada" badge="GRUPO" />
+        <ListCard image={images.home} title="Casa nova" meta="18 desejos • 3 precos cairam" badge="ATUAL" onClick={() => go("list")} />
+        <ListCard image={images.setup} title="Setup dos sonhos" meta="9 desejos • 2 prioritarios" badge="EXEMPLO" onClick={() => go("list")} />
+        <ListCard image={images.travel} title="Proxima viagem" meta="12 desejos • Compartilhada" badge="EXEMPLO" onClick={() => go("list")} />
       </Shelf>
 
       <section className="idea-band">
@@ -2556,19 +2689,77 @@ function HomeScreen({
   );
 }
 
+function ResetPasswordScreen({
+  passwordResetForm,
+  onChangeField,
+  onSubmit,
+  syncing,
+}: {
+  passwordResetForm: PasswordResetFormState;
+  onChangeField: <K extends keyof PasswordResetFormState>(field: K, value: PasswordResetFormState[K]) => void;
+  onSubmit: () => void;
+  syncing: boolean;
+}) {
+  return (
+    <section className="profile-settings-layout reset-password-layout">
+      <article className="profile-settings-card reset-password-card">
+        <div>
+          <p className="label">Recuperacao de acesso</p>
+          <h2>Crie uma nova senha</h2>
+          <p>Use o link do e-mail para definir uma nova senha antes de voltar ao Wishly.</p>
+        </div>
+
+        <div className="profile-settings-fields">
+          <Field
+            label="Nova senha"
+            placeholder="Digite a nova senha"
+            value={passwordResetForm.newPassword}
+            onChange={(value) => onChangeField("newPassword", value)}
+            inputType="password"
+            autoComplete="new-password"
+          />
+          <Field
+            label="Confirmar nova senha"
+            placeholder="Repita a nova senha"
+            value={passwordResetForm.confirmNewPassword}
+            onChange={(value) => onChangeField("confirmNewPassword", value)}
+            inputType="password"
+            autoComplete="new-password"
+          />
+        </div>
+
+        <div className="field-row">
+          <button
+            className="primary-button full"
+            type="button"
+            onClick={onSubmit}
+            disabled={!passwordResetForm.newPassword.trim() || !passwordResetForm.confirmNewPassword.trim() || syncing}
+          >
+            {syncing ? "Atualizando..." : "Atualizar senha"}
+          </button>
+        </div>
+      </article>
+    </section>
+  );
+}
+
 function CreateListScreen({
   formState,
   onBack,
   onChange,
   onSubmit,
   syncing,
+  mode,
 }: {
   formState: CreateListFormState;
   onBack: () => void;
   onChange: (title: string) => void;
   onSubmit: () => void;
   syncing: boolean;
+  mode: CreateListMode;
 }) {
+  const isEditing = mode === "edit";
+
   return (
     <section className="desktop-flow-layout">
       <form
@@ -2580,8 +2771,12 @@ function CreateListScreen({
       >
         <div className="upload-card">
           <Heart size={24} />
-          <h2>Crie sua primeira lista</h2>
-          <p>Escolha um nome para começar. Depois você adiciona os desejos e compartilha quando quiser.</p>
+          <h2>{isEditing ? "Edite o nome da lista" : "Crie sua primeira lista"}</h2>
+          <p>
+            {isEditing
+              ? "Ajuste o nome da lista sem perder os desejos já salvos."
+              : "Escolha um nome para começar. Depois você adiciona os desejos e compartilha quando quiser."}
+          </p>
         </div>
 
         <Field
@@ -2597,7 +2792,7 @@ function CreateListScreen({
             Voltar
           </button>
           <button className="primary-button full" type="submit" disabled={!formState.title.trim() || syncing}>
-            {syncing ? "Criando..." : "Continuar"}
+            {syncing ? (isEditing ? "Salvando..." : "Criando...") : isEditing ? "Salvar alterações" : "Continuar"}
           </button>
         </div>
       </form>
@@ -2605,8 +2800,12 @@ function CreateListScreen({
       <aside className="desktop-flow-aside">
         <div className="desktop-flow-card">
           <p className="label">Primeiro passo</p>
-          <h2>Sua lista nasce pronta para receber desejos</h2>
-          <p>Depois de criar a lista, você pode colar links, ajustar prioridades e compartilhar quando tudo estiver organizado.</p>
+          <h2>{isEditing ? "O nome aparece em todo o fluxo" : "Sua lista nasce pronta para receber desejos"}</h2>
+          <p>
+            {isEditing
+              ? "Ao salvar, o novo nome atualiza o topo, o resumo e o compartilhamento."
+              : "Depois de criar a lista, você pode colar links, ajustar prioridades e compartilhar quando tudo estiver organizado."}
+          </p>
         </div>
         <div className="desktop-flow-points">
           <article>
@@ -2639,6 +2838,8 @@ function ListScreen({
   onSelectWishlist,
   onBuyWish,
   onShare,
+  onEditList,
+  canEditList,
 }: {
   go: (view: View) => void;
   tracked: number[];
@@ -2651,6 +2852,8 @@ function ListScreen({
   onSelectWishlist: (wishlistId: string) => void;
   onBuyWish: (wish: LocalWish | DbWish) => void;
   onShare: () => void;
+  onEditList: () => void;
+  canEditList: boolean;
 }) {
   function toggle(id: number) {
     setTracked(tracked.includes(id) ? tracked.filter((item) => item !== id) : [...tracked, id]);
@@ -2665,6 +2868,12 @@ function ListScreen({
           <p className="label light">Lista compartilhada</p>
           <h2>{wishlistTitle}</h2>
           <p>Uma colecao calma de pecas para transformar o primeiro apartamento em casa.</p>
+          {canEditList && (
+            <button className="text-button hero-edit-button" type="button" onClick={onEditList}>
+              <PencilLine size={16} />
+              Editar lista
+            </button>
+          )}
           <div className="hero-actions">
             <button className="primary-button" type="button" onClick={() => go("add")}>
               <Plus size={18} />
