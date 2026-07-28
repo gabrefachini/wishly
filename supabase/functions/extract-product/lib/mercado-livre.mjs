@@ -30,12 +30,25 @@ export function isMercadoLivreHost(hostname) {
     normalized === "lista.mercadolivre.com.br" ||
     normalized.endsWith(".mercadolivre.com.br") ||
     normalized.endsWith(".mercadolibre.com") ||
+    // Hosts dos links de compartilhamento e de afiliado do app do Mercado Livre.
+    // Sem eles, um link /sec/ colado pela pessoa passava longe deste provider.
+    normalized === "mercadolivre.com" ||
+    normalized === "www.mercadolivre.com" ||
+    normalized === "mlbr.co" ||
     normalized === "meli.la"
   );
 }
 
-export function isMercadoLivreShortHost(hostname) {
-  return hostname.toLowerCase() === "meli.la";
+/**
+ * Links que precisam ter o redirect resolvido antes de dar para achar o item.
+ *
+ * O `pathname` é opcional para manter compatibilidade com quem chama só com o
+ * host; `/sec/` é o formato de afiliado e só revela o produto após o redirect.
+ */
+export function isMercadoLivreShortHost(hostname, pathname = "") {
+  const normalized = hostname.toLowerCase();
+  if (normalized === "meli.la" || normalized === "mlbr.co") return true;
+  return isMercadoLivreHost(normalized) && /^\/sec\//i.test(pathname);
 }
 
 export function normalizeMercadoLivreItemId(value) {
@@ -351,7 +364,7 @@ function getStructuredSignals(resolvedUrl, html) {
 }
 
 function detectResourceType(url) {
-  if (isMercadoLivreShortHost(url.hostname)) return "short_url";
+  if (isMercadoLivreShortHost(url.hostname, url.pathname)) return "short_url";
   if (USER_PRODUCT_PATH_PATTERN.test(url.pathname)) return "user_product";
   if (CATALOG_PATH_PATTERN.test(url.pathname)) return "catalog_product";
   if (ITEM_PATTERN.test(url.pathname) || ITEM_PATTERN.test(url.search)) return "item";

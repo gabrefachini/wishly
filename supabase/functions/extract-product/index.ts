@@ -9,6 +9,12 @@ import {
   isMercadoLivreHost,
   isMercadoLivreShortHost,
 } from "./lib/mercado-livre.mjs";
+import {
+  cleanProductTitle,
+  decodeHtmlEntities,
+  extractOfferPrices,
+  pickProductNode,
+} from "./lib/structured-data.mjs";
 
 type ProductExtractionResult = {
   originalUrl: string;
@@ -324,6 +330,32 @@ const HTTP_HEADERS = {
   accept: "text/html,application/xhtml+xml,application/json",
 };
 
+/**
+ * Cabeçalhos para buscar HTML de página de produto.
+ *
+ * Marketplaces entregam a página completa (com JSON-LD e OpenGraph) para os
+ * crawlers de preview de link, e devolvem uma página de verificação para
+ * user-agents genéricos. Com o UA anterior o Mercado Livre respondia 200 com
+ * `/gz/account-verification`, cujo título é "Mercado Libre" — era daí que vinham
+ * os itens sem preço e com a logo no lugar da foto.
+ */
+const HTML_FETCH_HEADERS = {
+  "user-agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+  accept: "text/html,application/xhtml+xml",
+  "accept-language": "pt-BR,pt;q=0.9",
+};
+
+// Páginas de verificação/desafio: retornam 200, então precisam ser detectadas
+// pelo conteúdo, senão viram "produto" com título e imagem da marca.
+const BLOCKED_PAGE_URL_PATTERN = /\/gz\/account-verification|\/gz\/challenge|\/jms\/[^/]+\/lgz\/login/i;
+const BLOCKED_PAGE_BODY_PATTERN = /<title[^>]*id=["']root-title["'][^>]*>\s*mercado\s+li[bv]re\s*</i;
+
+function assertNotBlockedPage(finalUrl: string, body: string) {
+  if (BLOCKED_PAGE_URL_PATTERN.test(finalUrl) || BLOCKED_PAGE_BODY_PATTERN.test(body)) {
+    throw new Error("blocked_by_marketplace");
+  }
+}
+
 function buildEmptyResult(originalUrl: string): ProductExtractionResult {
   return {
     originalUrl,
@@ -449,7 +481,7 @@ async function fetchText(url: string, timeoutMs: number, init: RequestInit = {})
     const response = await fetch(url, {
       ...init,
       headers: {
-        ...HTTP_HEADERS,
+        ...HTML_FETCH_HEADERS,
         ...(init.headers ?? {}),
       },
       signal: timeout.signal,
@@ -457,7 +489,11 @@ async function fetchText(url: string, timeoutMs: number, init: RequestInit = {})
     if (!response.ok) {
       throw new Error(`http_${response.status}`);
     }
-    return await response.text();
+    const body = await response.text();
+    // Falhar aqui é melhor que parsear o desafio como se fosse produto: o
+    // provider registra `partial` em vez de gravar título e imagem da marca.
+    assertNotBlockedPage(response.url || url, body);
+    return body;
   } finally {
     timeout.clear();
   }
@@ -579,7 +615,9 @@ async function resolveShortUrl(url: URL, steps: Record<string, number>) {
       try {
         const response = await fetch(current.toString(), {
           method: "GET",
-          headers: HTTP_HEADERS,
+          // Mesmo UA da busca de HTML: com UA genérico o redirect do /sec/ cai
+          // na página de verificação em vez de apontar para o produto.
+          headers: HTML_FETCH_HEADERS,
           redirect: "manual",
           signal: timeout.signal,
         });
@@ -878,14 +916,13 @@ class GenericHtmlProvider implements ProductProvider {
 
 function extractFromStructuredData(url: URL, html: string): ProductExtractionResult | null {
   const nodes = flattenGraph(parseLdJsonBlocks(html));
-  const candidates = nodes.filter((node) => {
-    const type = String(node["@type"] ?? "").toLowerCase();
-    return type.includes("product");
-  });
-  const selected = candidates[0];
+  // Escolhe o nó que corresponde à URL pedida: PDPs listam produtos relacionados.
+  const selected = pickProductNode(nodes, url.toString()) as Record<string, unknown> | null;
   if (!selected) return null;
 
   const offer = Array.isArray(selected.offers) ? selected.offers[0] : selected.offers;
+  const offerPrices = extractOfferPrices(selected.offers);
+  const currentPriceInCents = parseMoneyToCents(offerPrices.price);
   const imageUrls = normalizeImages(selected.image);
   const canonicalUrl =
     (typeof selected.url === "string" && selected.url) ||
@@ -901,26 +938,25 @@ function extractFromStructuredData(url: URL, html: string): ProductExtractionRes
     sellerName: null,
     externalProductId: typeof selected.sku === "string" ? selected.sku : null,
     externalVariantId: null,
-    title: typeof selected.name === "string" ? selected.name : null,
-    description: typeof selected.description === "string" ? selected.description : null,
+    // Lojas colam o próprio nome no fim do título ("Produto | Americanas").
+    title: cleanProductTitle(typeof selected.name === "string" ? selected.name : null, url.hostname),
+    description: typeof selected.description === "string" ? decodeHtmlEntities(selected.description) : null,
     imageUrl: imageUrls[0] ?? null,
     imageUrls,
-    currentPriceInCents: parseMoneyToCents((offer as Record<string, unknown> | undefined)?.price ?? (offer as Record<string, unknown> | undefined)?.lowPrice),
-    originalPriceInCents: parseMoneyToCents((offer as Record<string, unknown> | undefined)?.highPrice),
-    currency: typeof (offer as Record<string, unknown> | undefined)?.priceCurrency === "string"
-      ? String((offer as Record<string, unknown>).priceCurrency)
-      : null,
-    availability: toAvailability(typeof (offer as Record<string, unknown> | undefined)?.availability === "string"
-      ? String((offer as Record<string, unknown>).availability)
-      : null),
+    currentPriceInCents,
+    originalPriceInCents: parseMoneyToCents(offerPrices.originalPrice),
+    currency: offerPrices.currency,
+    availability: toAvailability(offerPrices.availability),
     selectedVariant: [],
     extractedAt: new Date().toISOString(),
-    partial: !Boolean(selected.name && imageUrls[0] && offer),
+    // Antes isso checava só a existência de `offers`. A Amazon devolve `offers`
+    // com `price` nulo, então o resultado se declarava completo sem preço.
+    partial: !(selected.name && imageUrls[0] && currentPriceInCents != null),
     confidence: {
       title: 0.85,
       description: 0.85,
       image: imageUrls.length ? 0.85 : 0.4,
-      price: offer ? 0.85 : 0,
+      price: currentPriceInCents != null ? 0.85 : 0,
       variant: 0.4,
     },
     warnings: [],
@@ -972,7 +1008,7 @@ async function extractProduct(originalUrl: string, options?: { authUserId?: stri
   };
 
   let workingUrl = normalizeMercadoLivreUrl(parsedOriginalUrl);
-  if (isMercadoLivreShortHost(workingUrl.hostname)) {
+  if (isMercadoLivreShortHost(workingUrl.hostname, workingUrl.pathname)) {
     try {
       workingUrl = await resolveShortUrl(workingUrl, context.steps);
       assertSafeUrl(workingUrl);
