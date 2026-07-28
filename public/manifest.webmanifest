@@ -1,0 +1,29 @@
+{
+  "name": "Wishly | Lista de desejos",
+  "short_name": "Wishly",
+  "description": "Guarde seus desejos, acompanhe os preços e compartilhe a lista quando for presente.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f4f0",
+  "theme_color": "#31614f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "shared_title",
+      "text": "shared_text",
+      "url": "shared_url"
+    }
+  }
+}

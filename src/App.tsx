@@ -93,6 +93,15 @@ type PriceAlert = {
   targetAmount: number | null;
 };
 
+type RadarSortKey = "prioridade" | "preco" | "alvo" | "falta" | "queda";
+
+const RADAR_COLUMNS: Array<{ key: RadarSortKey; label: string }> = [
+  { key: "preco", label: "Preço" },
+  { key: "alvo", label: "Alvo" },
+  { key: "falta", label: "Falta" },
+  { key: "queda", label: "Queda" },
+];
+
 type HomeListSummary = {
   id: string;
   title: string;
@@ -490,6 +499,7 @@ function App() {
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
   const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
   const [reserving, setReserving] = useState(false);
+  const [listPaletteOpen, setListPaletteOpen] = useState(false);
   const [deleteListConfirmOpen, setDeleteListConfirmOpen] = useState(false);
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
   const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
@@ -509,7 +519,7 @@ function App() {
     () => (isRemoteMode && session?.user ? getRemoteProfile(session.user) : localProfile),
     [isRemoteMode, localProfile, session],
   );
-  const showFab = !["admin", "create_list", "profile", "profile_settings", "reset_password", "pro", "checkout", "success"].includes(view);
+  const showFab = !["admin", "add", "create_list", "profile", "profile_settings", "reset_password", "pro", "checkout", "success"].includes(view);
 
   const title = useMemo(() => {
     if (view === "home") return "";
@@ -1797,6 +1807,43 @@ function App() {
     window.localStorage.setItem("wishly-theme", theme);
   }, [theme]);
 
+  // Atalhos de teclado (desktop): colar um link em qualquer lugar abre o cadastro
+  // já preenchido, e Cmd/Ctrl+K abre a troca rápida de lista.
+  useEffect(() => {
+    if (isPublicMode || isMarketingMode) return;
+
+    function isTypingTarget(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+    }
+
+    function handlePaste(event: ClipboardEvent) {
+      if (isTypingTarget(event.target)) return;
+      const url = extractSharedProductUrl({ text: event.clipboardData?.getData("text") ?? "" });
+      if (!url) return;
+      event.preventDefault();
+      setFormState((current) => ({ ...current, productUrl: url }));
+      go("add");
+      setAuthMessage("Link colado. Confira os dados antes de salvar.");
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setListPaletteOpen((open) => !open);
+        return;
+      }
+      if (event.key === "Escape") setListPaletteOpen(false);
+    }
+
+    window.addEventListener("paste", handlePaste);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPublicMode, isMarketingMode]);
+
   useEffect(() => {
     window.localStorage.setItem("wishly-price-alerts", JSON.stringify(priceAlerts));
   }, [priceAlerts]);
@@ -2101,6 +2148,23 @@ function App() {
       setView("profile_settings");
     }
 
+    // Web Share Target: o app foi aberto pelo "compartilhar" de outro app.
+    const sharedUrl = extractSharedProductUrl({
+      url: url.searchParams.get("shared_url"),
+      text: url.searchParams.get("shared_text"),
+      title: url.searchParams.get("shared_title"),
+    });
+
+    if (sharedUrl) {
+      setFormState((current) => ({ ...current, productUrl: sharedUrl }));
+      setView("add");
+      setAuthMessage("Link recebido. Confira os dados antes de salvar.");
+      url.searchParams.delete("shared_url");
+      url.searchParams.delete("shared_text");
+      url.searchParams.delete("shared_title");
+      window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    }
+
     if (!oauthStatus) return;
 
     if (oauthStatus === "success") {
@@ -2175,6 +2239,55 @@ function App() {
         className="hidden-file-input"
         onChange={(event) => void handleAvatarSelected(event.target.files)}
       />
+      {/* Sidebar exclusiva de desktop: substitui a barra de abas e o FAB de mobile. */}
+      <aside className="app-sidebar" aria-label="Navegação do Wishly">
+        <button className="brand-lockup app-sidebar-brand" type="button" onClick={() => go("home")} aria-label="Wishly">
+          <img className="wordmark" src={images.logo} alt="Wishly" />
+        </button>
+
+        <nav className="app-sidebar-nav" aria-label="Seções">
+          <SidebarItem active={view === "home"} icon={<Home size={19} />} label="Início" onClick={() => go("home")} />
+          <SidebarItem active={view === "list"} icon={<Gift size={19} />} label="Minha lista" onClick={() => go("list")} />
+          <SidebarItem active={view === "radar"} icon={<LineChart size={19} />} label="Radar" onClick={() => go("radar")} />
+          <SidebarItem active={view === "activity"} icon={<Bell size={19} />} label="Atividade" onClick={() => go("activity")} />
+          <SidebarItem
+            active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"}
+            icon={<User size={19} />}
+            label="Perfil"
+            onClick={() => go("profile")}
+          />
+        </nav>
+
+        {homeLists.length > 0 && (
+          <div className="app-sidebar-lists">
+            <p className="label">Suas listas</p>
+            {homeLists.map((list) => (
+              <button
+                key={list.id}
+                className={`app-sidebar-list ${list.isSelected && view === "list" ? "active" : ""}`}
+                type="button"
+                onClick={() => {
+                  if (isRemoteMode) void handleSelectRemoteWishlist(list.id);
+                  go("list");
+                }}
+              >
+                <img src={list.coverUrl} alt="" />
+                <span>
+                  <strong>{list.title}</strong>
+                  <small>{list.meta}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button className="primary-button full app-sidebar-cta" type="button" onClick={() => go("add")}>
+          <Plus size={18} />
+          Adicionar desejo
+        </button>
+      </aside>
+
+      <div className="app-main-column">
       <header className="topbar">
         {view === "home" ? (
           <button className="brand-lockup" type="button" onClick={() => go("home")} aria-label="Wishly Home">
@@ -2363,6 +2476,7 @@ function App() {
         {view === "checkout" && <CheckoutScreen go={go} />}
         {view === "success" && <SuccessScreen go={go} />}
       </main>
+      </div>
 
       {showFab && (
         <button className="fab" type="button" onClick={() => go(view === "home" ? "create_list" : "add")}>
@@ -2373,13 +2487,68 @@ function App() {
 
       {view !== "reset_password" && (
         <nav className="bottom-nav" aria-label="Navegação principal">
-          <NavItem active={view === "home"} icon={<Home size={22} />} label="Home" onClick={() => go("home")} />
+          <NavItem active={view === "home"} icon={<Home size={22} />} label="Início" onClick={() => go("home")} />
           <NavItem active={view === "radar"} icon={<LineChart size={22} />} label="Radar" onClick={() => go("radar")} />
-          <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Activity" onClick={() => go("activity")} />
-          <NavItem active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"} icon={<User size={22} />} label="Profile" onClick={() => go("profile")} />
+          <NavItem active={view === "activity"} icon={<Bell size={22} />} label="Atividade" onClick={() => go("activity")} />
+          <NavItem active={view === "profile" || view === "profile_settings" || view === "pro" || view === "checkout"} icon={<User size={22} />} label="Perfil" onClick={() => go("profile")} />
         </nav>
       )}
         </>
+      )}
+
+      {listPaletteOpen && (
+        <div className="reserve-dialog-backdrop" onClick={() => setListPaletteOpen(false)}>
+          <div
+            className="reserve-dialog list-palette"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Trocar de lista"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="reserve-dialog-header">
+              <div>
+                <p className="label">Ir para</p>
+                <h2>Suas listas</h2>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setListPaletteOpen(false)} aria-label="Fechar">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="list-palette-items">
+              {homeLists.map((list) => (
+                <button
+                  key={list.id}
+                  className="app-sidebar-list"
+                  type="button"
+                  onClick={() => {
+                    if (isRemoteMode) void handleSelectRemoteWishlist(list.id);
+                    setListPaletteOpen(false);
+                    go("list");
+                  }}
+                >
+                  <img src={list.coverUrl} alt="" />
+                  <span>
+                    <strong>{list.title}</strong>
+                    <small>{list.meta}</small>
+                  </span>
+                </button>
+              ))}
+              <button
+                className="app-sidebar-list"
+                type="button"
+                onClick={() => {
+                  setListPaletteOpen(false);
+                  go("create_list");
+                }}
+              >
+                <span>
+                  <strong>Criar nova lista</strong>
+                  <small>Começar de uma lista vazia</small>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {deleteListConfirmOpen && (
@@ -3687,6 +3856,39 @@ function ListScreen({
         </div>
       </section>
       
+      {/* Os desejos vêm antes do resumo: são o conteúdo que a pessoa abriu a lista para ver. */}
+      <section className="wish-list-section">
+        <div className="section-heading">
+          <h2>Seus desejos</h2>
+          {wishes.length > 0 && <span className="section-count">{formatWishCount(wishes.length)}</span>}
+        </div>
+        {wishes.length === 0 ? (
+          <div className="wishlist-empty">
+            <Gift size={28} />
+            <div>
+              <strong>Sua lista está pronta.</strong>
+              <p>Adicione o primeiro item para começar a organizar seus desejos.</p>
+            </div>
+            <button className="primary-button" type="button" onClick={() => go("add")}>
+              <Plus size={18} />
+              Adicionar primeiro item
+            </button>
+          </div>
+        ) : (
+          <div className="wish-list">
+            {wishes.map((wish) => (
+              <WishCard
+                key={getWishId(wish)}
+                wish={wish}
+                alert={priceAlerts[getWishId(wish)]}
+                onTrack={() => onEditAlert(wish)}
+                onBuy={() => onBuyWish(wish)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="inset-section compact list-overview">
         <div className="list-summary-stack">
           {isRemoteMode && wishlists.length > 1 && (
@@ -3740,31 +3942,6 @@ function ListScreen({
         </div>
       </section>
 
-      <Shelf title="Destaques" action="FILTRAR" variant="wishes">
-        {wishes.length === 0 ? (
-          <div className="wishlist-empty">
-            <Gift size={28} />
-            <div>
-              <strong>Sua lista está pronta.</strong>
-              <p>Adicione o primeiro item para começar a organizar seus desejos.</p>
-            </div>
-            <button className="primary-button" type="button" onClick={() => go("add")}>
-              <Plus size={18} />
-              Adicionar primeiro item
-            </button>
-          </div>
-        ) : (
-          wishes.map((wish) => (
-            <WishCard
-              key={getWishId(wish)}
-              wish={wish}
-              alert={priceAlerts[getWishId(wish)]}
-              onTrack={() => onEditAlert(wish)}
-              onBuy={() => onBuyWish(wish)}
-            />
-          ))
-        )}
-      </Shelf>
     </>
   );
 }
@@ -3790,6 +3967,31 @@ function AddWishScreen({
   syncing: boolean;
   isRemoteMode: boolean;
 }) {
+  const [pasteError, setPasteError] = useState("");
+
+  /**
+   * Lê a área de transferência só sob clique — é o que os navegadores permitem
+   * sem pedir permissão persistente, e evita ler o clipboard sem a pessoa querer.
+   */
+  async function pasteFromClipboard() {
+    try {
+      if (!navigator.clipboard?.readText) {
+        setPasteError("Cole o link no campo abaixo");
+        return;
+      }
+      const text = await navigator.clipboard.readText();
+      const url = extractSharedProductUrl({ text });
+      if (!url) {
+        setPasteError("Nenhum link copiado");
+        return;
+      }
+      setPasteError("");
+      setFormState({ ...formState, productUrl: url });
+    } catch {
+      setPasteError("Cole o link no campo abaixo");
+    }
+  }
+
   return (
     <section className="desktop-flow-layout">
       <form
@@ -3805,6 +4007,10 @@ function AddWishScreen({
           <p>
             Preenchemos automaticamente nome, foto e preço sempre que possível.
           </p>
+          <button className="secondary-button" type="button" onClick={() => void pasteFromClipboard()}>
+            <Copy size={18} />
+            {pasteError || "Colar link copiado"}
+          </button>
         </div>
         <Field
           label="Link do produto"
@@ -4223,12 +4429,41 @@ function RadarScreen({
   wishes: Array<LocalWish | DbWish>;
   onEditAlert: (wish: LocalWish | DbWish) => void;
 }) {
+  const [sortKey, setSortKey] = useState<RadarSortKey>("prioridade");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
   const radarItems = wishes
     .map((wish) => {
       const alert = priceAlerts[getWishId(wish)];
       return { ...buildRadarItem(wish, Boolean(alert)), alert, alertStatus: getPriceAlertStatus(wish, alert) };
     })
     .sort((left, right) => right.priorityScore - left.priorityScore);
+  const sortedItems = useMemo(() => {
+    const value = (item: (typeof radarItems)[number]) => {
+      const current = getWishAmount(item.wish);
+      const target = item.alert?.targetAmount ?? null;
+      switch (sortKey) {
+        case "preco":
+          return current ?? -Infinity;
+        case "alvo":
+          return target ?? -Infinity;
+        case "falta":
+          // Alvo atingido primeiro, depois quem está mais perto.
+          if (item.alertStatus?.reached) return -1;
+          return current != null && target != null ? current - target : Infinity;
+        case "queda":
+          return getWishDiscountPercent(item.wish);
+        default:
+          return item.priorityScore;
+      }
+    };
+
+    return [...radarItems].sort((left, right) => {
+      const delta = value(left) - value(right);
+      return sortDir === "asc" ? delta : -delta;
+    });
+  }, [radarItems, sortKey, sortDir]);
+
   const potentialSavings = radarItems.reduce((sum, item) => sum + item.savingsInCurrency, 0);
   const criticalCount = radarItems.filter((item) => item.state === "critical").length;
   const opportunityCount = radarItems.filter((item) => item.state === "opportunity").length;
@@ -4275,7 +4510,69 @@ function RadarScreen({
           Receber alertas automáticos com o Pro
         </button>
       </section>
-      <section className="vertical-list">
+      {/* Desktop: tabela ordenável — comparar muitos itens de uma vez só faz
+          sentido com espaço horizontal. No celular ficam os cards. */}
+      <section className="radar-table-wrap">
+        <table className="radar-table">
+          <thead>
+            <tr>
+              <th scope="col">Desejo</th>
+              {RADAR_COLUMNS.map((column) => (
+                <th scope="col" key={column.key}>
+                  <button
+                    type="button"
+                    className={sortKey === column.key ? "active" : ""}
+                    onClick={() => {
+                      if (sortKey === column.key) {
+                        setSortDir((current) => (current === "asc" ? "desc" : "asc"));
+                      } else {
+                        setSortKey(column.key);
+                        setSortDir("desc");
+                      }
+                    }}
+                  >
+                    {column.label}
+                    {sortKey === column.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
+              ))}
+              <th scope="col">Alerta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedItems.map((item) => {
+              const currency = getWishCurrency(item.wish);
+              const current = getWishAmount(item.wish);
+              const target = item.alert?.targetAmount ?? null;
+              const remaining = current != null && target != null ? Math.max(0, current - target) : null;
+
+              return (
+                <tr key={getWishId(item.wish)} className={item.alertStatus?.reached ? "is-reached" : ""}>
+                  <th scope="row">
+                    <img src={getWishImage(item.wish)} alt="" />
+                    <span>
+                      <strong>{getWishTitle(item.wish)}</strong>
+                      <small>{getWishStore(item.wish)}</small>
+                    </span>
+                  </th>
+                  <td>{current != null ? formatCurrency(current, currency) : "—"}</td>
+                  <td>{target != null ? formatCurrency(target, currency) : "sem alvo"}</td>
+                  <td>{item.alertStatus?.reached ? "atingido" : remaining != null ? formatCurrency(remaining, currency) : "—"}</td>
+                  <td>{getWishDrop(item.wish) ?? "0%"}</td>
+                  <td>
+                    <button className="text-button" type="button" onClick={() => onEditAlert(item.wish)}>
+                      <Tag size={14} />
+                      {item.alert ? "Editar" : "Ativar"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="vertical-list radar-cards">
         {radarItems.map((item) => (
           <article className={`radar-row radar-row-${item.state}`} key={getWishId(item.wish)}>
             <img src={getWishImage(item.wish)} alt="" />
@@ -5299,6 +5596,15 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
   );
 }
 
+function SidebarItem({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button className={`app-sidebar-item ${active ? "active" : ""}`} type="button" onClick={onClick} aria-current={active ? "page" : undefined}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function mergeExtractedProductIntoForm(formState: AddWishFormState, result: ProductExtractionResult): AddWishFormState {
   return {
     ...formState,
@@ -5542,6 +5848,24 @@ function parsePriceValue(price: string) {
 function currentListTitle(remote: ViewerState, isRemoteMode: boolean, localTitle: string) {
   if (!isRemoteMode) return localTitle;
   return remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.title ?? "Sua lista";
+}
+
+/**
+ * Extrai a URL do produto do que outro app compartilhou.
+ *
+ * Apps de loja variam: alguns mandam a URL em `url`, outros embutem no `text`
+ * junto com o nome do produto. Aceitamos os dois formatos.
+ */
+function extractSharedProductUrl(shared: { url?: string | null; text?: string | null; title?: string | null }) {
+  const candidates = [shared.url, shared.text, shared.title];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const match = candidate.match(/https?:\/\/[^\s]+/i);
+    if (match) return match[0];
+  }
+
+  return null;
 }
 
 function formatWishCount(total: number) {
