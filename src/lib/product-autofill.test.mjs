@@ -6,6 +6,8 @@ import {
   WishSubmissionLock,
   buildProductExtractionInsert,
   getExtractionFeedback,
+  getMissingWishFieldCopy,
+  getMissingWishFields,
   getProductImageSrc,
   getWishSubmissionReadiness,
   isAutofillResultCurrent,
@@ -270,4 +272,26 @@ test("shows catalog guidance when Mercado Livre returns only catalog partial dat
 test("missing image returns neutral placeholder instead of random product image", () => {
   assert.equal(getProductImageSrc(null, []), null);
   assert.match(PRODUCT_PLACEHOLDER_DATA_URL, /^data:image\/svg\+xml/);
+});
+
+test("getMissingWishFields aponta foto e preço ausentes", () => {
+  assert.deepEqual(getMissingWishFields({ imageUrl: null, priceInCents: null }), ["image", "price"]);
+  assert.deepEqual(getMissingWishFields({ imageUrl: "https://x/y.jpg", priceInCents: null }), ["price"]);
+  assert.deepEqual(getMissingWishFields({ imageUrl: null, priceInCents: 6999 }), ["image"]);
+  assert.deepEqual(getMissingWishFields({ imageUrl: "https://x/y.jpg", priceInCents: 6999 }), []);
+});
+
+test("getMissingWishFields trata string vazia e preço zero", () => {
+  assert.deepEqual(getMissingWishFields({ imageUrl: "   ", priceInCents: 0 }), ["image"]);
+  assert.deepEqual(getMissingWishFields({ imageUrl: undefined, priceInCents: undefined }), ["image", "price"]);
+});
+
+test("getMissingWishFieldCopy explica a consequência de cada campo", () => {
+  const foto = getMissingWishFieldCopy("image");
+  assert.equal(foto.label, "Foto");
+  assert.match(foto.consequence, /reconhece o presente/);
+
+  const preco = getMissingWishFieldCopy("price");
+  assert.equal(preco.label, "Preço");
+  assert.match(preco.consequence, /radar/);
 });

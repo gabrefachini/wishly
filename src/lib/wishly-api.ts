@@ -895,6 +895,60 @@ function centsToCurrencyUnits(value: number | null | undefined) {
   return value == null ? null : value / 100;
 }
 
+/**
+ * Completa os dados de um desejo já salvo.
+ *
+ * Serve ao caso em que o preenchimento automático não trouxe foto ou preço: em
+ * vez de travar o cadastro, a pessoa salva e completa depois. A permissão vem da
+ * policy `gifts_owner_all`, que já cobre update para o dono da lista.
+ *
+ * O preço é gravado em `current_price` e `estimated_price`: o primeiro é o que o
+ * radar lê, o segundo é o campo legado usado quando não há dado de extração.
+ */
+export async function updateGift(input: {
+  giftId: string;
+  name?: string;
+  imageUrl?: string | null;
+  priceInCents?: number | null;
+  currency?: string | null;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const payload: Record<string, unknown> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.imageUrl !== undefined) payload.image_url = input.imageUrl?.trim() || null;
+  if (input.currency !== undefined) payload.currency = input.currency || "BRL";
+  if (input.priceInCents !== undefined) {
+    payload.estimated_price = centsToCurrencyUnits(input.priceInCents);
+  }
+
+  if (Object.keys(payload).length === 0) return null;
+
+  // `current_price` só existe depois da migração de autofill; se o schema for
+  // antigo, repetimos o update sem ela em vez de falhar.
+  const withCurrentPrice = input.priceInCents !== undefined
+    ? { ...payload, current_price: centsToCurrencyUnits(input.priceInCents) }
+    : payload;
+
+  let response = await supabase.from("gifts").update(withCurrentPrice).eq("id", input.giftId).select("id").maybeSingle();
+
+  if (response.error && isSchemaCompatibilityInsertError(response.error)) {
+    response = await supabase.from("gifts").update(payload).eq("id", input.giftId).select("id").maybeSingle();
+  }
+
+  if (response.error) {
+    logSupabaseError("updateGift", response.error, { giftId: input.giftId });
+    throw response.error;
+  }
+
+  if (!response.data) {
+    throw new Error("Não foi possível atualizar este desejo. Confirme se a lista é sua.");
+  }
+
+  return response.data.id as string;
+}
+
 export async function loadAdminAffiliateQueue() {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");

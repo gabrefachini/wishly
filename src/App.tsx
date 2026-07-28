@@ -47,6 +47,7 @@ import {
   deleteWishlist,
   loadListTemplates,
   saveListTemplate,
+  updateGift,
   createGift,
   getInitialSession,
   listenToAuthChanges,
@@ -89,6 +90,8 @@ import {
   buildWishSubmissionFingerprint,
   getExtractionFeedback,
   getProductImageSrc,
+  getMissingWishFieldCopy,
+  getMissingWishFields,
   getWishSubmissionReadiness,
   isAutofillResultCurrent,
   sanitizeMercadoLivrePreview,
@@ -517,6 +520,7 @@ function App() {
   const [listPaletteOpen, setListPaletteOpen] = useState(false);
   const [deleteListConfirmOpen, setDeleteListConfirmOpen] = useState(false);
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
+  const [completeWishTarget, setCompleteWishTarget] = useState<LocalWish | DbWish | null>(null);
   const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -1494,6 +1498,56 @@ function App() {
     } finally {
       setSyncing(false);
     }
+  }
+
+  /**
+   * Salva foto e/ou preço de um desejo já existente.
+   *
+   * Permite adicionar com pressa e completar depois, em vez de travar a inclusão
+   * quando o preenchimento automático não trouxe tudo.
+   */
+  async function handleCompleteWish(wish: LocalWish | DbWish, values: { imageUrl: string; priceText: string }) {
+    const imageUrl = values.imageUrl.trim();
+    const priceInCents = parsePriceInputToCents(values.priceText);
+
+    if (isRemoteMode && !isLocalWish(wish)) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+        await updateGift({
+          giftId: wish.id,
+          imageUrl: imageUrl || null,
+          ...(priceInCents != null ? { priceInCents, currency: getWishCurrency(wish) } : {}),
+        });
+        if (remote.selectedWishlistId) {
+          const gifts = await loadWishlistGifts(remote.selectedWishlistId);
+          setRemote((current) => ({ ...current, gifts }));
+        }
+        setCompleteWishTarget(null);
+        setAuthMessage("Desejo atualizado.");
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    // Modo local: atualiza o item no navegador.
+    setLocalWishes((current) =>
+      current.map((item) =>
+        getWishId(item) === getWishId(wish)
+          ? {
+              ...item,
+              image: imageUrl || item.image,
+              price: priceInCents != null ? formatCurrency(priceInCents / 100, "BRL") : item.price,
+            }
+          : item,
+      ),
+    );
+    setCompleteWishTarget(null);
+    setSyncError("");
+    setAuthMessage("Desejo atualizado.");
   }
 
   async function handleDeleteList() {
@@ -2671,6 +2725,7 @@ function App() {
             onAddWish={() => beginAddWishFlow(remote.selectedWishlistId)}
             priceAlerts={priceAlerts}
             onEditAlert={setAlertTarget}
+            onCompleteWish={setCompleteWishTarget}
             wishes={currentWishes}
             wishlistTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
             wishlistCoverUrl={isRemoteMode ? currentListCover(remote, localListCoverUrl) : localListCoverUrl}
@@ -2865,6 +2920,15 @@ function App() {
         />
       )}
 
+      {completeWishTarget && (
+        <CompleteWishDialog
+          wish={completeWishTarget}
+          saving={syncing}
+          onSave={(values) => void handleCompleteWish(completeWishTarget, values)}
+          onClose={() => setCompleteWishTarget(null)}
+        />
+      )}
+
       {alertTarget && (
         <PriceAlertDialog
           wish={alertTarget}
@@ -2896,6 +2960,165 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Mostra o que o preenchimento automático não conseguiu, com a consequência de
+ * cada ausência e o campo para resolver na hora.
+ *
+ * Pede só o que faltou, em vez de jogar o formulário inteiro na pessoa.
+ */
+/**
+ * Dialog para completar um desejo já salvo, pedindo só o que falta.
+ *
+ * É o outro lado de "salvar incompleto": a pessoa adiciona com pressa e resolve
+ * depois, em vez de ser travada no momento em que colou o link.
+ */
+function CompleteWishDialog({
+  wish,
+  saving,
+  onSave,
+  onClose,
+}: {
+  wish: LocalWish | DbWish;
+  saving: boolean;
+  onSave: (values: { imageUrl: string; priceText: string }) => void;
+  onClose: () => void;
+}) {
+  const [imageUrl, setImageUrl] = useState(getWishImageUrlRaw(wish));
+  const [priceText, setPriceText] = useState("");
+  // Calculado na abertura, de propósito: se recalculasse a cada tecla, o campo
+  // desapareceria e o botão de salvar se desabilitaria no meio da digitação.
+  const [missing] = useState(() =>
+    getMissingWishFields({
+      imageUrl: getWishImageUrlRaw(wish),
+      priceInCents: toCentsOrNull(getWishAmount(wish)),
+    }),
+  );
+
+  const hasSomethingToSave =
+    (missing.includes("image") && imageUrl.trim().length > 0) ||
+    (missing.includes("price") && parsePriceInputToCents(priceText) != null);
+
+  return (
+    <div className="reserve-dialog-backdrop" onClick={saving ? undefined : onClose}>
+      <div
+        className="reserve-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Completar ${getWishTitle(wish)}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="reserve-dialog-header">
+          <div>
+            <p className="label">Completar desejo</p>
+            <h2>{getWishTitle(wish)}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar" disabled={saving}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <form
+          className="reserve-dialog-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave({ imageUrl, priceText });
+          }}
+        >
+          {missing.includes("image") && (
+            <Field
+              label="Link da imagem"
+              placeholder="https://..."
+              value={imageUrl}
+              onChange={setImageUrl}
+            />
+          )}
+          {missing.includes("price") && (
+            <Field label="Preço" placeholder="189,90" value={priceText} onChange={setPriceText} />
+          )}
+          {missing.length === 0 && <p className="reserve-dialog-intro">Este desejo já está completo.</p>}
+
+          <div className="field-row">
+            <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button className="primary-button full" type="submit" disabled={saving || !hasSomethingToSave}>
+              {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function WishCompletionChecklist({
+  title,
+  imageUrl,
+  priceText,
+  onChangeImage,
+  onChangePrice,
+}: {
+  title: string;
+  imageUrl: string;
+  priceText: string;
+  onChangeImage: (value: string) => void;
+  onChangePrice: (value: string) => void;
+}) {
+  const missing = getMissingWishFields({
+    imageUrl,
+    priceInCents: parsePriceInputToCents(priceText),
+  });
+
+  if (missing.length === 0) return null;
+
+  return (
+    <section className="completion-checklist" aria-label="Dados que faltam neste desejo">
+      <div className="completion-checklist-head">
+        <p className="label">Falta pouco</p>
+        <p>Preenchemos o que o link entregou. Complete o resto para a lista funcionar melhor.</p>
+      </div>
+
+      {/* Só marca como pronto o que realmente está preenchido. */}
+      {title.trim() ? (
+        <div className="completion-row is-done">
+          <Check size={16} aria-hidden="true" />
+          <div>
+            <strong>Nome</strong>
+            <small>{title.trim()}</small>
+          </div>
+        </div>
+      ) : (
+        <div className="completion-row">
+          <PencilLine size={16} aria-hidden="true" />
+          <div>
+            <strong>Nome</strong>
+            <small>Sem nome não é possível salvar o desejo.</small>
+          </div>
+        </div>
+      )}
+
+      {missing.map((field) => {
+        const copy = getMissingWishFieldCopy(field);
+        return (
+          <div className="completion-row" key={field}>
+            <PencilLine size={16} aria-hidden="true" />
+            <div>
+              <strong>{copy.label}</strong>
+              <small>{copy.consequence}</small>
+              <Field
+                label={copy.label}
+                placeholder={copy.placeholder}
+                value={field === "image" ? imageUrl : priceText}
+                onChange={field === "image" ? onChangeImage : onChangePrice}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -4150,6 +4373,7 @@ function ListScreen({
   onAddWish,
   priceAlerts,
   onEditAlert,
+  onCompleteWish,
   wishes,
   wishlistTitle,
   wishlistCoverUrl,
@@ -4167,6 +4391,7 @@ function ListScreen({
   onAddWish: () => void;
   priceAlerts: Record<string, PriceAlert>;
   onEditAlert: (wish: LocalWish | DbWish) => void;
+  onCompleteWish: (wish: LocalWish | DbWish) => void;
   wishes: Array<LocalWish | DbWish>;
   wishlistTitle: string;
   wishlistCoverUrl: string;
@@ -4235,6 +4460,7 @@ function ListScreen({
                 alert={priceAlerts[getWishId(wish)]}
                 onTrack={() => onEditAlert(wish)}
                 onBuy={() => onBuyWish(wish)}
+                onComplete={() => onCompleteWish(wish)}
               />
             ))}
           </div>
@@ -4429,6 +4655,15 @@ function AddWishScreen({
         )}
         {extractionState.status !== "idle" && extractionState.status !== "loading" && (
           <div className={`sync-banner ${extractionState.status === "error" ? "error" : "success"}`}>{extractionState.message}</div>
+        )}
+        {extractionState.status !== "loading" && formState.productUrl.trim() && (
+          <WishCompletionChecklist
+            title={formState.title}
+            imageUrl={formState.imageUrl}
+            priceText={formState.currentPrice}
+            onChangeImage={(value) => setFormState({ ...formState, imageUrl: value })}
+            onChangePrice={(value) => setFormState({ ...formState, currentPrice: value })}
+          />
         )}
         {(extractionState.preview || formState.title.trim() || formState.imageUrl.trim()) && (
           <div className="product-extraction-card">
@@ -6062,12 +6297,15 @@ function WishCard({
   alert,
   onTrack,
   onBuy,
+  onComplete,
 }: {
   wish: LocalWish | DbWish;
   alert: PriceAlert | undefined;
   onTrack: () => void;
   onBuy: () => void;
+  onComplete: () => void;
 }) {
+  const incomplete = isWishIncomplete(wish);
   const isMercadoLivre = getWishProvider(wish) === "mercado_livre";
   const tracked = Boolean(alert);
   const alertStatus = getPriceAlertStatus(wish, alert);
@@ -6082,6 +6320,18 @@ function WishCard({
           <h3>{getWishTitle(wish)}</h3>
           <p>{getWishStore(wish)}</p>
           <span>{getWishPrice(wish)}</span>
+          {incomplete && (
+            <button className="wish-incomplete-note" type="button" onClick={onComplete}>
+              <PencilLine size={13} aria-hidden="true" />
+              {getMissingWishFields({
+                imageUrl: getWishImageUrlRaw(wish),
+                priceInCents: toCentsOrNull(getWishAmount(wish)),
+              })
+                .map((field) => getMissingWishFieldCopy(field).label.toLowerCase())
+                .join(" e ")}{" "}
+              faltando · completar
+            </button>
+          )}
           {alertStatus && (
             <p className={`wish-alert-note ${alertStatus.reached ? "is-reached" : ""}`}>
               {alertStatus.reached ? <Check size={14} /> : <TrendingDown size={14} />}
@@ -6472,6 +6722,30 @@ function slugifyTemplateTitle(title: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
   return base || `modelo-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Imagem crua do desejo, sem o placeholder que `getWishImage` devolve.
+ * O checklist precisa saber que não há foto, não receber uma foto falsa.
+ */
+function getWishImageUrlRaw(wish: LocalWish | DbWish) {
+  const raw = "image" in wish ? wish.image : wish.image_url;
+  const value = typeof raw === "string" ? raw.trim() : "";
+  return value && value !== PRODUCT_PLACEHOLDER_DATA_URL ? value : "";
+}
+
+function toCentsOrNull(amount: number | null) {
+  return amount == null ? null : Math.round(amount * 100);
+}
+
+/** Desejo que ainda não tem foto ou preço. */
+function isWishIncomplete(wish: LocalWish | DbWish) {
+  return (
+    getMissingWishFields({
+      imageUrl: getWishImageUrlRaw(wish),
+      priceInCents: toCentsOrNull(getWishAmount(wish)),
+    }).length > 0
+  );
 }
 
 function formatWishCount(total: number) {

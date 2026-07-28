@@ -139,6 +139,41 @@ export type WishSubmissionReadiness = {
   manualConfirmationRequired: boolean;
 };
 
+export type MissingWishField = "image" | "price";
+
+/**
+ * Campos que faltam num desejo, na ordem em que valem a atenção.
+ *
+ * Nome já é obrigatório para salvar. Foto e preço não são — mas cada ausência
+ * tem um custo diferente: sem foto quem recebe a lista não reconhece o
+ * presente; sem preço o radar não tem o que acompanhar. Por isso a interface
+ * trata os dois separadamente em vez de dizer "revise manualmente".
+ */
+export function getMissingWishFields(input: {
+  imageUrl: string | null | undefined;
+  priceInCents: number | null | undefined;
+}): MissingWishField[] {
+  const missing: MissingWishField[] = [];
+  if (!input.imageUrl || !String(input.imageUrl).trim()) missing.push("image");
+  if (input.priceInCents == null) missing.push("price");
+  return missing;
+}
+
+export function getMissingWishFieldCopy(field: MissingWishField) {
+  if (field === "image") {
+    return {
+      label: "Foto",
+      consequence: "Sem foto, quem recebe a lista não reconhece o presente.",
+      placeholder: "Cole o link da imagem",
+    };
+  }
+  return {
+    label: "Preço",
+    consequence: "Sem preço, o radar não acompanha este item.",
+    placeholder: "189,90",
+  };
+}
+
 export function getWishSubmissionReadiness(input: {
   title: string;
   productUrl: string;

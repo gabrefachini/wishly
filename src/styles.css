@@ -1588,6 +1588,76 @@ button:disabled {
   }
 }
 
+.wish-incomplete-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 0;
+  color: var(--highlight);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.wish-incomplete-note:hover {
+  text-decoration: underline;
+}
+
+.completion-checklist {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--outline);
+  border-radius: 14px;
+  background: var(--surface-low);
+}
+
+.completion-checklist-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.completion-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.completion-row > svg {
+  margin-top: 2px;
+  color: var(--highlight);
+}
+
+.completion-row.is-done > svg {
+  color: var(--primary);
+}
+
+.completion-row strong {
+  display: block;
+  font-size: 14px;
+}
+
+.completion-row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.completion-row .field {
+  margin-top: 8px;
+}
+
+.completion-row .field-label {
+  display: none;
+}
+
 .wish-alert-note {
   display: flex;
   align-items: center;
