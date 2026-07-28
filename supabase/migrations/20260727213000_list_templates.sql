@@ -43,18 +43,31 @@ create index if not exists list_template_items_template_idx
 alter table public.list_templates enable row level security;
 alter table public.list_template_items enable row level security;
 
+-- Grants explícitos mantêm as tabelas disponíveis no Data API mesmo em
+-- projetos com "Automatically expose new tables" desabilitado.
+grant select on table public.list_templates to anon, authenticated;
+grant select on table public.list_template_items to anon, authenticated;
+grant insert, update, delete on table public.list_templates to authenticated;
+grant insert, update, delete on table public.list_template_items to authenticated;
+
 -- Leitura: modelos publicados são visíveis para todos (inclusive visitantes),
 -- porque a landing mostra os modelos antes de existir conta.
 drop policy if exists "list_templates_public_select" on public.list_templates;
 create policy "list_templates_public_select"
   on public.list_templates for select
-  to anon, authenticated
+  to anon
   using (published = true);
+
+drop policy if exists "list_templates_authenticated_select" on public.list_templates;
+create policy "list_templates_authenticated_select"
+  on public.list_templates for select
+  to authenticated
+  using (published = true or public.is_admin_user());
 
 drop policy if exists "list_template_items_public_select" on public.list_template_items;
 create policy "list_template_items_public_select"
   on public.list_template_items for select
-  to anon, authenticated
+  to anon
   using (
     exists (
       select 1
@@ -64,20 +77,58 @@ create policy "list_template_items_public_select"
     )
   );
 
+drop policy if exists "list_template_items_authenticated_select" on public.list_template_items;
+create policy "list_template_items_authenticated_select"
+  on public.list_template_items for select
+  to authenticated
+  using (
+    public.is_admin_user()
+    or exists (
+      select 1
+      from public.list_templates t
+      where t.id = list_template_items.template_id
+        and t.published = true
+    )
+  );
+
 -- Escrita: somente admins.
-drop policy if exists "list_templates_admin_all" on public.list_templates;
-create policy "list_templates_admin_all"
-  on public.list_templates for all
+drop policy if exists "list_templates_admin_insert" on public.list_templates;
+create policy "list_templates_admin_insert"
+  on public.list_templates for insert
+  to authenticated
+  with check (public.is_admin_user());
+
+drop policy if exists "list_templates_admin_update" on public.list_templates;
+create policy "list_templates_admin_update"
+  on public.list_templates for update
   to authenticated
   using (public.is_admin_user())
   with check (public.is_admin_user());
 
-drop policy if exists "list_template_items_admin_all" on public.list_template_items;
-create policy "list_template_items_admin_all"
-  on public.list_template_items for all
+drop policy if exists "list_templates_admin_delete" on public.list_templates;
+create policy "list_templates_admin_delete"
+  on public.list_templates for delete
+  to authenticated
+  using (public.is_admin_user());
+
+drop policy if exists "list_template_items_admin_insert" on public.list_template_items;
+create policy "list_template_items_admin_insert"
+  on public.list_template_items for insert
+  to authenticated
+  with check (public.is_admin_user());
+
+drop policy if exists "list_template_items_admin_update" on public.list_template_items;
+create policy "list_template_items_admin_update"
+  on public.list_template_items for update
   to authenticated
   using (public.is_admin_user())
   with check (public.is_admin_user());
+
+drop policy if exists "list_template_items_admin_delete" on public.list_template_items;
+create policy "list_template_items_admin_delete"
+  on public.list_template_items for delete
+  to authenticated
+  using (public.is_admin_user());
 
 -- Instancia um modelo como lista da pessoa autenticada.
 --
@@ -90,7 +141,7 @@ create or replace function public.create_wishlist_from_template(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_profile public.profiles%rowtype;
@@ -174,4 +225,5 @@ end;
 $$;
 
 revoke all on function public.create_wishlist_from_template(uuid, text) from public;
+revoke all on function public.create_wishlist_from_template(uuid, text) from anon;
 grant execute on function public.create_wishlist_from_template(uuid, text) to authenticated;

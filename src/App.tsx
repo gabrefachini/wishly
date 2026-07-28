@@ -53,6 +53,7 @@ import {
   loadAdminAccountDeletionRequests,
   extractProductFromUrl,
   processAdminAccountDeletionRequest,
+  publishWishlistForSharing,
   reservePublicGift,
   resolvePublicGiftRedirect,
   loadViewerContext,
@@ -514,6 +515,7 @@ function App() {
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
   const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [publicState, setPublicState] = useState<PublicState>({
     shareId: readPublicShareId(),
     wishlist: null,
@@ -904,12 +906,15 @@ function App() {
     }
   }
 
-  function handleShareCurrentList() {
-    const activeShareId = isRemoteMode
-      ? remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId)?.share_id ?? null
-      : localListId;
+  async function handleShareCurrentList() {
+    if (sharing) return;
 
-    if (!activeShareId) {
+    const activeWishlist = isRemoteMode
+      ? remote.wishlists.find((wishlist) => wishlist.id === remote.selectedWishlistId) ?? null
+      : null;
+    let activeShareId = activeWishlist?.share_id ?? (isRemoteMode ? null : localListId);
+
+    if (!activeShareId || (isRemoteMode && !activeWishlist)) {
       setSyncError("Não foi possível gerar o link da lista agora.");
       return;
     }
@@ -918,8 +923,21 @@ function App() {
       ? currentListTitle(remote, isRemoteMode, localListTitle)
       : localListTitle;
 
-    setSyncError("");
-    setShareSheet({ url: buildPublicShareUrl(activeShareId), title: shareTitle });
+    try {
+      setSharing(true);
+      setSyncError("");
+
+      if (isRemoteMode) {
+        const sharedWishlist = await publishWishlistForSharing(activeWishlist!.id);
+        activeShareId = sharedWishlist.share_id;
+      }
+
+      setShareSheet({ url: buildPublicShareUrl(activeShareId), title: shareTitle });
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSharing(false);
+    }
   }
 
   async function handleNativeShare() {
@@ -1333,12 +1351,27 @@ function App() {
     try {
       setSyncing(true);
       setSyncError("");
+      const coverImageUrl = input.coverImageUrl.trim();
+      if (coverImageUrl && !isValidHttpUrl(coverImageUrl)) {
+        throw new Error("Informe uma URL válida para a capa do modelo.");
+      }
+
+      if (input.published) {
+        const template = input.id ? listTemplates.find((candidate) => candidate.id === input.id) : null;
+        if (!template || template.items.length === 0) {
+          throw new Error("Adicione os produtos antes de publicar o modelo.");
+        }
+        if (template.items.some((item) => !item.affiliate_url?.trim())) {
+          throw new Error("Todos os produtos precisam de link de afiliado antes da publicação.");
+        }
+      }
+
       await saveListTemplate({
         id: input.id,
         slug: slugifyTemplateTitle(input.title),
         title: input.title,
         description: input.description,
-        coverImageUrl: input.coverImageUrl,
+        coverImageUrl,
         published: input.published,
       });
       await refreshListTemplates();
@@ -1376,6 +1409,16 @@ function App() {
     try {
       setSyncing(true);
       setSyncError("");
+      if (!isValidHttpUrl(input.productUrl.trim())) {
+        throw new Error("Informe uma URL válida para o produto.");
+      }
+      if (!isValidHttpUrl(input.affiliateUrl.trim())) {
+        throw new Error("Informe o link de afiliado real antes de salvar o item.");
+      }
+      if (input.imageUrl.trim() && !isValidHttpUrl(input.imageUrl.trim())) {
+        throw new Error("Informe uma URL válida para a imagem do produto.");
+      }
+
       const cents = parsePriceInputToCents(input.price);
       await addListTemplateItem({
         templateId: input.templateId,
@@ -2572,7 +2615,8 @@ function App() {
             isRemoteMode={isRemoteMode}
             onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
             onBuyWish={(wish) => void handleBuyWish(wish)}
-            onShare={handleShareCurrentList}
+            onShare={() => void handleShareCurrentList()}
+            sharing={sharing}
             onEditList={beginEditListFlow}
             canEditList
           />
@@ -4037,6 +4081,7 @@ function ListScreen({
   onSelectWishlist,
   onBuyWish,
   onShare,
+  sharing,
   onEditList,
   canEditList,
 }: {
@@ -4052,6 +4097,7 @@ function ListScreen({
   onSelectWishlist: (wishlistId: string) => void;
   onBuyWish: (wish: LocalWish | DbWish) => void;
   onShare: () => void;
+  sharing: boolean;
   onEditList: () => void;
   canEditList: boolean;
 }) {
@@ -4069,9 +4115,9 @@ function ListScreen({
               <Plus size={18} />
               Adicionar
             </button>
-            <button className="secondary-button light" type="button" onClick={onShare}>
+            <button className="secondary-button light" type="button" onClick={onShare} disabled={sharing}>
               <Share2 size={18} />
-              Compartilhar
+              {sharing ? "Preparando link..." : "Compartilhar"}
             </button>
             {canEditList && (
               <button className="text-button hero-edit-button" type="button" onClick={onEditList}>
@@ -4162,9 +4208,9 @@ function ListScreen({
               <span>prioridades altas</span>
             </div>
           </div>
-          <button className="secondary-button" type="button" onClick={onShare}>
+          <button className="secondary-button" type="button" onClick={onShare} disabled={sharing}>
               <Share2 size={18} />
-              Compartilhar
+              {sharing ? "Preparando link..." : "Compartilhar"}
             </button>
         </div>
       </section>
@@ -4565,7 +4611,7 @@ function PublicWishlistPage({
           <ShieldCheck size={18} />
           <div>
             <strong>Presente reservado.</strong>
-            <span>Avisamos {reservedName} por e-mail e o item já aparece como reservado na lista.</span>
+            <span>Reserva registrada para {reservedName}; o item já aparece como reservado na lista.</span>
           </div>
           <button className="icon-button" type="button" onClick={() => setReservedName("")} aria-label="Fechar aviso">
             <X size={18} />
@@ -5249,7 +5295,7 @@ function AdminTemplatesSection({
   }) => void;
   onDeleteItem: (itemId: string) => void;
 }) {
-  const [draft, setDraft] = useState({ title: "", description: "", coverImageUrl: "", published: true });
+  const [draft, setDraft] = useState({ title: "", description: "", coverImageUrl: "", published: false });
   const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
   const [itemDraft, setItemDraft] = useState({ name: "", productUrl: "", affiliateUrl: "", storeName: "", imageUrl: "", price: "" });
 
@@ -5286,8 +5332,10 @@ function AdminTemplatesSection({
             className="secondary-button"
             type="button"
             onClick={() => setDraft({ ...draft, published: !draft.published })}
+            disabled
+            title="Crie o modelo como rascunho, adicione os produtos e publique depois."
           >
-            {draft.published ? "Publicado" : "Rascunho"}
+            Rascunho
           </button>
           <button
             className="primary-button"
@@ -5295,7 +5343,7 @@ function AdminTemplatesSection({
             disabled={!draft.title.trim() || busy}
             onClick={() => {
               onSaveTemplate({ ...draft, title: draft.title.trim() });
-              setDraft({ title: "", description: "", coverImageUrl: "", published: true });
+              setDraft({ title: "", description: "", coverImageUrl: "", published: false });
             }}
           >
             Criar modelo
@@ -5355,7 +5403,13 @@ function AdminTemplatesSection({
               <button
                 className="secondary-button"
                 type="button"
-                disabled={busy}
+                disabled={
+                  busy
+                  || (!template.published && (
+                    template.items.length === 0
+                    || template.items.some((item) => !item.affiliate_url?.trim())
+                  ))
+                }
                 onClick={() =>
                   onSaveTemplate({
                     id: template.id,
@@ -5364,6 +5418,13 @@ function AdminTemplatesSection({
                     coverImageUrl: template.cover_image_url ?? "",
                     published: !template.published,
                   })
+                }
+                title={
+                  !template.published && template.items.length === 0
+                    ? "Adicione produtos antes de publicar."
+                    : !template.published && template.items.some((item) => !item.affiliate_url?.trim())
+                      ? "Todos os produtos precisam de link de afiliado."
+                      : undefined
                 }
               >
                 {template.published ? "Despublicar" : "Publicar"}
@@ -5388,7 +5449,12 @@ function AdminTemplatesSection({
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={!itemDraft.name.trim() || !itemDraft.productUrl.trim() || busy}
+                    disabled={
+                      !itemDraft.name.trim()
+                      || !itemDraft.productUrl.trim()
+                      || !itemDraft.affiliateUrl.trim()
+                      || busy
+                    }
                     onClick={() => {
                       onAddItem({ templateId: template.id, ...itemDraft });
                       setItemDraft({ name: "", productUrl: "", affiliateUrl: "", storeName: "", imageUrl: "", price: "" });

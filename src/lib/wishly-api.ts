@@ -329,6 +329,36 @@ export async function updateWishlistDetails(input: { wishlistId: string; title: 
 }
 
 /**
+ * Torna a lista acessível pelo link antes de entregá-lo à pessoa.
+ *
+ * Gerar a URL sem mudar `visibility` produz um link válido na aparência, mas
+ * `get_public_wishlist` o rejeita. A atualização passa pela RLS de dono.
+ */
+export async function publishWishlistForSharing(wishlistId: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase
+    .from("wishlists")
+    .update({ visibility: "public_link" })
+    .eq("id", wishlistId)
+    .is("archived_at", null)
+    .select("id, title, share_id, cover_image_url")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("publishWishlistForSharing", error, { wishlistId });
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Não foi possível publicar esta lista. Confirme se ela é sua e tente novamente.");
+  }
+
+  return data as DbWishlist;
+}
+
+/**
  * Exclui a lista para quem é dono dela.
  *
  * Usa `archived_at` em vez de remover a linha: é o mesmo sinal que
