@@ -2493,10 +2493,16 @@ function App() {
           </div>
         )}
 
-        <button className="primary-button full app-sidebar-cta" type="button" onClick={() => go("add")}>
-          <Plus size={18} />
-          Adicionar desejo
-        </button>
+        <div className="app-sidebar-actions">
+          <button className="secondary-button full" type="button" onClick={beginCreateListFlow}>
+            <Plus size={18} />
+            Nova lista
+          </button>
+          <button className="primary-button full" type="button" onClick={() => go("add")}>
+            <Gift size={18} />
+            Adicionar desejo
+          </button>
+        </div>
       </aside>
 
       <div className="app-main-column">
