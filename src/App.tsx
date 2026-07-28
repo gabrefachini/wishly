@@ -27,6 +27,7 @@ import {
   Sparkles,
   Sun,
   Tag,
+  Trash2,
   TrendingDown,
   Upload,
   User,
@@ -38,6 +39,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import {
   createWishlist,
+  deleteWishlist,
   createGift,
   getInitialSession,
   listenToAuthChanges,
@@ -488,6 +490,7 @@ function App() {
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
   const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
   const [reserving, setReserving] = useState(false);
+  const [deleteListConfirmOpen, setDeleteListConfirmOpen] = useState(false);
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
   const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -1255,6 +1258,56 @@ function App() {
     setSelectedPriority("Alta");
     addWishSubmissionLock.current.finish(true);
     go("list");
+  }
+
+  async function handleDeleteList() {
+    if (isRemoteMode) {
+      const wishlistId = remote.selectedWishlistId;
+      if (!wishlistId) {
+        setSyncError("Selecione uma lista antes de excluir.");
+        return;
+      }
+
+      try {
+        setSyncing(true);
+        setSyncError("");
+        await deleteWishlist(wishlistId);
+
+        const remaining = remote.wishlists.filter((wishlist) => wishlist.id !== wishlistId);
+        const nextSelectedId = remaining[0]?.id ?? null;
+        // Os desejos em memória são da lista excluída; recarregamos os da próxima.
+        const nextGifts = nextSelectedId ? await loadWishlistGifts(nextSelectedId) : [];
+
+        setRemote((current) => ({
+          ...current,
+          wishlists: remaining,
+          selectedWishlistId: nextSelectedId,
+          gifts: nextGifts,
+        }));
+        setDeleteListConfirmOpen(false);
+        setCreateListMode("create");
+        setCreateListForm({ title: "", coverFile: null, coverPreview: null });
+        setAuthMessage("Lista excluída.");
+        go(nextSelectedId ? "list" : "home");
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    // Modo local: só existe uma lista, então voltamos ao estado inicial vazio.
+    setLocalWishes([]);
+    setLocalListTitle(localListName);
+    setLocalListCoverUrl(buildDefaultListCover(localListName));
+    setPriceAlerts({});
+    setDeleteListConfirmOpen(false);
+    setCreateListMode("create");
+    setCreateListForm({ title: "", coverFile: null, coverPreview: null });
+    setSyncError("");
+    setAuthMessage("Lista excluída.");
+    go("home");
   }
 
   async function handleCreateWishlist() {
@@ -2216,6 +2269,7 @@ function App() {
             onChange={(title) => setCreateListForm((current) => ({ ...current, title }))}
             onSelectCover={(files) => void handleListCoverSelected(files)}
             onSubmit={() => void handleCreateWishlist()}
+            onRequestDelete={() => setDeleteListConfirmOpen(true)}
             syncing={syncing}
             mode={createListMode}
           />
@@ -2328,6 +2382,17 @@ function App() {
         </>
       )}
 
+      {deleteListConfirmOpen && (
+        <ConfirmDeleteListDialog
+          listTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
+          wishCount={currentWishes.length}
+          reservedCount={currentWishes.filter((wish) => getWishStatus(wish) === "Reservado").length}
+          deleting={syncing}
+          onConfirm={() => void handleDeleteList()}
+          onClose={() => setDeleteListConfirmOpen(false)}
+        />
+      )}
+
       {alertTarget && (
         <PriceAlertDialog
           wish={alertTarget}
@@ -2358,6 +2423,81 @@ function App() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function ConfirmDeleteListDialog({
+  listTitle,
+  wishCount,
+  reservedCount,
+  deleting,
+  onConfirm,
+  onClose,
+}: {
+  listTitle: string;
+  wishCount: number;
+  reservedCount: number;
+  deleting: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  // Exigir o nome digitado evita exclusão por engano em uma ação sem volta pela interface.
+  const [confirmText, setConfirmText] = useState("");
+  const canDelete = confirmText.trim().toLocaleLowerCase("pt-BR") === listTitle.trim().toLocaleLowerCase("pt-BR");
+
+  return (
+    <div className="reserve-dialog-backdrop" onClick={deleting ? undefined : onClose}>
+      <div
+        className="reserve-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Excluir a lista ${listTitle}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="reserve-dialog-header">
+          <div>
+            <p className="label">Excluir lista</p>
+            <h2>{listTitle}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar" disabled={deleting}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="reserve-dialog-intro">
+          {wishCount > 0
+            ? `${formatWishCount(wishCount)} saem da sua lista e o link compartilhado deixa de abrir.`
+            : "A lista sai do seu Wishly e o link compartilhado deixa de abrir."}
+          {reservedCount > 0
+            ? ` ${reservedCount === 1 ? "Um convidado já reservou" : `${reservedCount} convidados já reservaram`} um presente aqui.`
+            : ""}
+        </p>
+
+        <form
+          className="reserve-dialog-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canDelete) onConfirm();
+          }}
+        >
+          <Field
+            label={`Digite "${listTitle}" para confirmar`}
+            placeholder={listTitle}
+            value={confirmText}
+            onChange={setConfirmText}
+          />
+          <div className="field-row">
+            <button className="secondary-button" type="button" onClick={onClose} disabled={deleting}>
+              Cancelar
+            </button>
+            <button className="secondary-button danger-button full" type="submit" disabled={!canDelete || deleting}>
+              <Trash2 size={18} />
+              {deleting ? "Excluindo..." : "Excluir lista"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -3352,6 +3492,7 @@ function CreateListScreen({
   onChange,
   onSelectCover,
   onSubmit,
+  onRequestDelete,
   syncing,
   mode,
 }: {
@@ -3360,6 +3501,7 @@ function CreateListScreen({
   onChange: (title: string) => void;
   onSelectCover: (files: FileList | null) => void;
   onSubmit: () => void;
+  onRequestDelete: () => void;
   syncing: boolean;
   mode: CreateListMode;
 }) {
@@ -3441,6 +3583,20 @@ function CreateListScreen({
                 : "Criar lista e adicionar itens"}
           </button>
         </div>
+
+        {isEditing && (
+          <div className="danger-card list-danger-card">
+            <div>
+              <p className="label">Zona de perigo</p>
+              <h2>Excluir esta lista</h2>
+              <p>A lista sai do seu Wishly e o link compartilhado deixa de abrir para os convidados.</p>
+            </div>
+            <button className="secondary-button danger-button" type="button" onClick={onRequestDelete} disabled={syncing}>
+              <Trash2 size={18} />
+              Excluir lista
+            </button>
+          </div>
+        )}
       </form>
 
       <aside className="desktop-flow-aside">
