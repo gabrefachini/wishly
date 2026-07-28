@@ -4,6 +4,7 @@ import {
   buildProductExtractionInsert,
   mapAutofillStatusToExtractionStatus,
 } from "./product-autofill";
+import { isFeatureEnabled } from "./feature-flags";
 
 const SUPPORTED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const CONVERTIBLE_AVATAR_MIME_TYPES = new Set(["image/heic", "image/heif"]);
@@ -802,6 +803,34 @@ export async function createGift(input: {
 }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
+
+  if (input.storeUrl.trim() && isFeatureEnabled("commerce_ingestion_v2")) {
+    const fingerprint = JSON.stringify({
+      wishlistId: input.wishlistId,
+      url: input.autofill?.canonicalUrl ?? input.storeUrl.trim(),
+      name: input.name.trim(),
+    });
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fingerprint));
+    const idempotencyKey = [...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    const { data, error } = await supabase.functions.invoke("ingest-product", {
+      body: {
+        wishlistId: input.wishlistId,
+        url: input.storeUrl,
+        idempotencyKey,
+        name: input.name,
+        description: input.description,
+        imageUrl: input.imageUrl ?? null,
+        priceInCents: input.estimatedPriceInCents ?? null,
+        currency: input.currency ?? "BRL",
+        priority: input.priority,
+      },
+    });
+    if (error) throw error;
+    if (!data?.giftId) throw new Error("O pipeline de produto não retornou o item criado.");
+    return { id: String(data.giftId) };
+  }
 
   const legacyPayload = {
     wishlist_id: input.wishlistId,
