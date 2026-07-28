@@ -9,6 +9,12 @@ import {
   isMercadoLivreHost,
   isMercadoLivreShortHost,
 } from "./lib/mercado-livre.mjs";
+import {
+  cleanProductTitle,
+  decodeHtmlEntities,
+  extractOfferPrices,
+  pickProductNode,
+} from "./lib/structured-data.mjs";
 
 type ProductExtractionResult = {
   originalUrl: string;
@@ -910,14 +916,13 @@ class GenericHtmlProvider implements ProductProvider {
 
 function extractFromStructuredData(url: URL, html: string): ProductExtractionResult | null {
   const nodes = flattenGraph(parseLdJsonBlocks(html));
-  const candidates = nodes.filter((node) => {
-    const type = String(node["@type"] ?? "").toLowerCase();
-    return type.includes("product");
-  });
-  const selected = candidates[0];
+  // Escolhe o nó que corresponde à URL pedida: PDPs listam produtos relacionados.
+  const selected = pickProductNode(nodes, url.toString()) as Record<string, unknown> | null;
   if (!selected) return null;
 
   const offer = Array.isArray(selected.offers) ? selected.offers[0] : selected.offers;
+  const offerPrices = extractOfferPrices(selected.offers);
+  const currentPriceInCents = parseMoneyToCents(offerPrices.price);
   const imageUrls = normalizeImages(selected.image);
   const canonicalUrl =
     (typeof selected.url === "string" && selected.url) ||
@@ -933,26 +938,25 @@ function extractFromStructuredData(url: URL, html: string): ProductExtractionRes
     sellerName: null,
     externalProductId: typeof selected.sku === "string" ? selected.sku : null,
     externalVariantId: null,
-    title: typeof selected.name === "string" ? selected.name : null,
-    description: typeof selected.description === "string" ? selected.description : null,
+    // Lojas colam o próprio nome no fim do título ("Produto | Americanas").
+    title: cleanProductTitle(typeof selected.name === "string" ? selected.name : null, url.hostname),
+    description: typeof selected.description === "string" ? decodeHtmlEntities(selected.description) : null,
     imageUrl: imageUrls[0] ?? null,
     imageUrls,
-    currentPriceInCents: parseMoneyToCents((offer as Record<string, unknown> | undefined)?.price ?? (offer as Record<string, unknown> | undefined)?.lowPrice),
-    originalPriceInCents: parseMoneyToCents((offer as Record<string, unknown> | undefined)?.highPrice),
-    currency: typeof (offer as Record<string, unknown> | undefined)?.priceCurrency === "string"
-      ? String((offer as Record<string, unknown>).priceCurrency)
-      : null,
-    availability: toAvailability(typeof (offer as Record<string, unknown> | undefined)?.availability === "string"
-      ? String((offer as Record<string, unknown>).availability)
-      : null),
+    currentPriceInCents,
+    originalPriceInCents: parseMoneyToCents(offerPrices.originalPrice),
+    currency: offerPrices.currency,
+    availability: toAvailability(offerPrices.availability),
     selectedVariant: [],
     extractedAt: new Date().toISOString(),
-    partial: !Boolean(selected.name && imageUrls[0] && offer),
+    // Antes isso checava só a existência de `offers`. A Amazon devolve `offers`
+    // com `price` nulo, então o resultado se declarava completo sem preço.
+    partial: !(selected.name && imageUrls[0] && currentPriceInCents != null),
     confidence: {
       title: 0.85,
       description: 0.85,
       image: imageUrls.length ? 0.85 : 0.4,
-      price: offer ? 0.85 : 0,
+      price: currentPriceInCents != null ? 0.85 : 0,
       variant: 0.4,
     },
     warnings: [],
