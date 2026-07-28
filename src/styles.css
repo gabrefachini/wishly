@@ -2347,6 +2347,49 @@ button:disabled {
   min-width: 0;
 }
 
+.destination-field {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--primary-soft);
+}
+
+.destination-field .input-wrap {
+  background: var(--card);
+}
+
+.field-hint,
+.destination-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.destination-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.select-wrap {
+  position: relative;
+}
+
+.select-wrap select {
+  min-width: 0;
+  padding-right: 44px;
+  font-weight: 700;
+}
+
+.select-wrap .select-chevron {
+  position: absolute;
+  right: 14px;
+  margin: 0;
+  pointer-events: none;
+}
+
 .cover-upload {
   position: relative;
   display: grid;

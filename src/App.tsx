@@ -5,6 +5,7 @@ import {
   Bell,
   Clock3,
   Check,
+  ChevronDown,
   ChevronLeft,
   Copy,
   ExternalLink,
@@ -92,6 +93,7 @@ import {
   isAutofillResultCurrent,
   sanitizeMercadoLivrePreview,
 } from "./lib/product-autofill";
+import { resolveAddWishTargetId } from "./lib/add-wish-target";
 import { buildDefaultListCover, resolveListCover } from "./lib/listCover";
 
 /**
@@ -446,6 +448,8 @@ function App() {
   );
   const [localProfile, setLocalProfile] = useState<LocalProfile>(() => readLocalState("wishly-local-profile", localProfileSeed));
   const [formState, setFormState] = useState<AddWishFormState>(initialAddWishFormState);
+  const [addWishTargetId, setAddWishTargetId] = useState<string | null>(null);
+  const [addWishReturnView, setAddWishReturnView] = useState<"home" | "list">("home");
   const [extractionState, setExtractionState] = useState<ProductExtractionState>({
     status: "idle",
     message: "",
@@ -746,6 +750,20 @@ function App() {
     setMarketingMenuOpen(false);
   }
 
+  function beginAddWishFlow(wishlistId: string | null) {
+    const validWishlistId = resolveAddWishTargetId({
+      requestedWishlistId: wishlistId,
+      availableWishlistIds: remote.wishlists.map((wishlist) => wishlist.id),
+      isRemoteMode,
+      localWishlistId: localListId,
+    });
+
+    setAddWishTargetId(validWishlistId);
+    setAddWishReturnView(validWishlistId ? "list" : "home");
+    setSyncError("");
+    go("add");
+  }
+
   function beginCreateListFlow() {
     setPasswordRecoveryMode(false);
     setCreateListMode("create");
@@ -754,6 +772,13 @@ function App() {
     setSyncError("");
     setAuthSubmitState("idle");
     setCreateListForm({ title: "", coverFile: null, coverPreview: null });
+
+    if (session || !supabaseEnabled) {
+      window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+      go("create_list");
+      return;
+    }
+
     window.localStorage.setItem(POST_AUTH_VIEW_KEY, "create_list");
   }
 
@@ -1128,6 +1153,18 @@ function App() {
   }
 
   async function handleAddWish() {
+    const targetWishlistId = resolveAddWishTargetId({
+      requestedWishlistId: addWishTargetId,
+      availableWishlistIds: remote.wishlists.map((wishlist) => wishlist.id),
+      isRemoteMode,
+      localWishlistId: localListId,
+    });
+
+    if (!targetWishlistId) {
+      setSyncError("Escolha a lista em que deseja salvar este item.");
+      return;
+    }
+
     const submissionReadiness = getWishSubmissionReadiness({
       title: formState.title,
       productUrl: formState.productUrl,
@@ -1144,7 +1181,7 @@ function App() {
     const priceInCents = parsePriceInputToCents(formState.currentPrice);
     const canonicalOrOriginalUrl = formState.canonicalUrl.trim() || formState.productUrl.trim();
     const submissionFingerprint = buildWishSubmissionFingerprint({
-      wishlistId: remote.selectedWishlistId ?? localListId,
+      wishlistId: targetWishlistId,
       requestedUrl: formState.productUrl.trim() || canonicalOrOriginalUrl,
       title,
       canonicalUrl: canonicalOrOriginalUrl,
@@ -1154,13 +1191,13 @@ function App() {
       return;
     }
 
-    if (isRemoteMode && remote.selectedWishlistId) {
+    if (isRemoteMode) {
       try {
         setSyncing(true);
         setSyncError("");
 
         await createGift({
-          wishlistId: remote.selectedWishlistId,
+          wishlistId: targetWishlistId,
           name: title,
           description: formState.note.trim(),
           storeUrl: canonicalOrOriginalUrl,
@@ -1232,13 +1269,19 @@ function App() {
         addWishSubmissionLock.current.finish(true);
 
         try {
-          await refreshRemoteState(session);
+          const gifts = await loadWishlistGifts(targetWishlistId);
+          setRemote((current) => ({
+            ...current,
+            selectedWishlistId: targetWishlistId,
+            gifts,
+          }));
         } catch (refreshError) {
           console.warn("[Wishly] gift saved but list refresh failed", refreshError);
           setSyncError("O item foi salvo, mas a lista não atualizou agora. Recarregue a página para vê-lo.");
         }
 
         setFormState(initialAddWishFormState);
+        setAddWishTargetId(null);
         setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
         setSelectedPriority("Alta");
         go("list");
@@ -1292,6 +1335,7 @@ function App() {
     }
 
     setFormState(initialAddWishFormState);
+    setAddWishTargetId(null);
     setExtractionState({ status: "idle", message: "", provider: null, preview: null, extractedUrl: null, errorCode: null });
     setSelectedPriority("Alta");
     addWishSubmissionLock.current.finish(true);
@@ -1556,6 +1600,8 @@ function App() {
         setCreateListForm({ title: "", coverFile: null, coverPreview: null });
         setAuthMessage("");
         setCreateListMode("create");
+        setAddWishTargetId(wishlist.id);
+        setAddWishReturnView("list");
         go("add");
         return;
       } catch (error) {
@@ -1577,7 +1623,13 @@ function App() {
     setSyncError("");
     setCreateListMode("create");
     window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
-    go(createListMode === "edit" ? "list" : "add");
+    if (createListMode === "edit") {
+      go("list");
+    } else {
+      setAddWishTargetId(localListId);
+      setAddWishReturnView("list");
+      go("add");
+    }
   }
 
   async function handleRemoteAdminUpdate(giftId: string, status: "generated" | "failed" | "fallback") {
@@ -2021,6 +2073,11 @@ function App() {
       if (!url) return;
       event.preventDefault();
       setFormState((current) => ({ ...current, productUrl: url }));
+      const contextualWishlistId =
+        view === "list" ? (isRemoteMode ? remote.selectedWishlistId : localListId) : isRemoteMode ? null : localListId;
+      setAddWishTargetId(contextualWishlistId);
+      setAddWishReturnView(contextualWishlistId ? "list" : "home");
+      setSyncError("");
       go("add");
       setAuthMessage("Link colado. Confira os dados antes de salvar.");
     }
@@ -2040,7 +2097,7 @@ function App() {
       window.removeEventListener("paste", handlePaste);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isPublicMode, isMarketingMode]);
+  }, [isPublicMode, isMarketingMode, isRemoteMode, remote.selectedWishlistId, view]);
 
   useEffect(() => {
     window.localStorage.setItem("wishly-price-alerts", JSON.stringify(priceAlerts));
@@ -2498,7 +2555,7 @@ function App() {
             <Plus size={18} />
             Nova lista
           </button>
-          <button className="primary-button full" type="button" onClick={() => go("add")}>
+          <button className="primary-button full" type="button" onClick={() => beginAddWishFlow(null)}>
             <Gift size={18} />
             Adicionar desejo
           </button>
@@ -2611,6 +2668,7 @@ function App() {
         {view === "list" && (
           <ListScreen
             go={go}
+            onAddWish={() => beginAddWishFlow(remote.selectedWishlistId)}
             priceAlerts={priceAlerts}
             onEditAlert={setAlertTarget}
             wishes={currentWishes}
@@ -2631,13 +2689,16 @@ function App() {
           <AddWishScreen
             formState={formState}
             extractionState={extractionState}
-            go={go}
+            availableLists={homeLists}
+            selectedWishlistId={isRemoteMode ? addWishTargetId : localListId}
+            onSelectWishlist={setAddWishTargetId}
+            onCreateList={beginCreateListFlow}
+            onBack={() => go(addWishReturnView)}
             selectedPriority={selectedPriority}
             setFormState={setFormState}
             setSelectedPriority={setSelectedPriority}
             onSubmit={() => void handleAddWish()}
             syncing={syncing}
-            isRemoteMode={isRemoteMode}
           />
         )}
         {view === "radar" && (
@@ -2711,7 +2772,17 @@ function App() {
       </div>
 
       {showFab && (
-        <button className="fab" type="button" onClick={() => go(view === "home" ? "create_list" : "add")}>
+        <button
+          className="fab"
+          type="button"
+          onClick={() => {
+            if (view === "home") {
+              beginCreateListFlow();
+              return;
+            }
+            beginAddWishFlow(view === "list" ? remote.selectedWishlistId : null);
+          }}
+        >
           <Plus size={19} />
           <span>{view === "home" ? "CRIAR NOVA LISTA" : "ADICIONAR DESEJO"}</span>
         </button>
@@ -4076,6 +4147,7 @@ function CreateListScreen({
 
 function ListScreen({
   go,
+  onAddWish,
   priceAlerts,
   onEditAlert,
   wishes,
@@ -4092,6 +4164,7 @@ function ListScreen({
   canEditList,
 }: {
   go: (view: View) => void;
+  onAddWish: () => void;
   priceAlerts: Record<string, PriceAlert>;
   onEditAlert: (wish: LocalWish | DbWish) => void;
   wishes: Array<LocalWish | DbWish>;
@@ -4117,7 +4190,7 @@ function ListScreen({
           <h2>{wishlistTitle}</h2>
           <p>{formatWishCount(wishes.length)} · compartilhe quando estiver pronta para circular.</p>
           <div className="hero-actions">
-            <button className="primary-button" type="button" onClick={() => go("add")}>
+            <button className="primary-button" type="button" onClick={onAddWish}>
               <Plus size={18} />
               Adicionar
             </button>
@@ -4148,7 +4221,7 @@ function ListScreen({
               <strong>Sua lista está pronta.</strong>
               <p>Adicione o primeiro item para começar a organizar seus desejos.</p>
             </div>
-            <button className="primary-button" type="button" onClick={() => go("add")}>
+            <button className="primary-button" type="button" onClick={onAddWish}>
               <Plus size={18} />
               Adicionar primeiro item
             </button>
@@ -4228,23 +4301,29 @@ function ListScreen({
 function AddWishScreen({
   formState,
   extractionState,
-  go,
+  availableLists,
+  selectedWishlistId,
+  onSelectWishlist,
+  onCreateList,
+  onBack,
   selectedPriority,
   setFormState,
   setSelectedPriority,
   onSubmit,
   syncing,
-  isRemoteMode,
 }: {
   formState: AddWishFormState;
   extractionState: ProductExtractionState;
-  go: (view: View) => void;
+  availableLists: HomeListSummary[];
+  selectedWishlistId: string | null;
+  onSelectWishlist: (wishlistId: string | null) => void;
+  onCreateList: () => void;
+  onBack: () => void;
   selectedPriority: Priority;
   setFormState: (state: AddWishFormState) => void;
   setSelectedPriority: (priority: Priority) => void;
   onSubmit: () => void;
   syncing: boolean;
-  isRemoteMode: boolean;
 }) {
   const [pasteError, setPasteError] = useState("");
 
@@ -4290,6 +4369,46 @@ function AddWishScreen({
             <Copy size={18} />
             {pasteError || "Colar link copiado"}
           </button>
+        </div>
+        <div className="destination-field">
+          <label className="field" htmlFor="add-wish-destination">
+            <span className="field-label">Lista de destino</span>
+            <span className="input-wrap select-wrap">
+              <Gift size={18} aria-hidden="true" />
+              <select
+                id="add-wish-destination"
+                value={selectedWishlistId ?? ""}
+                onChange={(event) => onSelectWishlist(event.target.value || null)}
+                disabled={syncing || availableLists.length === 0}
+                required
+              >
+                <option value="" disabled>
+                  Selecione uma lista
+                </option>
+                {availableLists.map((list) => (
+                  <option value={list.id} key={list.id}>
+                    {list.title}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="select-chevron" size={18} aria-hidden="true" />
+            </span>
+          </label>
+          {availableLists.length > 0 ? (
+            <p className="field-hint">
+              {selectedWishlistId
+                ? "O desejo será salvo nesta lista."
+                : "Escolha onde o desejo deve aparecer antes de salvar."}
+            </p>
+          ) : (
+            <div className="destination-empty">
+              <p>Você precisa criar uma lista antes de adicionar um desejo.</p>
+              <button className="secondary-button" type="button" onClick={onCreateList}>
+                <Plus size={18} />
+                Criar uma lista
+              </button>
+            </div>
+          )}
         </div>
         <Field
           label="Link do produto"
@@ -4385,19 +4504,22 @@ function AddWishScreen({
           </div>
         </div>
         <div className="field-row">
-          <button className="secondary-button" type="button" onClick={() => go("list")}>
+          <button className="secondary-button" type="button" onClick={onBack}>
             Voltar
           </button>
           <button
             className="primary-button full"
             type="submit"
-            disabled={!getWishSubmissionReadiness({
-              title: formState.title,
-              productUrl: formState.productUrl,
-              extractionStatus: extractionState.status,
-              extractedUrl: extractionState.extractedUrl,
-              syncing,
-            }).canSubmit}
+            disabled={
+              !selectedWishlistId ||
+              !getWishSubmissionReadiness({
+                title: formState.title,
+                productUrl: formState.productUrl,
+                extractionStatus: extractionState.status,
+                extractedUrl: extractionState.extractedUrl,
+                syncing,
+              }).canSubmit
+            }
           >
             <Sparkles size={18} />
             {syncing ? "Salvando..." : extractionState.status === "error" ? "Confirmar inclusão manual" : "Salvar desejo"}
