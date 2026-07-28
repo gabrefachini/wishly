@@ -1119,6 +1119,206 @@ function slugify(value: string) {
     .slice(0, 48);
 }
 
+export type ListTemplateItem = {
+  id: string;
+  template_id: string;
+  name: string;
+  description: string | null;
+  store_name: string | null;
+  image_url: string | null;
+  product_url: string;
+  affiliate_url: string | null;
+  estimated_price: number | null;
+  currency: string;
+  priority: "must_have" | "nice_to_have" | "surprise_me";
+  position: number;
+};
+
+export type ListTemplate = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  occasion: string;
+  cover_image_url: string | null;
+  position: number;
+  published: boolean;
+  items: ListTemplateItem[];
+};
+
+const LIST_TEMPLATE_COLUMNS = "id, slug, title, description, occasion, cover_image_url, position, published";
+const LIST_TEMPLATE_ITEM_COLUMNS =
+  "id, template_id, name, description, store_name, image_url, product_url, affiliate_url, estimated_price, currency, priority, position";
+
+/**
+ * Carrega as listas modelo com seus itens.
+ *
+ * Devolve lista vazia quando a migração de modelos ainda não foi aplicada, para
+ * a interface simplesmente esconder a seção em vez de mostrar erro.
+ */
+export async function loadListTemplates(options?: { includeUnpublished?: boolean }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return [];
+
+  let query = supabase.from("list_templates").select(LIST_TEMPLATE_COLUMNS).order("position", { ascending: true });
+  if (!options?.includeUnpublished) query = query.eq("published", true);
+
+  const { data: templateRows, error: templateError } = await query;
+
+  if (templateError) {
+    if (isSchemaCompatibilityInsertError(templateError)) return [];
+    logSupabaseError("loadListTemplates", templateError);
+    throw templateError;
+  }
+
+  const templates = (templateRows ?? []) as Omit<ListTemplate, "items">[];
+  if (templates.length === 0) return [];
+
+  const { data: itemRows, error: itemError } = await supabase
+    .from("list_template_items")
+    .select(LIST_TEMPLATE_ITEM_COLUMNS)
+    .in("template_id", templates.map((template) => template.id))
+    .order("position", { ascending: true });
+
+  if (itemError && !isSchemaCompatibilityInsertError(itemError)) {
+    logSupabaseError("loadListTemplateItems", itemError);
+    throw itemError;
+  }
+
+  const itemsByTemplate = new Map<string, ListTemplateItem[]>();
+  for (const item of (itemRows ?? []) as ListTemplateItem[]) {
+    const current = itemsByTemplate.get(item.template_id) ?? [];
+    current.push(item);
+    itemsByTemplate.set(item.template_id, current);
+  }
+
+  return templates.map((template) => ({
+    ...template,
+    items: itemsByTemplate.get(template.id) ?? [],
+  })) as ListTemplate[];
+}
+
+export async function saveListTemplate(input: {
+  id?: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  occasion?: string | null;
+  coverImageUrl?: string | null;
+  published: boolean;
+  position?: number;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const payload = {
+    slug: input.slug,
+    title: input.title,
+    description: input.description?.trim() || null,
+    occasion: input.occasion?.trim() || "Lista de desejos",
+    cover_image_url: input.coverImageUrl?.trim() || null,
+    published: input.published,
+    position: input.position ?? 0,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = input.id
+    ? await supabase.from("list_templates").update(payload).eq("id", input.id).select(LIST_TEMPLATE_COLUMNS).single()
+    : await supabase.from("list_templates").insert(payload).select(LIST_TEMPLATE_COLUMNS).single();
+
+  if (error) {
+    logSupabaseError("saveListTemplate", error, { id: input.id });
+    throw error;
+  }
+
+  return data as Omit<ListTemplate, "items">;
+}
+
+export async function deleteListTemplate(templateId: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { error } = await supabase.from("list_templates").delete().eq("id", templateId);
+  if (error) {
+    logSupabaseError("deleteListTemplate", error, { templateId });
+    throw error;
+  }
+}
+
+export async function addListTemplateItem(input: {
+  templateId: string;
+  name: string;
+  productUrl: string;
+  affiliateUrl?: string | null;
+  storeName?: string | null;
+  imageUrl?: string | null;
+  description?: string | null;
+  estimatedPrice?: number | null;
+  priority?: ListTemplateItem["priority"];
+  position?: number;
+}) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase
+    .from("list_template_items")
+    .insert({
+      template_id: input.templateId,
+      name: input.name,
+      product_url: input.productUrl,
+      affiliate_url: input.affiliateUrl?.trim() || null,
+      store_name: input.storeName?.trim() || null,
+      image_url: input.imageUrl?.trim() || null,
+      description: input.description?.trim() || null,
+      estimated_price: input.estimatedPrice ?? null,
+      priority: input.priority ?? "nice_to_have",
+      position: input.position ?? 0,
+    })
+    .select(LIST_TEMPLATE_ITEM_COLUMNS)
+    .single();
+
+  if (error) {
+    logSupabaseError("addListTemplateItem", error, { templateId: input.templateId });
+    throw error;
+  }
+
+  return data as ListTemplateItem;
+}
+
+export async function deleteListTemplateItem(itemId: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { error } = await supabase.from("list_template_items").delete().eq("id", itemId);
+  if (error) {
+    logSupabaseError("deleteListTemplateItem", error, { itemId });
+    throw error;
+  }
+}
+
+/**
+ * Cria a lista da pessoa a partir de um modelo, já com os itens dentro.
+ */
+export async function createWishlistFromTemplate(input: { templateId: string; title?: string | null }) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase.rpc("create_wishlist_from_template", {
+    p_template_id: input.templateId,
+    p_title: input.title?.trim() || null,
+  });
+
+  if (error) {
+    logSupabaseError("create_wishlist_from_template", error, input);
+    if (typeof error.message === "string" && error.message.includes("template_not_found")) {
+      throw new Error("Esse modelo não está mais disponível.");
+    }
+    throw error;
+  }
+
+  return data as { wishlist_id: string; share_id: string; title: string; item_count: number };
+}
+
 function isSchemaCompatibilityInsertError(error: { code?: string; message?: string; details?: string | null; hint?: string | null }) {
   const context = [error.code, error.message, error.details, error.hint].filter(Boolean).join(" ").toLowerCase();
   return (

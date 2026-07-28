@@ -1076,6 +1076,128 @@ button:disabled {
   gap: 12px;
 }
 
+/* Listas modelo curadas pelo time. */
+.template-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.template-card {
+  display: grid;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.template-card > img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.template-card-copy {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+}
+
+.template-card-copy h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  line-height: 23px;
+}
+
+.template-card-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.template-card-meta {
+  margin-top: 6px !important;
+  font-weight: 600;
+}
+
+.template-card-items {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-low);
+  list-style: none;
+}
+
+.template-card-items li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.template-card-items small {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.template-card-more {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.template-card .primary-button {
+  margin-top: auto;
+}
+
+/* Cadastro de modelos no admin. */
+.admin-template-items {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-template-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-low);
+}
+
+.admin-template-item span {
+  display: grid;
+  min-width: 0;
+}
+
+.admin-template-item strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-template-item small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.admin-template-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+
+.status-pill.muted {
+  color: var(--text-muted);
+}
+
 /* A tabela do radar é exclusiva de desktop. */
 .radar-table-wrap {
   display: none;
@@ -1776,41 +1898,15 @@ button:disabled {
 }
 
 .idea-band {
+  display: grid;
+  gap: 14px;
   margin-top: 22px;
-  padding: 28px 0 20px;
+  padding: 28px 20px 24px;
   background: var(--tertiary-soft);
 }
 
-.idea {
-  flex: 0 0 132px;
+.idea-band .section-heading {
   padding: 0;
-  color: var(--muted);
-  background: transparent;
-  text-align: center;
-}
-
-.idea span {
-  display: grid;
-  place-items: center;
-  width: 118px;
-  height: 118px;
-  margin: 0 auto 10px;
-  border: 2px solid var(--outline);
-  border-radius: 999px;
-  background: var(--idea-bg);
-}
-
-.idea img {
-  width: 78%;
-  height: 78%;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-}
-
-.idea strong {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .hero-list {
@@ -3281,8 +3377,7 @@ select {
     padding: 24px 28px;
   }
 
-  .shelf-lists,
-  .shelf-ideas {
+  .shelf-lists {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 18px;
@@ -3300,6 +3395,15 @@ select {
   .wish-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
+  }
+
+  .idea-band {
+    padding: 32px 28px 28px;
+  }
+
+  .template-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
   }
 
   /* No desktop o diálogo volta a ser centralizado. */
@@ -3425,10 +3529,6 @@ select {
   .wish-list .wish-actions {
     margin-top: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .shelf-ideas .idea {
-    justify-self: center;
   }
 
   .hero-list {
@@ -3626,10 +3726,6 @@ select {
   }
 
   .shelf-lists {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .shelf-ideas {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 

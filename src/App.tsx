@@ -39,7 +39,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import {
   createWishlist,
+  addListTemplateItem,
+  createWishlistFromTemplate,
+  deleteListTemplate,
+  deleteListTemplateItem,
   deleteWishlist,
+  loadListTemplates,
+  saveListTemplate,
   createGift,
   getInitialSession,
   listenToAuthChanges,
@@ -67,6 +73,7 @@ import {
   updateRecoveredPassword,
   type AdminAccountDeletionRequest,
   type AdminAffiliateQueueItem,
+  type ListTemplate,
   type DbWish,
   type DbWishlist,
   type MercadoLivreConnectionStatus,
@@ -389,6 +396,7 @@ const localListName = "Casa nova";
 const localCreatorName = "Gabriel Fachini";
 const localAdminName = "Time Wishly";
 const POST_AUTH_VIEW_KEY = "wishly-post-auth-view";
+const PENDING_TEMPLATE_KEY = "wishly-pending-template";
 const localProfileSeed: LocalProfile = {
   fullName: localCreatorName,
   email: "gabriel@wishly.app",
@@ -499,6 +507,8 @@ function App() {
   const [adminQueue, setAdminQueue] = useState<AdminAffiliateQueueItem[]>([]);
   const [adminDeletionRequests, setAdminDeletionRequests] = useState<AdminAccountDeletionRequest[]>([]);
   const [reserving, setReserving] = useState(false);
+  const [listTemplates, setListTemplates] = useState<ListTemplate[]>([]);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
   const [listPaletteOpen, setListPaletteOpen] = useState(false);
   const [deleteListConfirmOpen, setDeleteListConfirmOpen] = useState(false);
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
@@ -1270,6 +1280,135 @@ function App() {
     go("list");
   }
 
+  /**
+   * Usa um modelo: cria a lista já com os produtos curados dentro.
+   *
+   * Sem sessão, guardamos o modelo escolhido e aplicamos depois do cadastro —
+   * assim a pessoa não perde a escolha no meio do fluxo de conta.
+   */
+  async function handleUseTemplate(template: ListTemplate) {
+    if (!isRemoteMode) {
+      window.localStorage.setItem(PENDING_TEMPLATE_KEY, template.id);
+      beginCreateListFlow();
+      setAuthMessage(`Crie sua conta para montar "${template.title}" com os itens já dentro.`);
+      go("home");
+      return;
+    }
+
+    try {
+      setApplyingTemplateId(template.id);
+      setSyncError("");
+      const created = await createWishlistFromTemplate({ templateId: template.id });
+      const context = session?.user ? await loadViewerContext(session.user) : null;
+      const gifts = await loadWishlistGifts(created.wishlist_id);
+
+      setRemote((current) => ({
+        ...current,
+        wishlists: context?.wishlists ?? current.wishlists,
+        selectedWishlistId: created.wishlist_id,
+        gifts,
+      }));
+      setAuthMessage(`"${created.title}" criada com ${formatWishCount(created.item_count)}.`);
+      go("list");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setApplyingTemplateId(null);
+    }
+  }
+
+  async function refreshListTemplates() {
+    // Admin também vê rascunhos; o restante do app só vê publicados.
+    const templates = await loadListTemplates({ includeUnpublished: remote.isAdmin });
+    setListTemplates(templates);
+  }
+
+  async function handleSaveTemplate(input: {
+    id?: string;
+    title: string;
+    description: string;
+    coverImageUrl: string;
+    published: boolean;
+  }) {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      await saveListTemplate({
+        id: input.id,
+        slug: slugifyTemplateTitle(input.title),
+        title: input.title,
+        description: input.description,
+        coverImageUrl: input.coverImageUrl,
+        published: input.published,
+      });
+      await refreshListTemplates();
+      setAuthMessage("Modelo salvo.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleDeleteTemplate(templateId: string) {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      await deleteListTemplate(templateId);
+      await refreshListTemplates();
+      setAuthMessage("Modelo excluído.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleAddTemplateItem(input: {
+    templateId: string;
+    name: string;
+    productUrl: string;
+    affiliateUrl: string;
+    storeName: string;
+    imageUrl: string;
+    price: string;
+  }) {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      const cents = parsePriceInputToCents(input.price);
+      await addListTemplateItem({
+        templateId: input.templateId,
+        name: input.name.trim(),
+        productUrl: input.productUrl.trim(),
+        affiliateUrl: input.affiliateUrl,
+        storeName: input.storeName,
+        imageUrl: input.imageUrl,
+        estimatedPrice: cents == null ? null : cents / 100,
+        position: listTemplates.find((template) => template.id === input.templateId)?.items.length ?? 0,
+      });
+      await refreshListTemplates();
+      setAuthMessage("Item adicionado ao modelo.");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleDeleteTemplateItem(itemId: string) {
+    try {
+      setSyncing(true);
+      setSyncError("");
+      await deleteListTemplateItem(itemId);
+      await refreshListTemplates();
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleDeleteList() {
     if (isRemoteMode) {
       const wishlistId = remote.selectedWishlistId;
@@ -1807,6 +1946,22 @@ function App() {
     window.localStorage.setItem("wishly-theme", theme);
   }, [theme]);
 
+  // Modelos publicados: visíveis também para quem ainda não tem conta.
+  useEffect(() => {
+    let active = true;
+    // Admin precisa ver rascunhos para poder publicá-los.
+    void loadListTemplates({ includeUnpublished: remote.isAdmin })
+      .then((templates) => {
+        if (active) setListTemplates(templates);
+      })
+      .catch(() => {
+        if (active) setListTemplates([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [remote.isAdmin]);
+
   // Atalhos de teclado (desktop): colar um link em qualquer lugar abre o cadastro
   // já preenchido, e Cmd/Ctrl+K abre a troca rápida de lista.
   useEffect(() => {
@@ -2116,6 +2271,18 @@ function App() {
   useEffect(() => {
     if (!session || !remoteReady || passwordRecoveryMode) return;
 
+    // A pessoa escolheu um modelo antes de ter conta: aplicamos agora.
+    const pendingTemplateId = window.localStorage.getItem(PENDING_TEMPLATE_KEY);
+    if (pendingTemplateId) {
+      window.localStorage.removeItem(PENDING_TEMPLATE_KEY);
+      window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
+      const pendingTemplate = listTemplates.find((template) => template.id === pendingTemplateId);
+      if (pendingTemplate) {
+        void handleUseTemplate(pendingTemplate);
+        return;
+      }
+    }
+
     const pendingView = window.localStorage.getItem(POST_AUTH_VIEW_KEY) as View | null;
     if (pendingView === "create_list") {
       window.localStorage.removeItem(POST_AUTH_VIEW_KEY);
@@ -2127,7 +2294,7 @@ function App() {
     if (view === "home" && remote.wishlists.length === 0) {
       setView("create_list");
     }
-  }, [passwordRecoveryMode, session, remoteReady, remote.wishlists.length, view]);
+  }, [passwordRecoveryMode, session, remoteReady, remote.wishlists.length, view, listTemplates]);
 
   useEffect(() => {
     document.body.classList.toggle("marketing-body", isMarketingMode);
@@ -2229,6 +2396,8 @@ function App() {
           onSetAuthField={updateAuthField}
           onToggleMenu={() => setMarketingMenuOpen((current) => !current)}
           syncing={syncing}
+          templates={listTemplates}
+          onUseTemplate={(template) => void handleUseTemplate(template)}
         />
       ) : (
         <>
@@ -2361,6 +2530,9 @@ function App() {
             syncing={syncing}
             lists={homeLists}
             notices={homeNotices}
+            templates={listTemplates}
+            applyingTemplateId={applyingTemplateId}
+            onUseTemplate={(template) => void handleUseTemplate(template)}
             onOpenList={(listId) => {
               if (isRemoteMode) void handleSelectRemoteWishlist(listId);
               go("list");
@@ -2438,6 +2610,16 @@ function App() {
             onLocalApply={(taskId) => handleLocalAdminUpdate(taskId, "completed")}
             onLocalInvalid={(taskId) => handleLocalAdminUpdate(taskId, "invalid")}
             onLocalUnavailable={(taskId) => handleLocalAdminUpdate(taskId, "unavailable")}
+            templatesSection={
+              <AdminTemplatesSection
+                templates={listTemplates}
+                busy={syncing}
+                onSaveTemplate={(input) => void handleSaveTemplate(input)}
+                onDeleteTemplate={(templateId) => void handleDeleteTemplate(templateId)}
+                onAddItem={(input) => void handleAddTemplateItem(input)}
+                onDeleteItem={(itemId) => void handleDeleteTemplateItem(itemId)}
+              />
+            }
           />
         )}
         {view === "profile" && (
@@ -2855,6 +3037,8 @@ function MarketingHomePage({
   onForgotPassword,
   onToggleMenu,
   syncing,
+  templates,
+  onUseTemplate,
 }: {
   authForm: AuthFormState;
   authMessage: string;
@@ -2871,20 +3055,14 @@ function MarketingHomePage({
   onForgotPassword: () => void;
   onToggleMenu: () => void;
   syncing: boolean;
+  templates: ListTemplate[];
+  onUseTemplate: (template: ListTemplate) => void;
 }) {
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
   const authBusy = syncing || authSubmitState === "submitting";
   const marketingImages = {
     heroCover:
       "https://media.architecturaldigest.com/photos/6879507ebb0032785eb73ee6/4%3A3/w_1600%2Cc_limit/41.%2520Hamptons%2520Modern%2520by%2520Chango%2520%26%2520Co.%2520-%2520Nursery%2520with%2520Glider%2520Detail.jpg",
-    nursery:
-      "https://media.architecturaldigest.com/photos/68795074980df8afc82091b5/4%3A3/w_1600%2Cc_limit/42.%2520Hamptons%2520Modern%2520by%2520Chango%2520%26%2520Co.%2520-%2520Nursery%2520with%2520Crib%2520Detail.jpg",
-    wedding:
-      "https://www.irishexaminer.com/cms_media/module_img/9925/4962821_9_org_AdobeStock_931604614.jpeg.jpg",
-    birthday:
-      "https://imgix.bustle.com/uploads/getty/2022/4/8/76ca8d7f-ee05-48b2-8357-7c5373f55654-getty-1156021435.jpg?crop=faces&dpr=2&fit=crop&h=900&w=1200",
-    personal:
-      "https://www.punkt.ch/cdn/shop/files/punkt-essay-cover1.webp?v=1752138119&width=1920",
     cribMobile:
       "https://www.mumzworld.com/media/catalog/product/g/f/gf-6981b-goodway-baby-bed-bell-hanging-toy-w-rattles-beige-1654780543.jpg",
     playGym:
@@ -2892,13 +3070,6 @@ function MarketingHomePage({
     lamp:
       "https://www.modishstore.com/cdn/shop/products/468693_1.jpg?v=1755510615&width=990",
   };
-
-  const templateLists = [
-    { title: "Chá de bebê", detail: "Comece pelo enxoval e ajuste do seu jeito.", image: marketingImages.nursery },
-    { title: "Casamento", detail: "Reúna desejos para a casa e para a celebração.", image: marketingImages.wedding },
-    { title: "Aniversário", detail: "Uma lista simples para compartilhar com amigos e família.", image: marketingImages.birthday },
-    { title: "Minha lista de desejos", detail: "Guarde ideias, produtos e compras futuras.", image: marketingImages.personal },
-  ];
 
   const heroItems = [
     { title: "Móbile para berço", meta: "Novo desejo adicionado", image: marketingImages.cribMobile, badge: "novo" },
@@ -3198,27 +3369,19 @@ function MarketingHomePage({
           </div>
         </section>
 
-        <section className="marketing-section" id="modelos">
-          <div className="section-intro">
-            <h2>Comece com uma lista para o seu momento</h2>
-            <p>Escolha um modelo e personalize no seu ritmo.</p>
-          </div>
-          <div className="marketing-list-grid">
-            {templateLists.map((item) => (
-              <article className="marketing-list-card" key={item.title}>
-                <img src={item.image} alt={item.title} />
-                <div className="marketing-list-overlay" />
-                <div className="marketing-list-copy">
-                  <h3>{item.title}</h3>
-                  <p>{item.detail}</p>
-                  <button className="text-button" type="button" onClick={openCreateAccountPanel}>
-                    Usar este modelo
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        {templates.length > 0 && (
+          <section className="marketing-section" id="modelos">
+            <div className="section-intro">
+              <h2>Comece com uma lista pronta</h2>
+              <p>Modelos com produtos já escolhidos. Você usa como base e ajusta do seu jeito.</p>
+            </div>
+            <div className="template-grid">
+              {templates.map((template) => (
+                <TemplateCard key={template.id} template={template} busy={false} onUse={() => onUseTemplate(template)} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="marketing-section marketing-steps-section" id="como-funciona">
           <div className="section-intro">
@@ -3432,6 +3595,9 @@ function HomeScreen({
   lists,
   onOpenList,
   notices,
+  templates,
+  applyingTemplateId,
+  onUseTemplate,
 }: {
   go: (view: View) => void;
   pendingCount: number;
@@ -3447,6 +3613,9 @@ function HomeScreen({
   lists: HomeListSummary[];
   onOpenList: (listId: string) => void;
   notices: string[];
+  templates: ListTemplate[];
+  applyingTemplateId: string | null;
+  onUseTemplate: (template: ListTemplate) => void;
 }) {
   return (
     <>
@@ -3590,14 +3759,72 @@ function HomeScreen({
         </section>
       )}
 
-      <section className="idea-band">
-        <Shelf title="Ideias para começar" tone="tertiary" variant="ideas">
-          <Idea image={images.ideaHome} label="Casa nova" />
-          <Idea image={images.baby} label="Chá de bebê" />
-          <Idea image={images.plane} label="Viagem" />
-        </Shelf>
-      </section>
+      {/* Modelos reais, curados pelo time, com produtos dentro. Sem modelo
+          publicado a seção simplesmente não aparece. */}
+      {templates.length > 0 && (
+        <section className="idea-band">
+          <div className="section-heading section-heading-stacked">
+            <h2>Ideias para começar</h2>
+            <p>Listas prontas com produtos escolhidos. Use como base e ajuste do seu jeito.</p>
+          </div>
+          <div className="template-grid">
+            {templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                busy={applyingTemplateId === template.id}
+                onUse={() => onUseTemplate(template)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </>
+  );
+}
+
+function TemplateCard({
+  template,
+  busy,
+  onUse,
+}: {
+  template: ListTemplate;
+  busy: boolean;
+  onUse: () => void;
+}) {
+  const itemCount = template.items.length;
+  const total = template.items.reduce((sum, item) => sum + (item.estimated_price ?? 0), 0);
+
+  return (
+    <article className="template-card">
+      <img src={resolveListCover(template.cover_image_url, template.title)} alt="" />
+      <div className="template-card-copy">
+        <div>
+          <h3>{template.title}</h3>
+          {template.description && <p>{template.description}</p>}
+          <p className="template-card-meta">
+            {itemCount > 0 ? formatWishCount(itemCount) : "Lista vazia"}
+            {total > 0 ? ` · a partir de ${formatCurrency(total, template.items[0]?.currency ?? "BRL")}` : ""}
+          </p>
+        </div>
+
+        {itemCount > 0 && (
+          <ul className="template-card-items">
+            {template.items.slice(0, 3).map((item) => (
+              <li key={item.id}>
+                <span>{item.name}</span>
+                {item.estimated_price != null && <small>{formatCurrency(item.estimated_price, item.currency)}</small>}
+              </li>
+            ))}
+            {itemCount > 3 && <li className="template-card-more">+ {itemCount - 3} itens</li>}
+          </ul>
+        )}
+
+        <button className="primary-button full" type="button" onClick={onUse} disabled={busy}>
+          {busy ? "Criando lista..." : "Usar este modelo"}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -4999,6 +5226,186 @@ function ProfileSettingsScreen({
   );
 }
 
+function AdminTemplatesSection({
+  templates,
+  busy,
+  onSaveTemplate,
+  onDeleteTemplate,
+  onAddItem,
+  onDeleteItem,
+}: {
+  templates: ListTemplate[];
+  busy: boolean;
+  onSaveTemplate: (input: { id?: string; title: string; description: string; coverImageUrl: string; published: boolean }) => void;
+  onDeleteTemplate: (templateId: string) => void;
+  onAddItem: (input: {
+    templateId: string;
+    name: string;
+    productUrl: string;
+    affiliateUrl: string;
+    storeName: string;
+    imageUrl: string;
+    price: string;
+  }) => void;
+  onDeleteItem: (itemId: string) => void;
+}) {
+  const [draft, setDraft] = useState({ title: "", description: "", coverImageUrl: "", published: true });
+  const [openTemplateId, setOpenTemplateId] = useState<string | null>(null);
+  const [itemDraft, setItemDraft] = useState({ name: "", productUrl: "", affiliateUrl: "", storeName: "", imageUrl: "", price: "" });
+
+  return (
+    <section className="admin-stack">
+      <div className="admin-summary">
+        <p className="label">Listas modelo</p>
+        <h2>Modelos com produtos curados</h2>
+        <p>
+          O modelo publicado aparece em "Ideias para começar" e na landing. Quem usa recebe a lista com os itens dentro,
+          e o link de afiliado é preservado.
+        </p>
+      </div>
+
+      <article className="admin-card">
+        <div className="admin-card-head">
+          <strong>Novo modelo</strong>
+        </div>
+        <Field label="Título" placeholder="Enxoval de chá de bebê" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
+        <Field
+          label="Descrição"
+          placeholder="O essencial para as primeiras semanas."
+          value={draft.description}
+          onChange={(value) => setDraft({ ...draft, description: value })}
+        />
+        <Field
+          label="Capa (URL, opcional)"
+          placeholder="https://..."
+          value={draft.coverImageUrl}
+          onChange={(value) => setDraft({ ...draft, coverImageUrl: value })}
+        />
+        <div className="admin-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => setDraft({ ...draft, published: !draft.published })}
+          >
+            {draft.published ? "Publicado" : "Rascunho"}
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={!draft.title.trim() || busy}
+            onClick={() => {
+              onSaveTemplate({ ...draft, title: draft.title.trim() });
+              setDraft({ title: "", description: "", coverImageUrl: "", published: true });
+            }}
+          >
+            Criar modelo
+          </button>
+        </div>
+      </article>
+
+      {templates.length === 0 ? (
+        <div className="empty-admin">
+          <Gift size={24} />
+          <strong>Nenhum modelo cadastrado</strong>
+          <p>Crie um modelo e adicione produtos com link de afiliado para ele aparecer no app.</p>
+        </div>
+      ) : (
+        templates.map((template) => (
+          <article className="admin-card" key={template.id}>
+            <div className="admin-card-head">
+              <strong>{template.title}</strong>
+              <span className={`status-pill ${template.published ? "" : "muted"}`}>
+                {template.published ? "Publicado" : "Rascunho"}
+              </span>
+            </div>
+            <div className="admin-meta">
+              <span>{template.items.length > 0 ? formatWishCount(template.items.length) : "Sem itens"}</span>
+              <span>/{template.slug}</span>
+            </div>
+
+            {template.items.length > 0 && (
+              <div className="admin-template-items">
+                {template.items.map((item) => (
+                  <div className="admin-template-item" key={item.id}>
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.store_name || "Loja não informada"}
+                        {item.estimated_price != null ? ` · ${formatCurrency(item.estimated_price, item.currency)}` : ""}
+                        {item.affiliate_url ? " · afiliado ok" : " · sem afiliado"}
+                      </small>
+                    </span>
+                    <button className="text-button" type="button" onClick={() => onDeleteItem(item.id)} disabled={busy}>
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="admin-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setOpenTemplateId(openTemplateId === template.id ? null : template.id)}
+              >
+                <Plus size={16} />
+                Adicionar item
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  onSaveTemplate({
+                    id: template.id,
+                    title: template.title,
+                    description: template.description ?? "",
+                    coverImageUrl: template.cover_image_url ?? "",
+                    published: !template.published,
+                  })
+                }
+              >
+                {template.published ? "Despublicar" : "Publicar"}
+              </button>
+              <button className="secondary-button danger-button" type="button" disabled={busy} onClick={() => onDeleteTemplate(template.id)}>
+                <Trash2 size={16} />
+                Excluir modelo
+              </button>
+            </div>
+
+            {openTemplateId === template.id && (
+              <div className="admin-template-form">
+                <Field label="Nome do produto" placeholder="Móbile para berço" value={itemDraft.name} onChange={(value) => setItemDraft({ ...itemDraft, name: value })} />
+                <Field label="Link do produto" placeholder="https://produto.mercadolivre.com.br/..." value={itemDraft.productUrl} onChange={(value) => setItemDraft({ ...itemDraft, productUrl: value })} />
+                <Field label="Link de afiliado" placeholder="https://mercadolivre.com/sec/..." value={itemDraft.affiliateUrl} onChange={(value) => setItemDraft({ ...itemDraft, affiliateUrl: value })} />
+                <div className="field-row split-row">
+                  <Field label="Loja" placeholder="Mercado Livre" value={itemDraft.storeName} onChange={(value) => setItemDraft({ ...itemDraft, storeName: value })} />
+                  <Field label="Preço" placeholder="189,90" value={itemDraft.price} onChange={(value) => setItemDraft({ ...itemDraft, price: value })} />
+                </div>
+                <Field label="Imagem (URL)" placeholder="https://..." value={itemDraft.imageUrl} onChange={(value) => setItemDraft({ ...itemDraft, imageUrl: value })} />
+                <div className="admin-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={!itemDraft.name.trim() || !itemDraft.productUrl.trim() || busy}
+                    onClick={() => {
+                      onAddItem({ templateId: template.id, ...itemDraft });
+                      setItemDraft({ name: "", productUrl: "", affiliateUrl: "", storeName: "", imageUrl: "", price: "" });
+                    }}
+                  >
+                    Salvar item
+                  </button>
+                </div>
+              </div>
+            )}
+          </article>
+        ))
+      )}
+    </section>
+  );
+}
+
 function AdminScreen({
   isRemoteMode,
   isAdmin,
@@ -5014,6 +5421,7 @@ function AdminScreen({
   onLocalApply,
   onLocalInvalid,
   onLocalUnavailable,
+  templatesSection,
 }: {
   isRemoteMode: boolean;
   isAdmin: boolean;
@@ -5029,6 +5437,7 @@ function AdminScreen({
   onLocalApply: (taskId: string) => void;
   onLocalInvalid: (taskId: string) => void;
   onLocalUnavailable: (taskId: string) => void;
+  templatesSection: React.ReactNode;
 }) {
   if (isRemoteMode && !isAdmin) {
     return (
@@ -5049,6 +5458,8 @@ function AdminScreen({
     const resolvedDeletionRequests = remoteDeletionRequests.filter((item) => item.status !== "pending");
 
     return (
+      <>
+      {templatesSection}
       <section className="admin-stack">
         <div className="admin-summary">
           <p className="label">Operação real</p>
@@ -5212,6 +5623,7 @@ function AdminScreen({
           </div>
         )}
       </section>
+      </>
     );
   }
 
@@ -5495,17 +5907,6 @@ function WishCard({
         </div>
       </div>
     </article>
-  );
-}
-
-function Idea({ image, label }: { image: string; label: string }) {
-  return (
-    <button className="idea" type="button">
-      <span>
-        <img src={image} alt="" />
-      </span>
-      <strong>{label}</strong>
-    </button>
   );
 }
 
@@ -5866,6 +6267,17 @@ function extractSharedProductUrl(shared: { url?: string | null; text?: string | 
   }
 
   return null;
+}
+
+function slugifyTemplateTitle(title: string) {
+  const base = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return base || `modelo-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function formatWishCount(total: number) {
