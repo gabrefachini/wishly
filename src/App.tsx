@@ -2576,10 +2576,28 @@ function App() {
         )}
         {title &&
           (view === "list" ? (
-            <div className="top-title-wrap">
-              <span className="top-title-kicker">Lista ativa</span>
-              <h1 className="top-title">{title}</h1>
-            </div>
+            // O nome da lista ativa é o próprio seletor: um controle, no topo,
+            // em vez de repetir a lista de listas dentro do conteúdo.
+            homeLists.length > 1 ? (
+              <button
+                className="top-title-wrap top-title-switcher"
+                type="button"
+                onClick={() => setListPaletteOpen(true)}
+                aria-haspopup="dialog"
+                aria-label={`Lista ativa: ${title}. Trocar de lista`}
+              >
+                <span className="top-title-kicker">Lista ativa</span>
+                <span className="top-title-switcher-row">
+                  <h1 className="top-title">{title}</h1>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </span>
+              </button>
+            ) : (
+              <div className="top-title-wrap">
+                <span className="top-title-kicker">Lista ativa</span>
+                <h1 className="top-title">{title}</h1>
+              </div>
+            )
           ) : (
             <h1 className="top-title">{title}</h1>
           ))}
@@ -2674,10 +2692,6 @@ function App() {
             wishes={currentWishes}
             wishlistTitle={currentListTitle(remote, isRemoteMode, localListTitle)}
             wishlistCoverUrl={isRemoteMode ? currentListCover(remote, localListCoverUrl) : localListCoverUrl}
-            wishlists={remote.wishlists}
-            selectedWishlistId={remote.selectedWishlistId}
-            isRemoteMode={isRemoteMode}
-            onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
             onBuyWish={(wish) => void handleBuyWish(wish)}
             onShare={() => void handleShareCurrentList()}
             sharing={sharing}
@@ -4153,10 +4167,6 @@ function ListScreen({
   wishes,
   wishlistTitle,
   wishlistCoverUrl,
-  wishlists,
-  selectedWishlistId,
-  isRemoteMode,
-  onSelectWishlist,
   onBuyWish,
   onShare,
   sharing,
@@ -4170,10 +4180,6 @@ function ListScreen({
   wishes: Array<LocalWish | DbWish>;
   wishlistTitle: string;
   wishlistCoverUrl: string;
-  wishlists: DbWishlist[];
-  selectedWishlistId: string | null;
-  isRemoteMode: boolean;
-  onSelectWishlist: (wishlistId: string) => void;
   onBuyWish: (wish: LocalWish | DbWish) => void;
   onShare: () => void;
   sharing: boolean;
@@ -4243,20 +4249,6 @@ function ListScreen({
 
       <section className="inset-section compact list-overview">
         <div className="list-summary-stack">
-          {isRemoteMode && wishlists.length > 1 && (
-            <div className="wishlist-switcher" aria-label="Selecionar lista">
-              {wishlists.map((wishlist) => (
-                <button
-                  key={wishlist.id}
-                  className={wishlist.id === selectedWishlistId ? "active" : ""}
-                  type="button"
-                  onClick={() => onSelectWishlist(wishlist.id)}
-                >
-                  {wishlist.title}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="list-summary-card">
             <div className="list-summary-head">
               <div>

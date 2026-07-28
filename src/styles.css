@@ -930,6 +930,26 @@ button:disabled {
   text-transform: uppercase;
 }
 
+/* O título da lista ativa abre a troca de lista. */
+.top-title-switcher {
+  min-height: 48px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.top-title-switcher:hover,
+.top-title-switcher:focus-visible {
+  background: var(--surface-low);
+}
+
+.top-title-switcher-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -2111,34 +2131,6 @@ button:disabled {
   color: var(--muted);
   font-size: 13px;
   line-height: 20px;
-}
-
-.wishlist-switcher {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  scrollbar-width: none;
-}
-
-.wishlist-switcher::-webkit-scrollbar {
-  display: none;
-}
-
-.wishlist-switcher button {
-  flex: 0 0 auto;
-  min-height: 38px;
-  padding: 0 14px;
-  border-radius: 999px;
-  color: var(--muted);
-  background: var(--surface-low);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.wishlist-switcher button.active {
-  color: var(--primary-action-text);
-  background: var(--primary);
 }
 
 .stat {
@@ -3552,10 +3544,6 @@ select {
   .list-summary-card {
     min-height: 100%;
     padding: 22px;
-  }
-
-  .wishlist-switcher {
-    padding-bottom: 4px;
   }
 
   .wish-list .wish-card {
