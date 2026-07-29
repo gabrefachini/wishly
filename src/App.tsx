@@ -4676,6 +4676,20 @@ function ListScreen({
       
       {/* Os desejos vêm antes do resumo: são o conteúdo que a pessoa abriu a lista para ver. */}
       <section className="wish-list-section">
+        {isRemoteMode && wishlists.length > 1 && (
+          <div className="wishlist-switcher" aria-label="Selecionar lista">
+            {wishlists.map((wishlist) => (
+              <button
+                key={wishlist.id}
+                className={wishlist.id === selectedWishlistId ? "active" : ""}
+                type="button"
+                onClick={() => onSelectWishlist(wishlist.id)}
+              >
+                {wishlist.title}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="section-heading">
           <h2>Seus desejos</h2>
           {wishes.length > 0 && <span className="section-count">{formatWishCount(wishes.length)}</span>}
@@ -4709,59 +4723,6 @@ function ListScreen({
             ))}
           </div>
         )}
-      </section>
-
-      <section className="inset-section compact list-overview">
-        <div className="list-summary-stack">
-          {isRemoteMode && wishlists.length > 1 && (
-            <div className="wishlist-switcher" aria-label="Selecionar lista">
-              {wishlists.map((wishlist) => (
-                <button
-                  key={wishlist.id}
-                  className={wishlist.id === selectedWishlistId ? "active" : ""}
-                  type="button"
-                  onClick={() => onSelectWishlist(wishlist.id)}
-                >
-                  {wishlist.title}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="list-summary-card">
-            <div className="list-summary-head">
-              <div>
-                <p className="label">Resumo da lista</p>
-                <h3>{wishlistTitle}</h3>
-              </div>
-              <span className="summary-badge">Atualizada agora</span>
-            </div>
-            <div className="stat-grid">
-              <Stat value={String(wishes.length)} label="desejos" />
-              <Stat value={String(wishes.filter((wish) => getWishDrop(wish)).length)} label="promoções" />
-              <Stat value={String(wishes.filter((wish) => getWishStatus(wish) === "Reservado").length)} label="reservados" />
-            </div>
-          </div>
-        </div>
-
-        <div className="list-summary-card list-summary-card-accent">
-          <p className="label">Lista pronta para compartilhar</p>
-          <h3>Quem recebe vê o que importa, sem confusão.</h3>
-          <p>Os desejos ficam organizados por prioridade, reservas e sinais de preço. A lista continua simples para quem envia e para quem compra.</p>
-          <div className="list-summary-notes">
-            <div>
-              <strong>{wishes.filter((wish) => priceAlerts[getWishId(wish)]).length}</strong>
-              <span>itens com radar ativo</span>
-            </div>
-            <div>
-              <strong>{wishes.filter((wish) => getWishPriorityLabel(wish) === "Alta").length}</strong>
-              <span>prioridades altas</span>
-            </div>
-          </div>
-          <button className="secondary-button" type="button" onClick={onShare} disabled={sharing}>
-              <Share2 size={18} />
-              {sharing ? "Preparando link..." : "Compartilhar"}
-            </button>
-        </div>
       </section>
 
     </>
