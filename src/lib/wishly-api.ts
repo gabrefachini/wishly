@@ -4,7 +4,13 @@ import {
   buildProductExtractionInsert,
   mapAutofillStatusToExtractionStatus,
 } from "./product-autofill";
+import type { ProductPricing } from "./product-autofill";
 import { isFeatureEnabled } from "./feature-flags";
+import {
+  getPrimaryProductImage,
+  type ProductImage,
+  type ProductImageDraft,
+} from "./product-images";
 
 const SUPPORTED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const CONVERTIBLE_AVATAR_MIME_TYPES = new Set(["image/heic", "image/heif"]);
@@ -33,6 +39,7 @@ export type DbWish = {
     value: string;
   }> | null;
   image_urls?: string[] | null;
+  images?: ProductImage[];
   extracted_at?: string | null;
   extraction_confidence?: ProductExtractionResult["confidence"] | null;
   extraction_warnings?: string[] | null;
@@ -144,6 +151,7 @@ export type ProductExtractionResult = {
   imageUrls: string[];
   currentPriceInCents: number | null;
   originalPriceInCents: number | null;
+  pricing: ProductPricing;
   priceSource?: string;
   currency: string | null;
   availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
@@ -167,6 +175,15 @@ export type ProductExtractionResult = {
   };
   observability?: Record<string, unknown>;
   rawPayload?: Record<string, unknown> | null;
+  brand?: string | null;
+  images?: string[];
+  seller?: string | null;
+  productCode?: string | null;
+  url?: string;
+  storeDomain?: string | null;
+  sourceType?: "official_integration" | "universal" | "manual";
+  extractionMethod?: "api" | "structured_data" | "open_graph" | "html" | "user";
+  capturedAt?: string;
 };
 
 export async function getInitialSession(): Promise<Session | null> {
@@ -744,10 +761,18 @@ export async function loadWishlistGifts(wishlistId: string) {
   let linkMap = new Map<string, DbWish["affiliate_link"]>();
 
   if (giftIds.length > 0) {
-    const { data: linkRows, error: linkError } = await supabase
-      .from("affiliate_links")
-      .select("gift_id, original_url, affiliate_url, status")
-      .in("gift_id", giftIds);
+    const [{ data: linkRows, error: linkError }, imageResponse] = await Promise.all([
+      supabase
+        .from("affiliate_links")
+        .select("gift_id, original_url, affiliate_url, status")
+        .in("gift_id", giftIds),
+      supabase
+        .from("product_images")
+        .select("id, gift_id, url, thumbnail_url, source, is_primary, width, height, created_at, position")
+        .in("gift_id", giftIds)
+        .is("removed_at", null)
+        .order("position", { ascending: true }),
+    ]);
 
     if (linkError) throw linkError;
 
@@ -761,6 +786,30 @@ export async function loadWishlistGifts(wishlistId: string) {
         },
       ]),
     );
+
+    if (!imageResponse.error) {
+      const imagesByGift = new Map<string, ProductImage[]>();
+      for (const row of imageResponse.data ?? []) {
+        const current = imagesByGift.get(row.gift_id) ?? [];
+        current.push({
+          id: row.id,
+          url: row.url,
+          thumbnailUrl: row.thumbnail_url ?? undefined,
+          source: row.source,
+          isPrimary: row.is_primary,
+          width: row.width ?? undefined,
+          height: row.height ?? undefined,
+          createdAt: row.created_at,
+        } as ProductImage);
+        imagesByGift.set(row.gift_id, current);
+      }
+      data = (data ?? []).map((gift) => ({
+        ...gift,
+        images: imagesByGift.get(String(gift.id)) ?? [],
+      }));
+    } else if (!isSchemaCompatibilityInsertError(imageResponse.error)) {
+      throw imageResponse.error;
+    }
   }
 
   return (data ?? []).map((gift) => ({
@@ -776,6 +825,8 @@ export async function createGift(input: {
   storeUrl: string;
   priority: DbWish["priority"];
   imageUrl?: string | null;
+  images?: ProductImageDraft[];
+  removedImageUrls?: string[];
   estimatedPriceInCents?: number | null;
   currency?: string | null;
   autofill?: {
@@ -792,6 +843,7 @@ export async function createGift(input: {
     imageUrl?: string | null;
     currentPriceInCents?: number | null;
     originalPriceInCents?: number | null;
+    pricing?: ProductPricing | null;
     extractedAt?: string | null;
     confidence?: ProductExtractionResult["confidence"] | null;
     warnings?: string[];
@@ -804,7 +856,12 @@ export async function createGift(input: {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
-  if (input.storeUrl.trim() && isFeatureEnabled("commerce_ingestion_v2")) {
+  const prepared = await uploadProductImageDrafts(input.images ?? []);
+  const effectiveImageUrl = getPrimaryProductImage(prepared.images)?.url ?? input.imageUrl ?? null;
+  let giftCreated = false;
+
+  try {
+    if (input.storeUrl.trim() && isFeatureEnabled("commerce_ingestion_v2")) {
     const fingerprint = JSON.stringify({
       wishlistId: input.wishlistId,
       url: input.autofill?.canonicalUrl ?? input.storeUrl.trim(),
@@ -821,7 +878,7 @@ export async function createGift(input: {
         idempotencyKey,
         name: input.name,
         description: input.description,
-        imageUrl: input.imageUrl ?? null,
+        imageUrl: effectiveImageUrl,
         priceInCents: input.estimatedPriceInCents ?? null,
         currency: input.currency ?? "BRL",
         priority: input.priority,
@@ -829,15 +886,17 @@ export async function createGift(input: {
     });
     if (error) throw error;
     if (!data?.giftId) throw new Error("O pipeline de produto não retornou o item criado.");
+    giftCreated = true;
+    await persistProductImages(String(data.giftId), prepared.images, input.removedImageUrls);
     return { id: String(data.giftId) };
-  }
+    }
 
   const legacyPayload = {
     wishlist_id: input.wishlistId,
     name: input.name,
     description: input.description || null,
     store_url: input.storeUrl || null,
-    image_url: input.imageUrl ?? null,
+    image_url: effectiveImageUrl,
     estimated_price: centsToCurrencyUnits(input.estimatedPriceInCents),
     priority: input.priority,
     currency: input.currency ?? "BRL",
@@ -857,6 +916,7 @@ export async function createGift(input: {
         image_urls: input.autofill.imageUrls ?? [],
         current_price: centsToCurrencyUnits(input.autofill.currentPriceInCents ?? input.estimatedPriceInCents),
         original_price: centsToCurrencyUnits(input.autofill.originalPriceInCents),
+        pricing: input.autofill.pricing ?? null,
         extracted_at: input.autofill.extractedAt ?? null,
         extraction_confidence: input.autofill.confidence ?? {},
         extraction_warnings: input.autofill.warnings ?? [],
@@ -900,7 +960,7 @@ export async function createGift(input: {
       giftId: data.id,
       name: input.name,
       description: input.description,
-      imageUrl: input.imageUrl,
+      imageUrl: effectiveImageUrl,
       estimatedPriceInCents: input.estimatedPriceInCents,
       currency: input.currency,
       autofill: {
@@ -917,7 +977,128 @@ export async function createGift(input: {
     }
   }
 
+  giftCreated = true;
+  await persistProductImages(data.id, prepared.images, input.removedImageUrls);
   return data;
+  } catch (error) {
+    if (!giftCreated) await cleanupUploadedProductImages(prepared.uploadedPaths);
+    throw error;
+  }
+}
+
+async function uploadProductImageDrafts(images: ProductImageDraft[]) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+  const uploads = images.filter((image) => image.file);
+  if (uploads.length === 0) return { images, uploadedPaths: [] as string[] };
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("Sua sessão expirou. Entre novamente para enviar imagens.");
+
+  const bucket = import.meta.env.VITE_SUPABASE_GIFT_IMAGE_BUCKET || "gift-images";
+  const uploadedPaths: string[] = [];
+  const resolved: ProductImageDraft[] = [];
+
+  try {
+    for (const image of images) {
+      if (!image.file) {
+        resolved.push(image);
+        continue;
+      }
+      if (image.file.size > 10 * 1024 * 1024) {
+        throw new Error("A imagem otimizada ainda excede 10 MB.");
+      }
+
+      const imagePath = `${user.id}/products/${image.id}.webp`;
+      const { error: imageError } = await supabase.storage.from(bucket).upload(imagePath, image.file, {
+        cacheControl: "31536000",
+        contentType: "image/webp",
+        upsert: false,
+      });
+      if (imageError) throw imageError;
+      uploadedPaths.push(imagePath);
+      const { data: publicImage } = supabase.storage.from(bucket).getPublicUrl(imagePath);
+
+      let thumbnailUrl: string | undefined;
+      if (image.thumbnailFile) {
+        const thumbnailPath = `${user.id}/products/${image.id}-thumb.webp`;
+        const { error: thumbnailError } = await supabase.storage.from(bucket).upload(
+          thumbnailPath,
+          image.thumbnailFile,
+          {
+            cacheControl: "31536000",
+            contentType: "image/webp",
+            upsert: false,
+          },
+        );
+        if (thumbnailError) throw thumbnailError;
+        uploadedPaths.push(thumbnailPath);
+        thumbnailUrl = supabase.storage.from(bucket).getPublicUrl(thumbnailPath).data.publicUrl;
+      }
+
+      resolved.push({
+        ...image,
+        url: publicImage.publicUrl,
+        thumbnailUrl,
+        file: undefined,
+        thumbnailFile: undefined,
+      });
+    }
+    return { images: resolved, uploadedPaths };
+  } catch (error) {
+    if (uploadedPaths.length > 0) await supabase.storage.from(bucket).remove(uploadedPaths);
+    throw error;
+  }
+}
+
+async function persistProductImages(giftId: string, images: ProductImageDraft[], removedImageUrls: string[] = []) {
+  if (images.length === 0 && removedImageUrls.length === 0) return;
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const rows: Array<Record<string, unknown>> = images.map((image, position) => ({
+    id: image.id,
+    gift_id: giftId,
+    url: image.url,
+    thumbnail_url: image.thumbnailUrl ?? null,
+    source: image.source,
+    is_primary: image.isPrimary,
+    position,
+    width: image.width ?? null,
+    height: image.height ?? null,
+    created_at: image.createdAt,
+    removed_at: null,
+  }));
+  const removedRows = removedImageUrls
+    .filter((url) => !images.some((image) => image.url === url))
+    .map((url, index) => ({
+      id: crypto.randomUUID(),
+      gift_id: giftId,
+      url,
+      thumbnail_url: null,
+      source: "html" as const,
+      is_primary: false,
+      position: images.length + index,
+      width: null,
+      height: null,
+      created_at: new Date().toISOString(),
+      removed_at: new Date().toISOString(),
+    }));
+  rows.push(...removedRows);
+  const { error } = await supabase.from("product_images").insert(rows);
+  if (error && !isSchemaCompatibilityInsertError(error)) throw error;
+}
+
+async function cleanupUploadedProductImages(paths: string[]) {
+  if (paths.length === 0) return;
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return;
+  const bucket = import.meta.env.VITE_SUPABASE_GIFT_IMAGE_BUCKET || "gift-images";
+  await supabase.storage.from(bucket).remove(paths);
 }
 
 function centsToCurrencyUnits(value: number | null | undefined) {
@@ -1207,6 +1388,32 @@ export async function loadPublicWishlist(shareId: string) {
           },
         ]),
       );
+    }
+
+    const publicImagesResponse = await supabase
+      .from("product_images")
+      .select("id, gift_id, url, thumbnail_url, source, is_primary, width, height, created_at, position")
+      .in("gift_id", giftIds)
+      .is("removed_at", null)
+      .order("position", { ascending: true });
+    if (!publicImagesResponse.error) {
+      for (const row of publicImagesResponse.data ?? []) {
+        const metadata = giftMetadataMap.get(row.gift_id) ?? {};
+        const images = metadata.images ?? [];
+        images.push({
+          id: row.id,
+          url: row.url,
+          thumbnailUrl: row.thumbnail_url ?? undefined,
+          source: row.source,
+          isPrimary: row.is_primary,
+          width: row.width ?? undefined,
+          height: row.height ?? undefined,
+          createdAt: row.created_at,
+        } as ProductImage);
+        giftMetadataMap.set(row.gift_id, { ...metadata, images });
+      }
+    } else if (!isSchemaCompatibilityInsertError(publicImagesResponse.error)) {
+      throw publicImagesResponse.error;
     }
   }
 

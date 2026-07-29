@@ -9,6 +9,7 @@ type LegacyExtractionPayload = {
   imageUrl?: string | null;
   currentPriceInCents?: number | null;
   originalPriceInCents?: number | null;
+  pricing?: ExtractProductResult["pricing"];
   currency?: string | null;
   sellerName?: string | null;
   availability?: ExtractProductResult["availability"] | null;
@@ -58,6 +59,7 @@ export function adaptLegacyExtraction(payload: LegacyExtractionPayload): Extract
     mpn: null,
     currentPrice: centsToUnits(payload.currentPriceInCents),
     originalPrice: centsToUnits(payload.originalPriceInCents),
+    pricing: payload.pricing ?? null,
     shippingPrice: null,
     currency: payload.currency?.trim() || "BRL",
     sellerName: payload.sellerName?.trim() || null,

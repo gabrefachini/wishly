@@ -8,6 +8,25 @@ export type IntegrationType =
 
 export type Availability = "in_stock" | "out_of_stock" | "preorder" | "unknown";
 
+export type ProductPricing = {
+  currency: "BRL";
+  cashPrice: number | null;
+  cashPriceLabel: string | null;
+  installment: {
+    quantity: number;
+    amount: number;
+    total: number | null;
+    interestFree: boolean | null;
+    label: string | null;
+  } | null;
+  currentPrice: number | null;
+  previousPrice: number | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+  capturedAt: string;
+  source: "api" | "structured_data" | "html" | "ai" | "user";
+};
+
 export type NormalizeUrlResult = {
   originalUrl: string;
   canonicalUrl: string;
@@ -39,6 +58,7 @@ export type ExtractProductResult = {
   mpn: string | null;
   currentPrice: number | null;
   originalPrice: number | null;
+  pricing: ProductPricing | null;
   shippingPrice: number | null;
   currency: string;
   sellerName: string | null;

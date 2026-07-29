@@ -98,6 +98,16 @@ import {
 } from "./lib/product-autofill";
 import { resolveAddWishTargetId } from "./lib/add-wish-target";
 import { buildDefaultListCover, resolveListCover } from "./lib/listCover";
+import {
+  addManualImageUrl,
+  getPrimaryProductImage,
+  mergeAutofillProductImages,
+  moveProductImage,
+  prepareUploadedProductImage,
+  removeProductImage,
+  selectPrimaryProductImage,
+  type ProductImageDraft,
+} from "./lib/product-images";
 
 /**
  * Alerta de preço por desejo. `targetAmount` nulo = acompanhar sem preço-alvo.
@@ -193,8 +203,14 @@ type AddWishFormState = {
   note: string;
   imageUrl: string;
   imageUrlsText: string;
+  images: ProductImageDraft[];
+  removedImageUrls: string[];
   currentPrice: string;
   originalPrice: string;
+  cashPrice: string;
+  installmentQuantity: string;
+  installmentAmount: string;
+  installmentInterestFree: boolean | null;
   currency: string;
   availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
   storeName: string;
@@ -420,8 +436,14 @@ const initialAddWishFormState: AddWishFormState = {
   note: "",
   imageUrl: "",
   imageUrlsText: "",
+  images: [],
+  removedImageUrls: [],
   currentPrice: "",
   originalPrice: "",
+  cashPrice: "",
+  installmentQuantity: "",
+  installmentAmount: "",
+  installmentInterestFree: null,
   currency: "BRL",
   availability: "unknown",
   storeName: "",
@@ -1200,13 +1222,16 @@ function App() {
         setSyncing(true);
         setSyncError("");
 
+        const primaryImage = getPrimaryProductImage(formState.images);
         await createGift({
           wishlistId: targetWishlistId,
           name: title,
           description: formState.note.trim(),
           storeUrl: canonicalOrOriginalUrl,
           priority: mapPriorityToDb(selectedPriority),
-          imageUrl: formState.imageUrl.trim() || null,
+          imageUrl: primaryImage?.url || formState.imageUrl.trim() || null,
+          images: formState.images,
+          removedImageUrls: formState.removedImageUrls,
           estimatedPriceInCents: priceInCents,
           currency: formState.currency.trim() || "BRL",
           autofill: extractionState.preview
@@ -1224,6 +1249,7 @@ function App() {
                 imageUrls: extractionState.preview.imageUrls,
                 currentPriceInCents: extractionState.preview.currentPriceInCents,
                 originalPriceInCents: extractionState.preview.originalPriceInCents,
+                pricing: buildPricingFromForm(formState, extractionState.preview.pricing),
                 extractedAt: extractionState.preview.extractedAt,
                 confidence: extractionState.preview.confidence,
                 warnings: extractionState.preview.warnings,
@@ -1255,6 +1281,7 @@ function App() {
                   imageUrls: parseImageUrlsText(formState.imageUrlsText),
                   currentPriceInCents: priceInCents,
                   originalPriceInCents: parsePriceInputToCents(formState.originalPrice),
+                  pricing: buildPricingFromForm(formState, null),
                   extractedAt: null,
                   confidence: null,
                   warnings: [],
@@ -1305,7 +1332,7 @@ function App() {
       title,
       store: formState.storeName.trim() || getStoreLabel(linkData.source),
       price: formState.currentPrice.trim() || "Adicionar preço",
-      image: formState.imageUrl.trim() || null,
+      image: getPrimaryProductImage(formState.images)?.url || formState.imageUrl.trim() || null,
       priority: selectedPriority,
       originalUrl: linkData.originalUrl,
       resolvedUrl: formState.canonicalUrl.trim() || linkData.resolvedUrl,
@@ -4524,6 +4551,180 @@ function ListScreen({
   );
 }
 
+function ProductImageManager({
+  formState,
+  setFormState,
+  disabled,
+}: {
+  formState: AddWishFormState;
+  setFormState: (state: AddWishFormState) => void;
+  disabled: boolean;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageUrlDraft, setImageUrlDraft] = useState("");
+  const [imageError, setImageError] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  function commitImages(images: ProductImageDraft[], removedImageUrls = formState.removedImageUrls) {
+    const primary = getPrimaryProductImage(images);
+    setFormState({
+      ...formState,
+      images,
+      removedImageUrls,
+      imageUrl: primary?.url ?? "",
+      imageUrlsText: images.map((image) => image.url).join("\n"),
+    });
+  }
+
+  function addImageUrl() {
+    if (!isValidHttpUrl(imageUrlDraft.trim())) {
+      setImageError("Informe uma URL de imagem válida.");
+      return;
+    }
+    const images = addManualImageUrl(formState.images, imageUrlDraft);
+    setImageError("");
+    setImageUrlDraft("");
+    commitImages(images);
+  }
+
+  async function addFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setProcessing(true);
+    setImageError("");
+    try {
+      const additions = await Promise.all([...files].map(prepareUploadedProductImage));
+      const images = [
+        ...additions.map((image, index) => ({ ...image, isPrimary: index === 0 })),
+        ...formState.images.map((image) => ({ ...image, isPrimary: false })),
+      ];
+      commitImages(images);
+    } catch (error) {
+      setImageError(getErrorMessage(error));
+    } finally {
+      setProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeImage(image: ProductImageDraft) {
+    if (image.url.startsWith("blob:")) URL.revokeObjectURL(image.url);
+    const images = removeProductImage(formState.images, image.id);
+    const removedImageUrls = image.source === "user_upload"
+      ? formState.removedImageUrls
+      : [...new Set([...formState.removedImageUrls, image.url])];
+    commitImages(images, removedImageUrls);
+  }
+
+  return (
+    <section className="product-images-editor" aria-labelledby="product-images-title">
+      <div className="product-images-heading">
+        <div>
+          <h3 id="product-images-title">Imagens do produto</h3>
+          <p>Envie uma foto ou cole uma URL. A imagem marcada como principal aparece na lista.</p>
+        </div>
+        <span>{formState.images.length} de 10</span>
+      </div>
+
+      <div className="product-image-actions">
+        <input
+          ref={fileInputRef}
+          className="visually-hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+          multiple
+          disabled={disabled || processing || formState.images.length >= 10}
+          onChange={(event) => void addFiles(event.target.files)}
+        />
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={disabled || processing || formState.images.length >= 10}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload size={18} />
+          {processing ? "Otimizando..." : "Fazer upload"}
+        </button>
+        <div className="product-image-url-row">
+          <label className="visually-hidden" htmlFor="manual-product-image-url">URL da imagem</label>
+          <input
+            id="manual-product-image-url"
+            type="url"
+            placeholder="https://site.com/imagem.jpg"
+            value={imageUrlDraft}
+            disabled={disabled}
+            onChange={(event) => setImageUrlDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addImageUrl();
+              }
+            }}
+          />
+          <button type="button" className="secondary-button" disabled={disabled || !imageUrlDraft.trim()} onClick={addImageUrl}>
+            <Link2 size={17} />
+            Adicionar URL
+          </button>
+        </div>
+      </div>
+
+      {imageError && <p className="product-image-error" role="alert">{imageError}</p>}
+
+      {formState.images.length > 0 ? (
+        <div className="product-images-gallery">
+          {formState.images.map((image, index) => (
+            <article className={`product-image-tile${image.isPrimary ? " is-primary" : ""}`} key={image.id}>
+              <button
+                className="product-image-preview"
+                type="button"
+                onClick={() => commitImages(selectPrimaryProductImage(formState.images, image.id))}
+                aria-label={`Usar imagem ${index + 1} como principal`}
+                aria-pressed={image.isPrimary}
+              >
+                <img src={image.thumbnailUrl || image.url} alt="" />
+                {image.isPrimary && <span><Check size={13} /> Principal</span>}
+              </button>
+              <div className="product-image-tile-actions">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => commitImages(moveProductImage(formState.images, image.id, -1))}
+                  aria-label="Mover imagem para a esquerda"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === formState.images.length - 1}
+                  onClick={() => commitImages(moveProductImage(formState.images, image.id, 1))}
+                  aria-label="Mover imagem para a direita"
+                >
+                  <ArrowRight size={16} />
+                </button>
+                <button type="button" onClick={() => removeImage(image)} aria-label="Remover imagem">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <button
+          className="product-images-empty"
+          type="button"
+          disabled={disabled || processing}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload size={22} />
+          <span>
+            <strong>Adicione até 10 imagens</strong>
+            <small>JPG, PNG, WebP ou HEIC · otimizadas automaticamente</small>
+          </span>
+        </button>
+      )}
+    </section>
+  );
+}
+
 function AddWishScreen({
   formState,
   extractionState,
@@ -4661,13 +4862,22 @@ function AddWishScreen({
             title={formState.title}
             imageUrl={formState.imageUrl}
             priceText={formState.currentPrice}
-            onChangeImage={(value) => setFormState({ ...formState, imageUrl: value })}
+            onChangeImage={(value) => {
+              const images = isValidHttpUrl(value)
+                ? addManualImageUrl(formState.images, value)
+                : formState.images;
+              setFormState({ ...formState, imageUrl: value, images });
+            }}
             onChangePrice={(value) => setFormState({ ...formState, currentPrice: value })}
           />
         )}
+        <ProductImageManager formState={formState} setFormState={setFormState} disabled={syncing} />
         {(extractionState.preview || formState.title.trim() || formState.imageUrl.trim()) && (
           <div className="product-extraction-card">
-            <img src={formState.imageUrl.trim() || PRODUCT_PLACEHOLDER_DATA_URL} alt="" />
+            <img
+              src={getPrimaryProductImage(formState.images)?.url || formState.imageUrl.trim() || PRODUCT_PLACEHOLDER_DATA_URL}
+              alt=""
+            />
             <div className="product-extraction-copy">
               <strong>{formState.title.trim() || "Produto sem nome"}</strong>
               <span>
@@ -4675,9 +4885,16 @@ function AddWishScreen({
                 {formState.marketplace.trim() ? ` · ${formState.marketplace}` : ""}
               </span>
               <div className="product-extraction-price-row">
-                <strong>{formState.currentPrice.trim() || "Preço não identificado"}</strong>
-                {formState.originalPrice.trim() && <small>{formState.originalPrice}</small>}
+                {formState.originalPrice.trim() && <small className="previous-price">{formState.originalPrice}</small>}
+                <strong>{formState.cashPrice.trim() || formState.currentPrice.trim() || "Preço não identificado"}</strong>
+                {formState.cashPrice.trim() && <span>à vista</span>}
               </div>
+              {formState.installmentQuantity && formState.installmentAmount && (
+                <p className="product-installment">
+                  {formState.installmentQuantity}x de {formState.installmentAmount}
+                  {formState.installmentInterestFree === true ? " sem juros" : ""}
+                </p>
+              )}
               {formState.selectedVariantText.trim() && <p>{formState.selectedVariantText}</p>}
             </div>
           </div>
@@ -4708,6 +4925,45 @@ function AddWishScreen({
             value={formState.marketplace}
             onChange={(value) => setFormState({ ...formState, marketplace: value })}
           />
+        </div>
+        <div className="field-row split-row">
+          <Field
+            label="Preço à vista"
+            placeholder="R$ 189,90"
+            value={formState.cashPrice}
+            onChange={(value) => setFormState({ ...formState, cashPrice: value })}
+          />
+          <Field
+            label="Quantidade de parcelas"
+            placeholder="10"
+            value={formState.installmentQuantity}
+            onChange={(value) => setFormState({ ...formState, installmentQuantity: value.replace(/\D/g, "").slice(0, 3) })}
+          />
+        </div>
+        <div className="field-row split-row">
+          <Field
+            label="Valor da parcela"
+            placeholder="R$ 19,99"
+            value={formState.installmentAmount}
+            onChange={(value) => setFormState({ ...formState, installmentAmount: value })}
+          />
+          <label className="field">
+            <span className="field-label">Juros</span>
+            <span className="select-wrap">
+              <select
+                value={formState.installmentInterestFree == null ? "" : formState.installmentInterestFree ? "free" : "with"}
+                onChange={(event) => setFormState({
+                  ...formState,
+                  installmentInterestFree: event.target.value === "" ? null : event.target.value === "free",
+                })}
+              >
+                <option value="">Não identificado</option>
+                <option value="free">Sem juros</option>
+                <option value="with">Com juros</option>
+              </select>
+              <ChevronDown className="select-chevron" size={18} aria-hidden="true" />
+            </span>
+          </label>
         </div>
         <div className="field-row split-row">
           <Field
@@ -6451,14 +6707,39 @@ function SidebarItem({ active, icon, label, onClick }: { active: boolean; icon: 
 }
 
 function mergeExtractedProductIntoForm(formState: AddWishFormState, result: ProductExtractionResult): AddWishFormState {
+  const source = result.provider === "mercado_livre" || result.provider === "amazon"
+    ? "marketplace"
+    : result.provider === "shopify"
+      ? "store"
+      : "html";
+  const extractedUrls = result.imageUrls.length > 0
+    ? result.imageUrls
+    : result.imageUrl
+      ? [result.imageUrl]
+      : [];
+  const images = mergeAutofillProductImages({
+    current: formState.images,
+    urls: extractedUrls,
+    source,
+    removedUrls: formState.removedImageUrls,
+  });
+  const primaryImage = getPrimaryProductImage(images);
+
   return {
     ...formState,
     title: result.title ?? formState.title,
     note: result.description ?? formState.note,
-    imageUrl: result.imageUrl ?? formState.imageUrl,
-    imageUrlsText: result.imageUrls.length > 0 ? result.imageUrls.join("\n") : formState.imageUrlsText,
+    imageUrl: primaryImage?.url ?? result.imageUrl ?? formState.imageUrl,
+    imageUrlsText: images.length > 0 ? images.map((image) => image.url).join("\n") : formState.imageUrlsText,
+    images,
     currentPrice: result.currentPriceInCents != null ? formatPriceInput(result.currentPriceInCents, result.currency) : formState.currentPrice,
     originalPrice: result.originalPriceInCents != null ? formatPriceInput(result.originalPriceInCents, result.currency) : formState.originalPrice,
+    cashPrice: result.pricing?.cashPrice != null ? formatPriceInput(Math.round(result.pricing.cashPrice * 100), result.pricing.currency) : formState.cashPrice,
+    installmentQuantity: result.pricing?.installment?.quantity != null ? String(result.pricing.installment.quantity) : formState.installmentQuantity,
+    installmentAmount: result.pricing?.installment?.amount != null
+      ? formatPriceInput(Math.round(result.pricing.installment.amount * 100), result.pricing.currency)
+      : formState.installmentAmount,
+    installmentInterestFree: result.pricing?.installment?.interestFree ?? formState.installmentInterestFree,
     currency: result.currency ?? formState.currency,
     availability: result.availability !== "unknown" ? result.availability : formState.availability,
     storeName: result.storeName ?? formState.storeName,
@@ -6469,6 +6750,37 @@ function mergeExtractedProductIntoForm(formState: AddWishFormState, result: Prod
     selectedVariantText: result.selectedVariant.length > 0
       ? result.selectedVariant.map((variant) => `${variant.name}: ${variant.value}`).join("\n")
       : formState.selectedVariantText,
+  };
+}
+
+function buildPricingFromForm(formState: AddWishFormState, extracted: ProductExtractionResult["pricing"] | null | undefined) {
+  const cashPriceInCents = parsePriceInputToCents(formState.cashPrice);
+  const installmentAmountInCents = parsePriceInputToCents(formState.installmentAmount);
+  const quantity = Number(formState.installmentQuantity);
+  return {
+    ...extracted,
+    currency: "BRL" as const,
+    cashPrice: cashPriceInCents == null ? extracted?.cashPrice ?? null : cashPriceInCents / 100,
+    cashPriceLabel: cashPriceInCents == null ? extracted?.cashPriceLabel ?? null : `${formState.cashPrice} à vista`,
+    installment: quantity > 0 && installmentAmountInCents != null
+      ? {
+          quantity,
+          amount: installmentAmountInCents / 100,
+          total: null,
+          interestFree: formState.installmentInterestFree,
+          label: `${quantity}x de ${formState.installmentAmount}${formState.installmentInterestFree === true ? " sem juros" : ""}`,
+        }
+      : extracted?.installment ?? null,
+    currentPrice: parsePriceInputToCents(formState.currentPrice) == null
+      ? extracted?.currentPrice ?? null
+      : Number(parsePriceInputToCents(formState.currentPrice)) / 100,
+    previousPrice: parsePriceInputToCents(formState.originalPrice) == null
+      ? extracted?.previousPrice ?? null
+      : Number(parsePriceInputToCents(formState.originalPrice)) / 100,
+    priceFrom: extracted?.priceFrom ?? null,
+    priceTo: extracted?.priceTo ?? null,
+    capturedAt: extracted?.capturedAt ?? new Date().toISOString(),
+    source: "user" as const,
   };
 }
 
@@ -6729,7 +7041,9 @@ function slugifyTemplateTitle(title: string) {
  * O checklist precisa saber que não há foto, não receber uma foto falsa.
  */
 function getWishImageUrlRaw(wish: LocalWish | DbWish) {
-  const raw = "image" in wish ? wish.image : wish.image_url;
+  const raw = "image" in wish
+    ? wish.image
+    : getPrimaryProductImage(wish.images ?? [])?.url ?? wish.image_url;
   const value = typeof raw === "string" ? raw.trim() : "";
   return value && value !== PRODUCT_PLACEHOLDER_DATA_URL ? value : "";
 }
@@ -6800,6 +7114,8 @@ function getWishProvider(wish: LocalWish | DbWish) {
 
 function getWishImage(wish: LocalWish | DbWish) {
   if ("image" in wish) return wish.image || PRODUCT_PLACEHOLDER_DATA_URL;
+  const primaryImage = getPrimaryProductImage(wish.images ?? []);
+  if (primaryImage) return primaryImage.thumbnailUrl || primaryImage.url;
   return getProductImageSrc(wish.image_url, wish.image_urls) || PRODUCT_PLACEHOLDER_DATA_URL;
 }
 

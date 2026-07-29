@@ -8,6 +8,25 @@ export type AutofillLifecycleStatus =
 
 export type ExtractionInsertStatus = "pending" | "success" | "partial" | "failed";
 
+export type ProductPricing = {
+  currency: "BRL";
+  cashPrice: number | null;
+  cashPriceLabel: string | null;
+  installment: {
+    quantity: number;
+    amount: number;
+    total: number | null;
+    interestFree: boolean | null;
+    label: string | null;
+  } | null;
+  currentPrice: number | null;
+  previousPrice: number | null;
+  priceFrom: number | null;
+  priceTo: number | null;
+  capturedAt: string;
+  source: "api" | "structured_data" | "html" | "ai" | "user";
+};
+
 export type AutofillDraft = {
   requestedUrl: string;
   canonicalUrl?: string | null;
@@ -25,6 +44,7 @@ export type AutofillDraft = {
   imageUrls?: string[];
   currentPriceInCents?: number | null;
   originalPriceInCents?: number | null;
+  pricing?: ProductPricing | null;
   extractedAt?: string | null;
   confidence?: Record<string, unknown> | null;
   warnings?: string[];
@@ -102,6 +122,7 @@ export function buildProductExtractionInsert(input: ProductExtractionInsertInput
     selected_variant: input.autofill.selectedVariant ?? [],
     current_price_in_cents: input.autofill.currentPriceInCents ?? null,
     original_price_in_cents: input.autofill.originalPriceInCents ?? null,
+    pricing: input.autofill.pricing ?? null,
   };
 
   return {

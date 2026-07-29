@@ -15,6 +15,9 @@ import {
   extractOfferPrices,
   pickProductNode,
 } from "./lib/structured-data.mjs";
+import { emptyPricing, extractPricingFromHtml, mergePricing } from "./lib/pricing.mjs";
+
+type ProductPricing = ReturnType<typeof emptyPricing>;
 
 type ProductExtractionResult = {
   originalUrl: string;
@@ -37,6 +40,7 @@ type ProductExtractionResult = {
   imageUrls: string[];
   currentPriceInCents: number | null;
   originalPriceInCents: number | null;
+  pricing: ProductPricing;
   currency: string | null;
   availability: "in_stock" | "out_of_stock" | "preorder" | "unknown";
   selectedVariant: Array<{ name: string; value: string }>;
@@ -58,6 +62,15 @@ type ProductExtractionResult = {
   resolvedUrl?: string;
   resourceType?: string;
   observability?: Record<string, unknown>;
+  brand?: string | null;
+  images?: string[];
+  seller?: string | null;
+  productCode?: string | null;
+  url?: string;
+  storeDomain?: string | null;
+  sourceType?: "official_integration" | "universal" | "manual";
+  extractionMethod?: "api" | "structured_data" | "open_graph" | "html" | "user";
+  capturedAt?: string;
 };
 
 type ExtractionContext = {
@@ -357,6 +370,7 @@ function assertNotBlockedPage(finalUrl: string, body: string) {
 }
 
 function buildEmptyResult(originalUrl: string): ProductExtractionResult {
+  const extractedAt = new Date().toISOString();
   return {
     originalUrl,
     canonicalUrl: null,
@@ -371,10 +385,11 @@ function buildEmptyResult(originalUrl: string): ProductExtractionResult {
     imageUrls: [],
     currentPriceInCents: null,
     originalPriceInCents: null,
+    pricing: emptyPricing("html", extractedAt),
     currency: null,
     availability: "unknown",
     selectedVariant: [],
-    extractedAt: new Date().toISOString(),
+    extractedAt,
     partial: false,
     confidence: {
       title: 0,
@@ -397,10 +412,44 @@ function finalizeResult(result: ProductExtractionResult, steps: Record<string, n
   if (!result.imageUrl) warnings.push("image_missing");
   if (result.currentPriceInCents == null) warnings.push("price_missing");
 
+  const pricing = result.pricing ?? {
+    ...emptyPricing(result.provider === "mercado_livre" ? "api" : "html", result.extractedAt),
+    currentPrice: result.currentPriceInCents == null ? null : result.currentPriceInCents / 100,
+    previousPrice: result.originalPriceInCents == null ? null : result.originalPriceInCents / 100,
+  };
+
   return {
     ...result,
+    pricing,
     imageUrls: Array.from(new Set(result.imageUrls.filter(Boolean))),
+    images: Array.from(new Set(result.imageUrls.filter(Boolean))),
+    brand: result.brand ?? null,
+    seller: result.sellerName,
+    productCode: result.externalProductId,
+    url: result.canonicalUrl ?? result.originalUrl,
+    storeDomain: (() => {
+      try {
+        return new URL(result.canonicalUrl ?? result.originalUrl).hostname.replace(/^www\./, "");
+      } catch {
+        return null;
+      }
+    })(),
+    sourceType: result.provider === "mercado_livre"
+      ? "official_integration"
+      : result.provider === "manual"
+        ? "manual"
+        : "universal",
+    extractionMethod: result.provider === "mercado_livre"
+      ? "api"
+      : result.provider === "structured_data" || result.provider === "shopify"
+        ? "structured_data"
+        : result.provider === "open_graph"
+          ? "open_graph"
+          : result.provider === "manual"
+            ? "user"
+            : "html",
     extractedAt: new Date().toISOString(),
+    capturedAt: new Date().toISOString(),
     partial: result.partial || !hasEssentialFields(result),
     warnings,
     timings: {
@@ -437,6 +486,7 @@ function mergeResults(base: ProductExtractionResult | null, candidate: ProductEx
     imageUrls: candidate.imageUrls.length > 0 ? candidate.imageUrls : base.imageUrls,
     currentPriceInCents: candidate.currentPriceInCents ?? base.currentPriceInCents,
     originalPriceInCents: candidate.originalPriceInCents ?? base.originalPriceInCents,
+    pricing: mergePricing(candidate.pricing, base.pricing),
     currency: candidate.currency ?? base.currency,
     availability: candidate.availability !== "unknown" ? candidate.availability : base.availability,
     selectedVariant: candidate.selectedVariant.length > 0 ? candidate.selectedVariant : base.selectedVariant,
@@ -773,6 +823,7 @@ class ShopifyProvider implements ProductProvider {
 
   async extract(url: URL, context: ExtractionContext, timeoutMs: number) {
     const html = await ensureHtml(url, context, timeoutMs);
+    const htmlPricing = extractPricingFromHtml(html);
     const variantId = url.searchParams.get("variant");
     const jsonLdResult = extractFromStructuredData(url, html);
     const scriptVariantMatch = html.match(/"variantId"\s*:\s*"?(\d+)"?/i) || html.match(/"selected_or_first_available_variant"\s*:\s*\{[^}]*"id"\s*:\s*(\d+)/i);
@@ -794,6 +845,7 @@ class ShopifyProvider implements ProductProvider {
       externalVariantId: variantId ?? scriptVariantMatch?.[1] ?? jsonLdResult?.externalVariantId ?? null,
       imageUrl: jsonLdResult?.imageUrl ?? featuredImages[0] ?? null,
       imageUrls: jsonLdResult?.imageUrls?.length ? jsonLdResult.imageUrls : featuredImages,
+      pricing: mergePricing(jsonLdResult?.pricing, htmlPricing),
       partial: !hasEssentialFields(jsonLdResult ?? undefined),
       confidence: {
         title: Math.max(jsonLdResult?.confidence.title ?? 0, 0.9),
@@ -835,6 +887,8 @@ class OpenGraphProvider implements ProductProvider {
     const imageUrl = metas.get("og:image") ?? metas.get("twitter:image") ?? null;
     const canonicalUrl = metas.get("og:url") ?? findCanonicalUrl(html) ?? url.toString();
     const price = parseMoneyToCents(metas.get("product:price:amount"));
+    const extractedAt = new Date().toISOString();
+    const htmlPricing = extractPricingFromHtml(html, extractedAt);
 
     if (!title && !imageUrl && price == null) return null;
 
@@ -852,10 +906,15 @@ class OpenGraphProvider implements ProductProvider {
       imageUrls: imageUrl ? [imageUrl] : [],
       currentPriceInCents: price,
       originalPriceInCents: null,
+      pricing: {
+        ...htmlPricing,
+        currentPrice: price == null ? htmlPricing.currentPrice : price / 100,
+        source: price == null ? "html" : "structured_data",
+      },
       currency: metas.get("product:price:currency") ?? null,
       availability: toAvailability(metas.get("product:availability")),
       selectedVariant: [],
-      extractedAt: new Date().toISOString(),
+      extractedAt,
       partial: !Boolean(title && imageUrl && price != null),
       confidence: {
         title: title ? 0.7 : 0,
@@ -881,6 +940,8 @@ class GenericHtmlProvider implements ProductProvider {
     const title = getTitle(html);
     const metas = parseMetaTags(html);
     const imageUrl = metas.get("og:image") ?? html.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i)?.[1] ?? null;
+    const extractedAt = new Date().toISOString();
+    const pricing = extractPricingFromHtml(html, extractedAt);
     if (!title && !imageUrl) return null;
 
     return {
@@ -895,18 +956,19 @@ class GenericHtmlProvider implements ProductProvider {
       description: metas.get("description") ?? null,
       imageUrl,
       imageUrls: imageUrl ? [imageUrl] : [],
-      currentPriceInCents: null,
-      originalPriceInCents: null,
-      currency: null,
+      currentPriceInCents: pricing.currentPrice == null ? null : Math.round(pricing.currentPrice * 100),
+      originalPriceInCents: pricing.previousPrice == null ? null : Math.round(pricing.previousPrice * 100),
+      pricing,
+      currency: "BRL",
       availability: "unknown",
       selectedVariant: [],
-      extractedAt: new Date().toISOString(),
+      extractedAt,
       partial: true,
       confidence: {
         title: title ? 0.5 : 0,
         description: metas.get("description") ? 0.45 : 0,
         image: imageUrl ? 0.45 : 0,
-        price: 0,
+        price: pricing.currentPrice != null ? 0.55 : 0,
         variant: 0,
       },
       warnings: [],
@@ -923,7 +985,10 @@ function extractFromStructuredData(url: URL, html: string): ProductExtractionRes
   const offer = Array.isArray(selected.offers) ? selected.offers[0] : selected.offers;
   const offerPrices = extractOfferPrices(selected.offers);
   const currentPriceInCents = parseMoneyToCents(offerPrices.price);
+  const originalPriceInCents = parseMoneyToCents(offerPrices.originalPrice);
   const imageUrls = normalizeImages(selected.image);
+  const extractedAt = new Date().toISOString();
+  const htmlPricing = extractPricingFromHtml(html, extractedAt);
   const canonicalUrl =
     (typeof selected.url === "string" && selected.url) ||
     (offer && typeof offer.url === "string" && offer.url) ||
@@ -944,11 +1009,16 @@ function extractFromStructuredData(url: URL, html: string): ProductExtractionRes
     imageUrl: imageUrls[0] ?? null,
     imageUrls,
     currentPriceInCents,
-    originalPriceInCents: parseMoneyToCents(offerPrices.originalPrice),
+    originalPriceInCents,
+    pricing: mergePricing({
+      ...emptyPricing("structured_data", extractedAt),
+      currentPrice: currentPriceInCents == null ? null : currentPriceInCents / 100,
+      previousPrice: originalPriceInCents == null ? null : originalPriceInCents / 100,
+    }, htmlPricing),
     currency: offerPrices.currency,
     availability: toAvailability(offerPrices.availability),
     selectedVariant: [],
-    extractedAt: new Date().toISOString(),
+    extractedAt,
     // Antes isso checava só a existência de `offers`. A Amazon devolve `offers`
     // com `price` nulo, então o resultado se declarava completo sem preço.
     partial: !(selected.name && imageUrls[0] && currentPriceInCents != null),
