@@ -42,6 +42,7 @@ import {
   createWishlist,
   addListTemplateItem,
   createWishlistFromTemplate,
+  deleteGift,
   deleteListTemplate,
   deleteListTemplateItem,
   deleteWishlist,
@@ -543,6 +544,7 @@ function App() {
   const [deleteListConfirmOpen, setDeleteListConfirmOpen] = useState(false);
   const [alertTarget, setAlertTarget] = useState<LocalWish | DbWish | null>(null);
   const [completeWishTarget, setCompleteWishTarget] = useState<LocalWish | DbWish | null>(null);
+  const [editWishTarget, setEditWishTarget] = useState<LocalWish | DbWish | null>(null);
   const [shareSheet, setShareSheet] = useState<{ url: string; title: string } | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -1575,6 +1577,123 @@ function App() {
     setCompleteWishTarget(null);
     setSyncError("");
     setAuthMessage("Desejo atualizado.");
+  }
+
+  async function handleEditWish(
+    wish: LocalWish | DbWish,
+    values: { title: string; note: string; productUrl: string; imageUrl: string; priceText: string; priority: Priority },
+  ) {
+    const title = values.title.trim();
+    if (!title) {
+      setSyncError("Informe o nome do desejo.");
+      return;
+    }
+
+    const priceInCents = parsePriceInputToCents(values.priceText);
+    if (values.priceText.trim() && priceInCents == null) {
+      setSyncError("Informe um preço válido ou deixe o campo em branco.");
+      return;
+    }
+    const productUrl = values.productUrl.trim();
+    const imageUrl = values.imageUrl.trim();
+
+    if (isRemoteMode && !isLocalWish(wish)) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+        await updateGift({
+          giftId: wish.id,
+          name: title,
+          description: values.note.trim() || null,
+          storeUrl: productUrl || null,
+          imageUrl: imageUrl || null,
+          ...(values.priceText.trim() ? { priceInCents } : {}),
+          currency: getWishCurrency(wish),
+          priority: mapPriorityToDb(values.priority),
+        });
+        if (remote.selectedWishlistId) {
+          const gifts = await loadWishlistGifts(remote.selectedWishlistId);
+          setRemote((current) => ({ ...current, gifts }));
+        }
+        setEditWishTarget(null);
+        setAuthMessage("Desejo atualizado.");
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    setLocalWishes((current) =>
+      current.map((item) =>
+        getWishId(item) === getWishId(wish)
+          ? {
+              ...item,
+              title,
+              status: values.note.trim() || item.status,
+              originalUrl: productUrl || item.originalUrl,
+              resolvedUrl: productUrl || item.resolvedUrl,
+              image: imageUrl || item.image,
+              price: priceInCents != null ? formatCurrency(priceInCents / 100, "BRL") : item.price,
+              priority: values.priority,
+            }
+          : item,
+      ),
+    );
+    setEditWishTarget(null);
+    setSyncError("");
+    setAuthMessage("Desejo atualizado.");
+  }
+
+  async function handleMarkWishPurchased(wish: LocalWish | DbWish) {
+    if (isRemoteMode && !isLocalWish(wish)) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+        await updateGift({ giftId: wish.id, status: "purchased" });
+        if (remote.selectedWishlistId) {
+          const gifts = await loadWishlistGifts(remote.selectedWishlistId);
+          setRemote((current) => ({ ...current, gifts }));
+        }
+        setAuthMessage("Desejo marcado como comprado.");
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    setLocalWishes((current) =>
+      current.map((item) => (getWishId(item) === getWishId(wish) ? { ...item, status: "Comprado" } : item)),
+    );
+    setAuthMessage("Desejo marcado como comprado.");
+  }
+
+  async function handleDeleteWish(wish: LocalWish | DbWish) {
+    if (!window.confirm(`Excluir "${getWishTitle(wish)}" da lista?`)) return;
+
+    if (isRemoteMode && !isLocalWish(wish)) {
+      try {
+        setSyncing(true);
+        setSyncError("");
+        await deleteGift(wish.id);
+        if (remote.selectedWishlistId) {
+          const gifts = await loadWishlistGifts(remote.selectedWishlistId);
+          setRemote((current) => ({ ...current, gifts }));
+        }
+        setAuthMessage("Desejo excluído.");
+      } catch (error) {
+        setSyncError(getErrorMessage(error));
+      } finally {
+        setSyncing(false);
+      }
+      return;
+    }
+
+    setLocalWishes((current) => current.filter((item) => getWishId(item) !== getWishId(wish)));
+    setAuthMessage("Desejo excluído.");
   }
 
   async function handleDeleteList() {
@@ -2761,6 +2880,9 @@ function App() {
             isRemoteMode={isRemoteMode}
             onSelectWishlist={(wishlistId) => void handleSelectRemoteWishlist(wishlistId)}
             onBuyWish={(wish) => void handleBuyWish(wish)}
+            onEditWish={(wish) => setEditWishTarget(wish)}
+            onMarkWishPurchased={(wish) => void handleMarkWishPurchased(wish)}
+            onDeleteWish={(wish) => void handleDeleteWish(wish)}
             onShare={() => void handleShareCurrentList()}
             sharing={sharing}
             onEditList={beginEditListFlow}
@@ -2956,6 +3078,15 @@ function App() {
         />
       )}
 
+      {editWishTarget && (
+        <EditWishDialog
+          wish={editWishTarget}
+          saving={syncing}
+          onSave={(values) => void handleEditWish(editWishTarget, values)}
+          onClose={() => setEditWishTarget(null)}
+        />
+      )}
+
       {alertTarget && (
         <PriceAlertDialog
           wish={alertTarget}
@@ -3073,6 +3204,83 @@ function CompleteWishDialog({
             </button>
             <button className="primary-button full" type="submit" disabled={saving || !hasSomethingToSave}>
               {saving ? "Salvando..." : "Salvar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditWishDialog({
+  wish,
+  saving,
+  onSave,
+  onClose,
+}: {
+  wish: LocalWish | DbWish;
+  saving: boolean;
+  onSave: (values: { title: string; note: string; productUrl: string; imageUrl: string; priceText: string; priority: Priority }) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(getWishTitle(wish));
+  const [note, setNote] = useState(isLocalWish(wish) ? wish.status ?? "" : wish.description ?? "");
+  const [productUrl, setProductUrl] = useState(getWishEditableUrl(wish));
+  const [imageUrl, setImageUrl] = useState(getWishImageUrlRaw(wish));
+  const amount = getWishAmount(wish);
+  const [priceText, setPriceText] = useState(amount == null ? "" : formatCurrency(amount, getWishCurrency(wish)));
+  const [priority, setPriority] = useState<Priority>(getWishPriorityLabel(wish) ?? "Baixa");
+
+  return (
+    <div className="reserve-dialog-backdrop" onClick={saving ? undefined : onClose}>
+      <div
+        className="reserve-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Editar ${getWishTitle(wish)}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="reserve-dialog-header">
+          <div>
+            <p className="label">Editar desejo</p>
+            <h2>{getWishTitle(wish)}</h2>
+          </div>
+          <button className="icon-button" type="button" onClick={onClose} aria-label="Fechar" disabled={saving}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <form
+          className="reserve-dialog-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave({ title, note, productUrl, imageUrl, priceText, priority });
+          }}
+        >
+          <Field label="Nome" placeholder="Nome do produto" value={title} onChange={setTitle} />
+          <Field label="Observação" placeholder="Tamanho, cor ou qualquer detalhe" textarea value={note} onChange={setNote} />
+          <Field label="Link do produto" placeholder="https://..." value={productUrl} onChange={setProductUrl} />
+          <Field label="Link da imagem" placeholder="https://..." value={imageUrl} onChange={setImageUrl} />
+          <Field label="Preço" placeholder="189,90" value={priceText} onChange={setPriceText} />
+          <div className="priority-selector">
+            {(["Alta", "Media", "Baixa"] as Priority[]).map((option) => (
+              <button
+                key={option}
+                className={priority === option ? "active" : ""}
+                type="button"
+                onClick={() => setPriority(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+
+          <div className="field-row">
+            <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button className="primary-button full" type="submit" disabled={saving || !title.trim()}>
+              {saving ? "Salvando..." : "Salvar alterações"}
             </button>
           </div>
         </form>
@@ -4409,6 +4617,9 @@ function ListScreen({
   isRemoteMode,
   onSelectWishlist,
   onBuyWish,
+  onEditWish,
+  onMarkWishPurchased,
+  onDeleteWish,
   onShare,
   sharing,
   onEditList,
@@ -4427,6 +4638,9 @@ function ListScreen({
   isRemoteMode: boolean;
   onSelectWishlist: (wishlistId: string) => void;
   onBuyWish: (wish: LocalWish | DbWish) => void;
+  onEditWish: (wish: LocalWish | DbWish) => void;
+  onMarkWishPurchased: (wish: LocalWish | DbWish) => void;
+  onDeleteWish: (wish: LocalWish | DbWish) => void;
   onShare: () => void;
   sharing: boolean;
   onEditList: () => void;
@@ -4488,6 +4702,9 @@ function ListScreen({
                 onTrack={() => onEditAlert(wish)}
                 onBuy={() => onBuyWish(wish)}
                 onComplete={() => onCompleteWish(wish)}
+                onEdit={() => onEditWish(wish)}
+                onMarkPurchased={() => onMarkWishPurchased(wish)}
+                onDelete={() => onDeleteWish(wish)}
               />
             ))}
           </div>
@@ -6554,20 +6771,27 @@ function WishCard({
   onTrack,
   onBuy,
   onComplete,
+  onEdit,
+  onMarkPurchased,
+  onDelete,
 }: {
   wish: LocalWish | DbWish;
   alert: PriceAlert | undefined;
   onTrack: () => void;
   onBuy: () => void;
   onComplete: () => void;
+  onEdit: () => void;
+  onMarkPurchased: () => void;
+  onDelete: () => void;
 }) {
   const incomplete = isWishIncomplete(wish);
   const isMercadoLivre = getWishProvider(wish) === "mercado_livre";
   const tracked = Boolean(alert);
   const alertStatus = getPriceAlertStatus(wish, alert);
+  const isPurchased = getWishStatus(wish) === "Comprado";
 
   return (
-    <article className={`wish-card${isMercadoLivre ? " wish-card--marketplace" : ""}`}>
+    <article className={`wish-card${isMercadoLivre ? " wish-card--marketplace" : ""}${isPurchased ? " wish-card--purchased" : ""}`}>
       <div className="wish-card-media">
         <img src={getWishImage(wish)} alt="" className={isMercadoLivre ? "wish-card-marketplace-image" : ""} />
       </div>
@@ -6576,6 +6800,12 @@ function WishCard({
           <h3>{getWishTitle(wish)}</h3>
           <p>{getWishStore(wish)}</p>
           <span>{getWishPrice(wish)}</span>
+          {isPurchased && (
+            <p className="wish-alert-note is-reached">
+              <Check size={14} />
+              Comprado
+            </p>
+          )}
           {incomplete && (
             <button className="wish-incomplete-note" type="button" onClick={onComplete}>
               <PencilLine size={13} aria-hidden="true" />
@@ -6603,6 +6833,21 @@ function WishCard({
           <button className="secondary-button buy-button" type="button" onClick={onBuy}>
             <ExternalLink size={16} />
             Comprar
+          </button>
+          <button className="icon-button" type="button" onClick={onEdit} aria-label={`Editar ${getWishTitle(wish)}`}>
+            <PencilLine size={16} />
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={onMarkPurchased}
+            aria-label={`Marcar ${getWishTitle(wish)} como comprado`}
+            disabled={isPurchased}
+          >
+            <Check size={16} />
+          </button>
+          <button className="icon-button danger" type="button" onClick={onDelete} aria-label={`Excluir ${getWishTitle(wish)}`}>
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
@@ -6982,7 +7227,7 @@ function buildLocalPublicWishlist(shareId: string, wishes: LocalWish[], title = 
       estimated_price: parsePriceValue(wish.price),
       currency: "BRL",
       priority: mapPriorityToDb(wish.priority ?? "Baixa"),
-      status: wish.status === "Reservado" ? "reserved" : "available",
+      status: wish.status === "Comprado" ? "purchased" : wish.status === "Reservado" ? "reserved" : "available",
       created_at: new Date().toISOString(),
       affiliate_link:
         wish.affiliateStatus === "generated" && wish.affiliateUrl
@@ -7121,6 +7366,7 @@ function getWishImage(wish: LocalWish | DbWish) {
 
 function getWishStatus(wish: LocalWish | DbWish) {
   if ("status" in wish && typeof wish.id === "number") return wish.status;
+  if (wish.status === "purchased") return "Comprado";
   return wish.status === "reserved" ? "Reservado" : undefined;
 }
 
@@ -7151,7 +7397,7 @@ function getWishSavingsAmount(wish: LocalWish | DbWish) {
 }
 
 function getWishPriorityLabel(wish: LocalWish | DbWish) {
-  if ("priority" in wish && typeof wish.id === "number") return wish.priority;
+  if (isLocalWish(wish)) return wish.priority;
   if (wish.priority === "must_have") return "Alta";
   if (wish.priority === "nice_to_have") return "Media";
   return "Baixa";
@@ -7165,6 +7411,11 @@ function getWishPurchaseUrl(wish: LocalWish | DbWish) {
     if (wish.affiliateStatus === "generated" && wish.affiliateUrl) return wish.affiliateUrl;
     return wish.originalUrl;
   }
+}
+
+function getWishEditableUrl(wish: LocalWish | DbWish) {
+  if (isLocalWish(wish)) return wish.originalUrl;
+  return wish.canonical_url || wish.store_url || "";
 }
 
 function formatEventDate(value: string) {

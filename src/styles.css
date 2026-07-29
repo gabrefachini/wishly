@@ -2317,15 +2317,30 @@ button:disabled {
 }
 
 .wish-actions {
-  display: grid;
-  /* Lado a lado mantém o card baixo, para caber mais desejos por tela. */
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .wish-actions button {
+  flex: 1 1 128px;
   padding: 0 10px;
   font-size: 13px;
+}
+
+.wish-actions .icon-button {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+.wish-actions .icon-button.danger {
+  color: #b42318;
+}
+
+.wish-card--purchased {
+  opacity: 0.78;
 }
 
 .wish-copy span {
@@ -3866,7 +3881,6 @@ select {
 
   .wish-list .wish-actions {
     margin-top: auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .hero-list {

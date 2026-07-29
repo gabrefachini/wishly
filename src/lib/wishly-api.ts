@@ -1118,17 +1118,25 @@ function centsToCurrencyUnits(value: number | null | undefined) {
 export async function updateGift(input: {
   giftId: string;
   name?: string;
+  description?: string | null;
+  storeUrl?: string | null;
   imageUrl?: string | null;
   priceInCents?: number | null;
   currency?: string | null;
+  priority?: DbWish["priority"];
+  status?: DbWish["status"];
 }) {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase indisponivel");
 
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name;
+  if (input.description !== undefined) payload.description = input.description?.trim() || null;
+  if (input.storeUrl !== undefined) payload.store_url = input.storeUrl?.trim() || null;
   if (input.imageUrl !== undefined) payload.image_url = input.imageUrl?.trim() || null;
   if (input.currency !== undefined) payload.currency = input.currency || "BRL";
+  if (input.priority !== undefined) payload.priority = input.priority;
+  if (input.status !== undefined) payload.status = input.status;
   if (input.priceInCents !== undefined) {
     payload.estimated_price = centsToCurrencyUnits(input.priceInCents);
   }
@@ -1157,6 +1165,30 @@ export async function updateGift(input: {
   }
 
   return response.data.id as string;
+}
+
+export async function deleteGift(giftId: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase indisponivel");
+
+  const { data, error } = await supabase
+    .from("gifts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", giftId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("deleteGift", error, { giftId });
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error("Não foi possível excluir este desejo. Confirme se a lista é sua.");
+  }
+
+  return data.id as string;
 }
 
 export async function loadAdminAffiliateQueue() {
